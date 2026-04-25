@@ -21,6 +21,7 @@ Determine the active module from ARCHITECTURE.md's Implementation Sequence table
 - Attention Filter — personality-driven content selection and annotation (ARCH_attention_filter.md)
 - Source Ingestion — adapters for content sources including human-share channel (ARCH_source_ingestion.md)
 - Gateway — multi-platform message bus for inbound and outbound (ARCH_gateway.md)
+- Generator + Output Router — content generation and platform routing (ARCH_generator.md)
 - Distillation — tier promotion with RAPTOR clustering and reflect-evolve (ARCH_distillation.md)
 - Orchestrator — activation lifecycle, scheduling, lateral freedom, ambient context (ARCH_orchestrator.md)
 
