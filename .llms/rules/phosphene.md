@@ -23,6 +23,7 @@ Determine the active module from ARCHITECTURE.md's Implementation Sequence table
 - Gateway — multi-platform message bus for inbound and outbound (ARCH_gateway.md)
 - Generator + Output Router — content generation and platform routing (ARCH_generator.md)
 - Distillation — tier promotion with RAPTOR clustering and reflect-evolve (ARCH_distillation.md)
+- Feedback Collector — normalizes feedback signals for distillation calibration (ARCH_feedback_collector.md)
 - Orchestrator — activation lifecycle, scheduling, lateral freedom, ambient context (ARCH_orchestrator.md)
 
 ## Reference Documents (load on demand)
