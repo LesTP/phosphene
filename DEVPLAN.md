@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 1
 phase_title: Core data model and CRUD
-step: 3 of 4
+step: 4 of 4
 mode: Build
 blocked: null
 regime: Build
@@ -31,7 +31,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 1 — Core data model and CRUD
-- **Focus** — Step 4: `get_note` and `update_note`
+- **Focus** — Phase 1 review
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -102,6 +102,7 @@ Status: Complete (2026-04-25).
   - Constructor raises `VaultError` for a path pointing at an existing file.
 
 **Step 4 — `get_note` and `update_note`**
+Status: Complete (2026-04-25).
 - `get_note(note_id: str) -> MemoryNote`:
   - Searches the three tier subdirectories for `<note_id>.md`. Raises `NoteNotFoundError` if absent.
   - Returns the parsed `MemoryNote`. `link_count` reflects outbound links only (Phase 2 will add inbound counting). `decay_deadline` is `None` (Phase 4).
