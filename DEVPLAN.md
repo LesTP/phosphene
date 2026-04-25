@@ -6,7 +6,7 @@ step: 4 of 4
 mode: Build
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan

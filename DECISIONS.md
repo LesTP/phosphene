@@ -41,3 +41,10 @@ Priority: Important
 Decision: Use a single primary model for generation and distillation during the establishment phase (first ~90 days or until Tier 3 has been through at least 3 supersession cycles). After the personality layer is dense enough, rotation across models is acceptable for budget management. Commodity tasks (pre-fetch scoring, parsing, routine classification) may use any model at any time.
 Rationale: The personality system operates at the content/structure level (what gets noticed, what patterns emerge, what claims the personality makes), but the model doing the generation contributes voice-level coloring (sentence rhythm, qualification habits, confidence calibration). During the establishment phase, a consistent model voice makes it easier to distinguish "personality developing" from "model being itself." Once the personality context is strong enough (dense Tier 3, multiple supersession cycles), the content-level personality dominates over model-level style, making rotation safe. Commodity tasks are structurally constrained enough that model personality doesn't leak through.
 Revisit if: A clearly superior model becomes available during the establishment phase (switching primary is fine, just maintain single-model consistency). Or if budget pressure requires rotation earlier — in that case, restrict rotation to the same model family (e.g., Claude Sonnet ↔ Claude Haiku rather than Claude ↔ GPT).
+
+D-6: Memory Store Phase 1 remains CRUD-only
+Date: 2026-04-25 | Status: Closed
+Priority: Important
+Decision: Accept Memory Store Phase 1 as complete without implementing index rebuilds, inbound link counting, embedding persistence/search, graph traversal, density metrics, decay, or supersession.
+Rationale: DEVPLAN Phase 1 explicitly stabilizes the public data model and single-note vault CRUD only. The broader `ARCH_memory_store.md` contract is intentionally phased, and adding later behaviors during review would expand scope beyond the active phase.
+Revisit if: Phase 2 planning changes the index contract or requires Phase 1 storage metadata to be migrated.
