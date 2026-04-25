@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 1
 phase_title: Core data model and CRUD
-step: 2 of 4
+step: 3 of 4
 mode: Build
 blocked: null
 regime: Build
@@ -31,7 +31,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 1 — Core data model and CRUD
-- **Focus** — Step 3: `MemoryStore` constructor and `store_note`
+- **Focus** — Step 4: `get_note` and `update_note`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -85,6 +85,7 @@ Status: Complete (2026-04-25).
   - Special characters in `content` (multiline, unicode, `---` lines, YAML-significant characters) survive round-trip.
 
 **Step 3 — `MemoryStore` constructor and `store_note`**
+Status: Complete (2026-04-25).
 - Create `src/phosphene/memory_store/store.py` with the `MemoryStore` class.
 - `__init__(config: MemoryStoreConfig)`:
   - Creates `vault_path` and the three tier subdirectories if missing.

@@ -11,6 +11,7 @@ from phosphene.memory_store.errors import (
     TitleTooLongError,
     VaultError,
 )
+from phosphene.memory_store.store import MemoryStore
 from phosphene.memory_store.types import (
     DecayReport,
     DensityMetrics,
@@ -31,6 +32,7 @@ __all__ = [
     "IndexEntry",
     "InvalidScoreError",
     "InvalidTierError",
+    "MemoryStore",
     "MemoryNote",
     "MemoryStoreConfig",
     "MemoryStoreError",
