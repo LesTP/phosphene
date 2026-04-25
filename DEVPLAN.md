@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 1
 phase_title: Core data model and CRUD
-step: 1 of 4
+step: 2 of 4
 mode: Build
 blocked: null
 regime: Build
@@ -31,7 +31,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 1 — Core data model and CRUD
-- **Focus** — Step 2: Vault I/O primitives
+- **Focus** — Step 3: `MemoryStore` constructor and `store_note`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -73,6 +73,7 @@ Status: Complete (2026-04-25).
   - Each exception is constructable, raises/catches via its base class, and inherits from `MemoryStoreError`.
 
 **Step 2 — Vault I/O primitives**
+Status: Complete (2026-04-25).
 - Create `src/phosphene/memory_store/vault.py` (module-private — not re-exported from package `__init__`):
   - `generate_note_id(title: str, created_at: datetime) -> str` — `<slug>-<yyyymmddHHMMSS>-<4-char-hash>`. Stable for the same (title, created_at, salt). Slug strips non-alphanumeric, lowercases, joins with hyphens, truncates ≤ 60 chars.
   - `note_path(vault_path: Path, tier: int, note_id: str) -> Path` — returns `<vault>/tier<N>/<note_id>.md`.
