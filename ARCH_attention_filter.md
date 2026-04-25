@@ -26,6 +26,9 @@ class FilterCriterion:
 class AttentionFilterConfig:
     prompt_criteria: list[FilterCriterion]   # personality-derived criteria (from Seeding, updated by Distillation)
     acceptance_threshold: float = 0.3        # minimum composite score for retention [0.0, 1.0]
+    auto_accept_sources: list[str] = field(default_factory=list)
+                                             # sources that bypass acceptance_threshold but still get full annotation
+                                             # e.g., ["human_share"] — human-curated content always enters Tier 1
     density_crossover: float = 3.0           # mean_link_degree at which prompt/structure blend reaches 50/50
     similarity_candidates: int = 20          # how many existing notes to retrieve for friction/connection detection
     llm_config: LLMConfig                    # toolkit/llm_client — for criteria evaluation and annotation
@@ -92,8 +95,8 @@ For each content item, the filter:
    - *Cluster novelty*: whether the content falls within an existing Tier 2 cluster or opens new territory
    - *Unresolvedness affinity*: whether the content engages with notes that have high unresolvedness
 6. **Computes composite score** — weighted combination of prompt and structure scores, blended by prompt_weight/structure_weight.
-7. **Accepts or rejects** based on `acceptance_threshold`.
-8. For accepted items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified.
+7. **Accepts or rejects** based on `acceptance_threshold`. Items from `auto_accept_sources` bypass the threshold but still receive the full annotation pass — importance, unresolvedness, friction, and connections are computed normally.
+8. For accepted items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified. For auto-accepted items, the annotation captures what the system finds interesting *about* the content, even though it was pre-accepted.
 
 ### Default Prompt Criteria
 

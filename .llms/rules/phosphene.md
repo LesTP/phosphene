@@ -19,6 +19,7 @@ Determine the active module from ARCHITECTURE.md's Implementation Sequence table
 - Memory Store — three-tier hierarchical memory (ARCH_memory_store.md)
 - Seeding — corpus-to-personality pipeline (ARCH_seeding.md)
 - Attention Filter — personality-driven content selection and annotation (ARCH_attention_filter.md)
+- Source Ingestion — adapters for content sources including human-share channel (ARCH_source_ingestion.md)
 - Distillation — tier promotion with RAPTOR clustering and reflect-evolve (ARCH_distillation.md)
 - Orchestrator — activation lifecycle, scheduling, lateral freedom, ambient context (ARCH_orchestrator.md)
 
