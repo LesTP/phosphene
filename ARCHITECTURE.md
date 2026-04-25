@@ -105,6 +105,12 @@ Decision: Defer individual ARCH_[module].md files until after Year-in-Search bui
 Rationale: Writing ARCH files against hypothetical toolkit interfaces risks spec drift. Better to write them once toolkit APIs are real, tested code.
 Closed: 2026-04-25. All toolkit modules complete. ARCH_memory_store.md written as first Phosphene module spec.
 
+D-5: Model selection policy — single primary, then rotate
+Date: 2026-04-25 | Status: Open
+Decision: Use a single primary model for generation and distillation during the establishment phase (first ~90 days or until Tier 3 has been through at least 3 supersession cycles). After the personality layer is dense enough, rotation across models is acceptable for budget management. Commodity tasks (pre-fetch scoring, parsing, routine classification) may use any model at any time.
+Rationale: The personality system operates at the content/structure level (what gets noticed, what patterns emerge, what claims the personality makes), but the model doing the generation contributes voice-level coloring (sentence rhythm, qualification habits, confidence calibration). During the establishment phase, a consistent model voice makes it easier to distinguish "personality developing" from "model being itself." Once the personality context is strong enough (dense Tier 3, multiple supersession cycles), the content-level personality dominates over model-level style, making rotation safe. Commodity tasks are structurally constrained enough that model personality doesn't leak through.
+Revisit if: A clearly superior model becomes available during the establishment phase (switching primary is fine, just maintain single-model consistency). Or if budget pressure requires rotation earlier — in that case, restrict rotation to the same model family (e.g., Claude Sonnet ↔ Claude Haiku rather than Claude ↔ GPT).
+
 ## Provisional Contracts
 
 - **Memory Store ↔ Attention Filter density metrics** — resolved in ARCH_memory_store.md. The `get_density_metrics()` method returns note count, mean link degree, cluster count, unresolved count, and max unresolvedness. The Attention Filter uses these to compute its prompt-to-structure blend weight.
