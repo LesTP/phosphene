@@ -2,8 +2,8 @@
 module: MEMORY_STORE
 phase: 1
 phase_title: Core data model and CRUD
-step: 0 of 4
-mode: Discuss
+step: 1 of 4
+mode: Build
 blocked: null
 regime: Build
 review_done: false
@@ -31,7 +31,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 1 — Core data model and CRUD
-- **Focus** — Step 1: Project bootstrap, types module, errors module
+- **Focus** — Step 2: Vault I/O primitives
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -62,6 +62,7 @@ Four-phase plan (matching ARCH_memory_store.md public API surface). Phases 2–4
 #### Steps
 
 **Step 1 — Project bootstrap, types, and errors**
+Status: Complete (2026-04-25).
 - Create `pyproject.toml` (Python 3.12+, deps: `numpy`, `pyyaml`; dev deps: `pytest`).
 - Create `src/phosphene/memory_store/__init__.py` exporting the public surface.
 - Create `src/phosphene/memory_store/types.py` with every dataclass from `ARCH_memory_store.md` §Public API → Types: `MemoryStoreConfig`, `NoteInput`, `MemoryNote`, `IndexEntry`, `DensityMetrics`, `PersonalityContext`, `NoteQuery`, `NotePatch`, `DecayReport`. Field names, types, and defaults must match the ARCH exactly.
