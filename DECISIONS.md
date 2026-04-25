@@ -1,0 +1,43 @@
+# Phosphene — Decision Log
+
+<!-- Record non-trivial design and implementation decisions here.
+     Use the full template for genuine design forks with trade-offs.
+     For reactive decisions during Refine work, a one-line note in
+     the DEVLOG is sufficient — don't over-use this file.
+
+     Once Closed, don't reopen unless new evidence appears. -->
+
+D-1: Toolkit as external dependency
+Date: 2026-04-04 | Status: Closed
+Priority: Critical
+Decision: Shared modules (embedding, clustering, llm_client, telegram_client) live in a separate toolkit project. Phosphene imports from toolkit.
+Rationale: Confirmed overlap with Year-in-Search and TGBot. Building shared modules once, tested by multiple consumers, avoids reinvention.
+Revisit if: Toolkit interfaces prove too generic for Phosphene's specific needs and the abstraction cost exceeds the reuse benefit.
+
+D-2: Ambient streams bypass Attention Filter
+Date: 2026-04-04 | Status: Closed
+Priority: Important
+Decision: Environmental context (time, budget, interaction recency) is injected as ambient data available to all modules, not filtered through the Attention Filter as content.
+Rationale: Ambient streams are enclosure conditions, not foraging material. Filtering them would subject them to personality-shaped selection, defeating their purpose as environmental context the personality develops within.
+Revisit if: The system develops a genuine need to selectively attend to environmental data (currently no evidence this is needed).
+
+D-3: Per-activation lateral freedom, not scheduled free play only
+Date: 2026-04-04 | Status: Closed
+Priority: Important
+Decision: Every activation carries a small free-play budget for lateral movement. Dedicated free-play activations also exist, triggered by tension thresholds.
+Rationale: Spontaneity for a discontinuous system means unpredicted lateral movement within an activation. A separate free-play schedule would make all "spontaneous" outputs actually scheduled.
+Revisit if: Lateral movement consistently prevents scheduled tasks from completing, indicating the budget is too large or the mechanism needs throttling.
+
+D-4: No individual ARCH files yet
+Date: 2026-04-04 | Status: Closed
+Priority: Critical
+Decision: Defer individual ARCH_[module].md files until after Year-in-Search builds the toolkit modules.
+Rationale: Writing ARCH files against hypothetical toolkit interfaces risks spec drift. Better to write them once toolkit APIs are real, tested code.
+Closed: 2026-04-25. All toolkit modules complete. All 10 ARCH files written.
+
+D-5: Model selection policy — single primary, then rotate
+Date: 2026-04-25 | Status: Open
+Priority: Important
+Decision: Use a single primary model for generation and distillation during the establishment phase (first ~90 days or until Tier 3 has been through at least 3 supersession cycles). After the personality layer is dense enough, rotation across models is acceptable for budget management. Commodity tasks (pre-fetch scoring, parsing, routine classification) may use any model at any time.
+Rationale: The personality system operates at the content/structure level (what gets noticed, what patterns emerge, what claims the personality makes), but the model doing the generation contributes voice-level coloring (sentence rhythm, qualification habits, confidence calibration). During the establishment phase, a consistent model voice makes it easier to distinguish "personality developing" from "model being itself." Once the personality context is strong enough (dense Tier 3, multiple supersession cycles), the content-level personality dominates over model-level style, making rotation safe. Commodity tasks are structurally constrained enough that model personality doesn't leak through.
+Revisit if: A clearly superior model becomes available during the establishment phase (switching primary is fine, just maintain single-model consistency). Or if budget pressure requires rotation earlier — in that case, restrict rotation to the same model family (e.g., Claude Sonnet ↔ Claude Haiku rather than Claude ↔ GPT).
