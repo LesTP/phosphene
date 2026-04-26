@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 2
 phase_title: Index layer and queries
-step: 1 of 3
+step: 2 of 3
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 2 — Index layer and queries
-- **Focus** — Step 1: in-memory index + rebuild on init + `get_index`
+- **Focus** — Step 2: inbound link counts on `MemoryNote`; retrofit `get_note`/`update_note` via index
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -48,7 +48,7 @@ Four-phase plan (matching ARCH_memory_store.md public API surface). Phases 3–4
 
 Regime: Build. Three steps. Each step ends with passing `tests/memory_store` and a commit.
 
-**Step 1 — Index data model, rebuild on init, `get_index`**
+**Step 1 (complete) — Index data model, rebuild on init, `get_index`**
 
 - New private module `phosphene.memory_store.index` exposing an `Index` object that owns:
   - `entries: dict[note_id → IndexEntry-shaped record]` (carries tier, title, importance, unresolvedness, tags, source, created_at, outbound link list, plus the markdown path so `get_note` can locate the file without a directory scan).

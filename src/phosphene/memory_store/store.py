@@ -13,7 +13,14 @@ from phosphene.memory_store.errors import (
     TitleTooLongError,
     VaultError,
 )
-from phosphene.memory_store.types import MemoryNote, MemoryStoreConfig, NoteInput, NotePatch
+from phosphene.memory_store.index import Index
+from phosphene.memory_store.types import (
+    IndexEntry,
+    MemoryNote,
+    MemoryStoreConfig,
+    NoteInput,
+    NotePatch,
+)
 from phosphene.memory_store.vault import generate_note_id, note_path, parse_note, serialize_note
 
 _VALID_TIERS = {1, 2, 3}
@@ -27,8 +34,10 @@ class MemoryStore:
         self.config = config
         self.vault_path = Path(config.vault_path)
         self.embedding_path = Path(config.embedding_path) if config.embedding_path else None
+        self._index = Index()
 
         self._ensure_vault()
+        self._rebuild_index()
 
     def store_note(self, note: NoteInput) -> str:
         """Persist a note and return its generated note id."""
@@ -62,7 +71,20 @@ class MemoryStore:
 
         path = note_path(self.vault_path, note.tier, note_id)
         path.write_text(serialize_note(memory_note), encoding="utf-8")
+        self._index.register(memory_note, path)
         return note_id
+
+    def get_index(self, tier: int | None = None) -> list[IndexEntry]:
+        """Return lightweight index entries sorted by creation time descending."""
+        if tier is not None:
+            _validate_tier(tier)
+
+        entries = [
+            self._index.to_index_entry(note_id)
+            for note_id, entry in self._index.entries.items()
+            if tier is None or entry.tier == tier
+        ]
+        return sorted(entries, key=lambda entry: entry.created_at, reverse=True)
 
     def get_note(self, note_id: str) -> MemoryNote:
         """Load a note by id from any tier."""
@@ -101,6 +123,7 @@ class MemoryStore:
         note.updated_at = updated_at
 
         path.write_text(serialize_note(note), encoding="utf-8")
+        self._index.register(note, path)
         return note
 
     def _ensure_vault(self) -> None:
@@ -123,6 +146,12 @@ class MemoryStore:
             if path.exists():
                 return path
         raise NoteNotFoundError(f"note not found: {note_id}")
+
+    def _rebuild_index(self) -> None:
+        for tier in sorted(_VALID_TIERS):
+            for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
+                note = parse_note(path.read_text(encoding="utf-8"))
+                self._index.register(note, path)
 
 
 def _validate_tier(tier: int) -> None:
