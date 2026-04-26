@@ -16,6 +16,8 @@
 | Feedback Collector | Normalizes signals from all platforms into common format. Intent-aware interpretation. | Memory Store (write: feedback events) |
 | Scheduler | Activation management: cron triggers, tension-responsive frequency, lateral-freedom budget allocation, ambient stream assembly. | Memory Store (read: tension metrics) |
 | Orchestrator | Wires all modules. Manages activation lifecycle: trigger → load context → execute task → lateral opportunity → output → log. | All modules |
+| Reviewer Panel *(deferred — flexible scope, see below)* | Multi-model evaluation of Generator outputs against personality criteria. Produces signals for the Feedback Collector. | toolkit/llm_client (multiple model handles), Generator (consumes outputs), Memory Store (read: personality context for evaluation criteria) |
+| Model Router *(deferred — flexible scope, see below)* | Routes LLM calls across providers/subscriptions to realize the union-of-subscriptions cost model. Sits as a thin layer in front of toolkit/llm_client. | toolkit/llm_client |
 
 ## Data Flow
 
@@ -67,6 +69,17 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 | 8 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Not started |
 | 9 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
 | 10 | Scheduler + Orchestrator | Full activation lifecycle: tension-responsive scheduling, lateral-freedom budget, ambient stream injection. Last because it requires all other modules. | Not started |
+
+### Flexible / Deferred Components
+
+The following are in PROJECT.md's flexible-scope `[in]` set but have no numbered slot in the Implementation Sequence above. They will be promoted (assigned a build order, given an `ARCH_*.md` file, and added to the active sequence) when the operational pressure that motivates them becomes real.
+
+| Module | Promote when | Status |
+|--------|--------------|--------|
+| Reviewer Panel | Generator outputs are landing on real channels and a single-model evaluation signal is no longer enough (e.g., systematic bias suspected, or feedback-loop calibration needs cross-model corroboration). | Deferred — flexible scope. ARCH file not yet written. |
+| Model Router | Subscription rotation moves from a configuration-time choice to a runtime concern (e.g., a single subscription's daily cap is hit during a normal day, or multi-provider routing is needed inside a single activation). | Deferred — flexible scope. ARCH file not yet written. |
+
+Both are flagged as load-bearing for downstream concerns (Reviewer Panel for `Reviewer Panel Calibration` in PROJECT.md Risks; Model Router for the `Subscription rotation strategy` cost model in Constraints), so the deferral is about timing, not importance. See D-10.
 
 ## Coupling Notes
 
