@@ -101,3 +101,13 @@ Contract changes: None
 Retrofitted `MemoryStore.get_note` and `MemoryStore.update_note` to resolve notes through the in-memory index path rather than scanning tier directories. Returned `MemoryNote.link_count` now reflects inbound plus outbound links while markdown frontmatter remains outbound-only, preserving stable disk round trips. `update_note` writes the outbound-only count, refreshes the index, and returns the inbound-augmented note.
 
 Extended `tests/memory_store/test_index.py` for `get_note` inbound counts, link-removal propagation through `update_note`, and restart recovery after deliberate in-memory inbound-count drift. Existing CRUD missing-note and outbound-only fixture behavior remains covered. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` under Python 3.11.2 using the repo-local dependency target documented in DEVPLAN.
+
+### Step 3: `query_notes`
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented `MemoryStore.query_notes` against the in-memory index, including tier validation, index-side filtering for tier, minimum scores, tags, source, and created-at windows, full note loading for matches, inbound-augmented `link_count`, validated ordering, descending/ascending sort direction, and limit truncation.
+
+Added `tests/memory_store/test_query.py` with fixed-timestamp vault fixtures spanning all tiers. Coverage includes each independent filter, combined filters, all supported ordering fields in both directions, limit behavior, invalid tier and invalid `order_by` rejection, empty result sets, and returned-note link counts. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` under Python 3.11.2 using the repo-local dependency target documented in DEVPLAN.

@@ -20,6 +20,7 @@ from phosphene.memory_store.types import (
     MemoryStoreConfig,
     NoteInput,
     NotePatch,
+    NoteQuery,
 )
 from phosphene.memory_store.vault import generate_note_id, note_path, parse_note, serialize_note
 
@@ -89,6 +90,36 @@ class MemoryStore:
     def get_note(self, note_id: str) -> MemoryNote:
         """Load a note by id from any tier."""
         return self._load_note(note_id)
+
+    def query_notes(self, query: NoteQuery) -> list[MemoryNote]:
+        """Return full notes matching the query filters."""
+        if query.tier is not None:
+            _validate_tier(query.tier)
+
+        valid_order_fields = {"created_at", "importance", "unresolvedness", "link_count"}
+        if query.order_by not in valid_order_fields:
+            raise ValueError(f"order_by must be one of {sorted(valid_order_fields)}")
+
+        matching_ids = [
+            note_id
+            for note_id, entry in self._index.entries.items()
+            if (query.tier is None or entry.tier == query.tier)
+            and (query.min_importance is None or entry.importance >= query.min_importance)
+            and (
+                query.min_unresolvedness is None
+                or entry.unresolvedness >= query.min_unresolvedness
+            )
+            and (query.tags is None or bool(set(query.tags) & set(entry.tags)))
+            and (query.source is None or entry.source == query.source)
+            and (query.since is None or entry.created_at >= query.since)
+            and (query.until is None or entry.created_at <= query.until)
+        ]
+        notes = [self._load_note(note_id) for note_id in matching_ids]
+        notes.sort(
+            key=lambda note: getattr(note, query.order_by),
+            reverse=query.descending,
+        )
+        return notes[: query.limit]
 
     def update_note(self, note_id: str, patch: NotePatch) -> MemoryNote:
         """Apply a partial update to a note and return the updated note."""
