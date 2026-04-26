@@ -1,7 +1,7 @@
 # Worker Spec — Backend-Agnostic Contract
 
 This document defines the universal contract that every worker backend must obey.
-Backend-specific adapters (Claude `CLAUDE.md`, Codex `AGENTS.md`, etc.) translate
+Backend-specific adapters (Claude `CLAUDE.md`, Codex `CODEX.md`, etc.) translate
 this contract into model-native phrasing. Adapters differ in **phrasing**, not
 **behavior**.
 

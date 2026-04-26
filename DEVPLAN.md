@@ -27,6 +27,7 @@ review_done: true
   - All 10 ARCH files define contracts — implementation must match signatures exactly
   - Model selection policy D-5: single primary model during establishment phase (~90 days)
   - NTFS drives: use `bash script.sh`, not `./script.sh`
+  - **Test environment** — system Python is 3.11.2 with no pytest; `pip install --user` is blocked (externally-managed-environment); `python3 -m venv .venv` creates binaries that can't run on this NTFS-3G mount (no exec bits, can't chmod). Working pattern: `pip install --target .python_deps` (already pre-installed in repo root) and run with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`. Do NOT recreate `.venv` or reinstall — `.python_deps/` is gitignored and persists.
 
 ## Current Status
 

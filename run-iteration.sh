@@ -38,7 +38,7 @@ fi
 # ============================================================
 # CUSTOMIZE: Set this to your project's absolute path
 # ============================================================
-PROJECT_DIR="{{PROJECT_DIR}}"
+PROJECT_DIR="/home/claude/workspace/phosphene"
 # ============================================================
 
 LOG_DIR="$PROJECT_DIR/logs/loop"
