@@ -77,6 +77,7 @@ Regime: Build. Three steps. Each step ends with passing `tests/memory_store` and
   - `update_note` removing links decrements the prior targets' inbound counts (visible via subsequent `get_note(target).link_count`)
   - `get_note` on a missing id raises `NoteNotFoundError` (still); behavior preserved through retrofit
   - existing `test_crud.py` cases continue to pass — their fixtures link to non-existent ids, so inbound for the round-trip note remains 0 and `link_count` equals outbound count.
+  - **Index-drift recovery (regression guard for D-11):** mutate `MemoryStore._index.inbound` to a deliberately wrong value, instantiate a new `MemoryStore` on the same vault, and assert the rebuilt inbound counts match the on-disk truth. Guards against silent drift if a future write path forgets to update the index — restart corrects it.
 
 **Step 3 — `query_notes`**
 
