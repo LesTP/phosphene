@@ -213,7 +213,7 @@ After `distill_t2_to_t3` returns an `EvolutionResult`:
 
 - **Schedule state**: active cron entries, next-fire times. In-memory, derived from config.
 - **Budget tracking**: tokens used today, banked budget from quiet days. Persisted to a metadata file in the Memory Store vault (alongside distillation timestamps).
-- **Interaction tracker**: timestamp of last human interaction (from Gateway). In-memory, reset on restart.
+- **Interaction tracker**: timestamp of last human interaction (from Gateway). Persisted alongside budget tracking in the Memory Store vault metadata file. Loaded on init; written on each Gateway `on_message` event. Surviving restarts is a hard requirement — `AmbientContext.time_since_last_interaction` is a core enclosure signal and must not silently reset to None on process restart (per D-9).
 - **Running flag**: whether the main loop is active. In-memory.
 
 The Orchestrator does not own any content state — all content lives in Memory Store. Budget and schedule metadata are lightweight operational state.
