@@ -40,7 +40,7 @@ review_done: true
 Four-phase plan (matching ARCH_memory_store.md public API surface). Phases 2–4 are sketched here for orientation only and will each get their own Phase Plan when reached.
 
 - **Phase 1 (active)** — Core data model and CRUD: types, errors, vault I/O, store/get/update for individual notes.
-- **Phase 2** — Index layer and queries: `get_index`, `query_notes`, inbound link counting.
+- **Phase 2** — Index layer and queries: `get_index`, `query_notes`, inbound link counting. Also retrofits Phase 1 `get_note` and `update_note` to read via the index instead of scanning tier directories (per D-8).
 - **Phase 3** — Embedding search and graph operations: `search_by_embedding`, `add_links`, `get_linked`, `get_personality_context`.
 - **Phase 4** — Decay, supersession, and density metrics: `supersede`, `run_decay`, `get_density_metrics`.
 

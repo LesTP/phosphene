@@ -1,7 +1,7 @@
 # ARCH: Memory Store
 
 ## Purpose
-Three-tier hierarchical memory for Phosphene. Stores notes as Obsidian-compatible markdown with YAML frontmatter and `[[wikilink]]` backlinks. Provides CRUD, graph-based linking, tier-scoped queries, density metrics, embedding-based search, and scheduled decay. All reads go through a lightweight index layer; all writes go through typed APIs. No other module reads or writes note files directly.
+Three-tier hierarchical memory for Phosphene. Stores notes as Obsidian-compatible markdown with YAML frontmatter and `[[wikilink]]` backlinks. Provides CRUD, graph-based linking, tier-scoped queries, density metrics, embedding-based search, and scheduled decay. From Phase 2 onward, reads go through a lightweight index layer; in Phase 1 (CRUD-only), single-note reads scan the tier subdirectories. All writes go through typed APIs. No other module reads or writes note files directly.
 
 ## Public API
 
@@ -115,7 +115,7 @@ class DecayReport:
 - **Signature:** `MemoryStore(config: MemoryStoreConfig)`
 - **Parameters:**
   - config: MemoryStoreConfig — vault path, embedding path, decay windows
-- **Behavior:** Opens (or creates) the vault directory. Rebuilds the index from existing note frontmatter on first initialization; updates incrementally on subsequent writes.
+- **Behavior:** Opens (or creates) the vault directory. From Phase 2 onward, rebuilds the index from existing note frontmatter on first initialization and updates it incrementally on subsequent writes; in Phase 1 the constructor only ensures the vault and tier subdirectories exist.
 - **Errors:**
   - `VaultError` — vault_path is not writable or not a directory
 
