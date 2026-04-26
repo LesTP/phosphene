@@ -28,6 +28,7 @@ class PlatformConfig:
 class InboundMessage:
     content: str                                    # message text
     platform: str                                   # originating platform name
+    message_id: str                                 # platform-assigned ID of THIS message (for threading replies via OutboundMessage.reply_to)
     sender: str                                     # platform-specific sender identifier
     timestamp: datetime
     reply_to: str | None = None                     # message_id this replies to (if threaded)

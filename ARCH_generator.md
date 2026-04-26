@@ -48,6 +48,9 @@ class GeneratorOutput:
     source_note_ids: list[str]                      # personality/pattern note_ids that contributed
     contradictions_noted: list[Contradiction]        # personality claims that conflicted with recent experience
     token_usage: TokenUsage                         # from toolkit/llm_client
+    originating_message_id: str | None = None       # InboundMessage.message_id when output_mode == "response";
+                                                    # consumed by route() to populate OutboundMessage.reply_to.
+                                                    # None for prompted, free_play, and lateral modes.
 
 @dataclass
 class Contradiction:
@@ -125,6 +128,7 @@ class PersonalitySnapshot:
 2. Queries Memory Store for notes relevant to the message content (via `search_by_embedding`).
 3. Constructs LLM prompt with personality snapshot, relevant notes, the message, and ambient context.
 4. Generates a response in the personality's voice.
+5. Sets `GeneratorOutput.originating_message_id = message.message_id` so the Output Router can thread the reply.
 
 ### Skeptical Memory
 
@@ -178,7 +182,7 @@ class LengthThresholds:
    - ≤ `short_max` → `"text"`
    - ≤ `medium_max` → `"markdown"`
    - \> `medium_max` → `"telegraph"`
-3. If `output.output_mode == "response"`, set `reply_to` from the originating message's ID (threading).
+3. If `output.output_mode == "response"`, set `OutboundMessage.reply_to = output.originating_message_id` (threading). The Generator's `respond()` populates this field from `InboundMessage.message_id`; the router never needs the InboundMessage itself.
 4. Construct `OutboundMessage` and call `gateway.send()`.
 
 ## Inputs
