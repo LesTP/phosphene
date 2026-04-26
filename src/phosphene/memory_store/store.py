@@ -88,12 +88,11 @@ class MemoryStore:
 
     def get_note(self, note_id: str) -> MemoryNote:
         """Load a note by id from any tier."""
-        path = self._find_note_path(note_id)
-        return parse_note(path.read_text(encoding="utf-8"))
+        return self._load_note(note_id)
 
     def update_note(self, note_id: str, patch: NotePatch) -> MemoryNote:
         """Apply a partial update to a note and return the updated note."""
-        path = self._find_note_path(note_id)
+        path = self._note_path_from_index(note_id)
         note = parse_note(path.read_text(encoding="utf-8"))
 
         if patch.title is not None:
@@ -122,9 +121,10 @@ class MemoryStore:
             updated_at = note.updated_at + timedelta(seconds=1)
         note.updated_at = updated_at
 
+        note.link_count = len(note.links)
         path.write_text(serialize_note(note), encoding="utf-8")
         self._index.register(note, path)
-        return note
+        return self._with_computed_link_count(note)
 
     def _ensure_vault(self) -> None:
         if self.vault_path.exists() and not self.vault_path.is_dir():
@@ -140,18 +140,26 @@ class MemoryStore:
         if not os.access(self.vault_path, os.W_OK):
             raise VaultError(f"vault path is not writable: {self.vault_path}")
 
-    def _find_note_path(self, note_id: str) -> Path:
-        for tier in sorted(_VALID_TIERS):
-            path = note_path(self.vault_path, tier, note_id)
-            if path.exists():
-                return path
-        raise NoteNotFoundError(f"note not found: {note_id}")
-
     def _rebuild_index(self) -> None:
         for tier in sorted(_VALID_TIERS):
             for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
                 note = parse_note(path.read_text(encoding="utf-8"))
                 self._index.register(note, path)
+
+    def _note_path_from_index(self, note_id: str) -> Path:
+        entry = self._index.entries.get(note_id)
+        if entry is None:
+            raise NoteNotFoundError(f"note not found: {note_id}")
+        return entry.path
+
+    def _load_note(self, note_id: str) -> MemoryNote:
+        path = self._note_path_from_index(note_id)
+        note = parse_note(path.read_text(encoding="utf-8"))
+        return self._with_computed_link_count(note)
+
+    def _with_computed_link_count(self, note: MemoryNote) -> MemoryNote:
+        note.link_count = self._index.inbound_count(note.note_id) + len(note.links)
+        return note
 
 
 def _validate_tier(tier: int) -> None:

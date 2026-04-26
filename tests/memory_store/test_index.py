@@ -172,3 +172,42 @@ def test_inbound_counts_update_after_store_and_update(tmp_path: Path) -> None:
     assert entries[target_id].link_count == 2
     assert entries[first_source_id].link_count == 1
     assert entries[second_source_id].link_count == 1
+
+
+def test_get_note_link_count_includes_inbound_links(tmp_path: Path) -> None:
+    store = make_store(tmp_path)
+    target_id = store.store_note(
+        NoteInput(tier=1, content="Target", title="Target", links=["external"])
+    )
+    store.store_note(NoteInput(tier=1, content="Source", title="Source", links=[target_id]))
+
+    target = store.get_note(target_id)
+
+    assert target.link_count == 2
+
+
+def test_update_note_link_removal_updates_target_get_note_link_count(tmp_path: Path) -> None:
+    store = make_store(tmp_path)
+    target_id = store.store_note(NoteInput(tier=1, content="Target", title="Target"))
+    source_id = store.store_note(
+        NoteInput(tier=1, content="Source", title="Source", links=[target_id])
+    )
+
+    assert store.get_note(target_id).link_count == 1
+
+    updated_source = store.update_note(source_id, NotePatch(links=[]))
+
+    assert updated_source.link_count == 0
+    assert store.get_note(target_id).link_count == 0
+
+
+def test_reinitializing_store_recovers_inbound_counts_from_disk(tmp_path: Path) -> None:
+    vault_path = tmp_path / "vault"
+    store = MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+    target_id = store.store_note(NoteInput(tier=1, content="Target", title="Target"))
+    store.store_note(NoteInput(tier=1, content="Source", title="Source", links=[target_id]))
+    store._index.inbound[target_id] = 99
+
+    rebuilt_store = MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    assert rebuilt_store.get_note(target_id).link_count == 1

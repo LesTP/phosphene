@@ -91,3 +91,13 @@ Contract changes: None
 Implemented the private `phosphene.memory_store.index` module with an `Index` object that tracks note metadata, markdown paths, outbound links, and derived inbound counts. `MemoryStore` now rebuilds the index during construction, refreshes it after `store_note` and `update_note`, raises `VaultError` on duplicate note ids across tier directories, and exposes `get_index(tier=None)` with tier validation, public `IndexEntry` projection, inbound-plus-outbound `link_count`, and newest-first ordering.
 
 Added `tests/memory_store/test_index.py` covering empty vaults, constructor rebuild across tiers, tier filtering and invalid tier errors, immediate store/update visibility, duplicate id detection, and inbound count refresh after link changes. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` under Python 3.11.2 using the repo-local dependency target documented in DEVPLAN.
+
+### Step 2: Inbound link counts on `MemoryNote`; index-backed reads
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Retrofitted `MemoryStore.get_note` and `MemoryStore.update_note` to resolve notes through the in-memory index path rather than scanning tier directories. Returned `MemoryNote.link_count` now reflects inbound plus outbound links while markdown frontmatter remains outbound-only, preserving stable disk round trips. `update_note` writes the outbound-only count, refreshes the index, and returns the inbound-augmented note.
+
+Extended `tests/memory_store/test_index.py` for `get_note` inbound counts, link-removal propagation through `update_note`, and restart recovery after deliberate in-memory inbound-count drift. Existing CRUD missing-note and outbound-only fixture behavior remains covered. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` under Python 3.11.2 using the repo-local dependency target documented in DEVPLAN.

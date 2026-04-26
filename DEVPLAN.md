@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 2
 phase_title: Index layer and queries
-step: 2 of 3
+step: 3 of 3
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 2 — Index layer and queries
-- **Focus** — Step 2: inbound link counts on `MemoryNote`; retrofit `get_note`/`update_note` via index
+- **Focus** — Step 3: `query_notes`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -67,7 +67,7 @@ Regime: Build. Three steps. Each step ends with passing `tests/memory_store` and
   - duplicate `note_id` in two tier directories → constructor raises `VaultError`
   - inbound count: A links to B → B's inbound count = 1; remove via `update_note` → B's inbound count = 0; second source linking B → count = 2.
 
-**Step 2 — Inbound link counts on `MemoryNote`; retrofit `get_note`/`update_note` via index**
+**Step 2 (complete) — Inbound link counts on `MemoryNote`; retrofit `get_note`/`update_note` via index**
 
 - `get_note` resolves the note's path through `index.entries[note_id]` instead of scanning tier subdirectories. Raise `NoteNotFoundError` when the index has no such id. The tier-scan helper `_find_note_path` is removed.
 - `update_note` resolves the path the same way. After mutation, the index entry is refreshed. If `patch.links` is provided, inbound counts are decremented for old targets and incremented for new ones.
