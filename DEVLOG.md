@@ -63,3 +63,21 @@ Findings:
 - Optional: None.
 
 Verification could not run in this container because `pytest` is not installed and the available interpreter is Python 3.11.2 while the project requires Python 3.12+.
+
+### Phase 1 Completion: Core data model and CRUD
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Closed Phase 1 of Memory Store. Final verification ran the full `tests/memory_store` suite via the documented gotcha pattern (`PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`); 49 tests pass. The earlier review entry's "verification could not run" note reflected the pre-gotcha state of this container; the gotcha now lives in the DEVPLAN Cold Start Summary, so future iterations can run the suite directly.
+
+DEVLOG learning review: no trial-and-error patterns across Steps 1–4. Each step landed on first implementation. The only operational friction recorded was the Python 3.11/`.python_deps/` install pattern, which is already captured as a Cold Start Gotcha — no new Gotchas to promote.
+
+Contract Changes scan: every Phase 1 entry recorded "Contract changes: None". `ARCH_memory_store.md` already encodes the deferred Phase 2/3/4 surface; no upstream propagation required.
+
+DEVPLAN cleanup: reduced the Phase 1 detail block to a one-line summary referencing this entry. The four-phase Module 1 outline at the head of the section is preserved for orientation, with Phase 1 marked complete and Phase 2 marked next.
+
+ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "In progress (Phase 1)" to "Phase 1 complete".
+
+Frontmatter reset for next phase: `phase: 2`, `phase_title: Index layer and queries`, `step: null`, `mode: Discuss`, `review_done: false`.
