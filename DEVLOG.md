@@ -203,3 +203,23 @@ Findings:
   - `get_linked` (store.py:258) calls `_load_note(current_id)` during BFS expansion when `self._index.entries[current_id].links` would suffice. Performance-only; the terminal `_load_note` for returned ids is correct since they need full `MemoryNote` materialization.
 
 DEVPLAN frontmatter updated: `review_done: true`. No upstream contract propagation required (Contract Changes scan: every Phase 3 step entry recorded "Contract changes: None"; ARCH already encoded the Phase 3 surface). Phase Complete is the next action.
+
+### Phase 3 Completion: Embedding search and graph operations
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Closed Phase 3 of Memory Store. Final verification ran the full suite with the documented test command: `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 117 tests pass on Python 3.11.2 with `.python_deps`.
+
+DEVLOG learning review: Phase 3 landed linearly across five implementation steps and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas. The optional review cleanups were explicitly skipped in D-12, not failed attempts.
+
+Contract Changes scan: every Phase 3 step and review entry recorded "Contract changes: None". Phase 3 fulfilled the existing `ARCH_memory_store.md` contract for sidecar embeddings, embedding search, graph operations, and personality context loading; no upstream propagation required.
+
+Log review: `logs/loop/summary.log` shows Phase 3 iterations 14-20 completed successfully without repeated tool failures. No transcripts were present under the project tree. No Phase 3 operational Gotchas to promote.
+
+DEVPLAN cleanup: removed the Phase 3 step plan from active DEVPLAN content and left a one-line completion summary referencing this entry. `DEVLOG.md` is 205 lines before this entry, below the archive threshold, so no archive was created.
+
+ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "Phase 2 complete" to "Phase 3 complete".
+
+Frontmatter reset for next phase: `phase: 4`, `phase_title: Decay, supersession, and density metrics`, `step: null`, `mode: Discuss`, `review_done: false`.

@@ -59,7 +59,7 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 
 | Order | Module | Rationale | Status |
 |-------|--------|-----------|--------|
-| 1 | Memory Store | Leaf. Everything depends on it. Three-tier CRUD, index layer, density metrics API. | Phase 2 complete |
+| 1 | Memory Store | Leaf. Everything depends on it. Three-tier CRUD, index layer, density metrics API. | Phase 3 complete |
 | 2 | Seeding | Populates Memory Store with initial content. Enables testing downstream modules against real data. | Not started |
 | 3 | Attention Filter | First module that actively uses Memory Store. Tests the density metrics interface. Core novel mechanism. | Not started |
 | 4 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Start with one adapter (Telegram or RSS). | Not started |
