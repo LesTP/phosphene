@@ -19,6 +19,7 @@ class IndexedNote:
     unresolvedness: float
     tags: list[str]
     source: str | None
+    supersedes: str | None
     created_at: datetime
     links: list[str]
     path: Path
@@ -45,6 +46,7 @@ class Index:
             unresolvedness=note.unresolvedness,
             tags=list(note.tags),
             source=note.source,
+            supersedes=note.supersedes,
             created_at=note.created_at,
             links=list(note.links),
             path=path,

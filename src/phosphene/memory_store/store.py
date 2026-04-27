@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from phosphene.memory_store.types import (
     NoteInput,
     NotePatch,
     NoteQuery,
+    PersonalityContext,
 )
 from phosphene.memory_store.vault import generate_note_id, note_path, parse_note, serialize_note
 
@@ -267,6 +269,28 @@ class MemoryStore:
 
         return [self._load_note(linked_id) for linked_id in linked_ids]
 
+    def get_personality_context(self) -> PersonalityContext:
+        """Return current non-superseded Tier 3 notes with a stable version id."""
+        self._rebuild_index()
+        superseded_ids = {
+            entry.supersedes
+            for entry in self._index.entries.values()
+            if entry.tier == 3 and entry.supersedes is not None
+        }
+        selected_ids = [
+            note_id
+            for note_id, entry in self._index.entries.items()
+            if entry.tier == 3 and note_id not in superseded_ids
+        ]
+        notes = [self._load_note(note_id) for note_id in selected_ids]
+        notes.sort(key=lambda note: note.note_id)
+
+        version_payload = "\0".join(
+            f"{note.note_id}|{note.updated_at.isoformat()}" for note in notes
+        )
+        version_id = hashlib.sha1(version_payload.encode("utf-8")).hexdigest()
+        return PersonalityContext(personality_files=notes, version_id=version_id)
+
     def _ensure_vault(self) -> None:
         if self.vault_path.exists() and not self.vault_path.is_dir():
             raise VaultError(f"vault path is not a directory: {self.vault_path}")
@@ -282,6 +306,7 @@ class MemoryStore:
             raise VaultError(f"vault path is not writable: {self.vault_path}")
 
     def _rebuild_index(self) -> None:
+        self._index = Index()
         for tier in sorted(_VALID_TIERS):
             for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
                 note = parse_note(path.read_text(encoding="utf-8"))

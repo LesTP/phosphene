@@ -2,8 +2,8 @@
 module: MEMORY_STORE
 phase: 3
 phase_title: Embedding search and graph operations
-step: 5 of 5
-mode: Code
+step: null
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 3 — Embedding search and graph operations
-- **Focus** — Step 5: `get_personality_context`
+- **Focus** — Phase 3 review
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -124,7 +124,7 @@ Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and 
   - `NoteNotFoundError` on unknown `note_id`
   - Isolated note returns `[]`
 
-**Step 5 — `get_personality_context`**
+**Step 5 — `get_personality_context`** — Complete. See DEVLOG "Step 5: `get_personality_context`" entry.
 
 - Implement `MemoryStore.get_personality_context() -> PersonalityContext`:
   - Considers Tier 3 notes via the index. A Tier 3 note is **superseded** when some other note's `supersedes` field equals its `note_id`; superseded notes are excluded.

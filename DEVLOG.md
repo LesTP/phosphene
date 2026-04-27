@@ -173,3 +173,13 @@ Contract changes: None
 Implemented graph traversal for `MemoryStore.get_linked`. The method validates depth in the ARCH-defined range, raises `NoteNotFoundError` for unknown origins, performs breadth-first traversal across both outbound links and inbound sources, excludes the origin and already visited notes, ignores dangling outbound ids that are not present in the index, and returns full `MemoryNote` objects through the existing read path so embeddings and inbound-augmented `link_count` are populated.
 
 Added `Index.inbound_for(note_id)` as a private helper exposing inbound source ids from the existing index state. Extended `tests/memory_store/test_links.py` for direct inbound/outbound neighbors, depth-2 and depth-3 traversal, BFS ordering, deduplication across paths, cycles, origin exclusion, invalid depth, missing origins, isolated notes, and returned embeddings/link counts. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 109 tests pass.
+
+### Step 5: `get_personality_context`
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented `MemoryStore.get_personality_context` for current Tier 3 personality files. The method rebuilds the index on each call so it reads the vault fresh, excludes Tier 3 notes superseded by another Tier 3 note's `supersedes` pointer, loads returned notes through the existing read path so embeddings and inbound-augmented `link_count` are populated, and derives a deterministic SHA-1 `version_id` from sorted `note_id|updated_at` pairs.
+
+Extended the private `IndexedNote` record with `supersedes` while leaving the public `IndexEntry` contract unchanged. Added `tests/memory_store/test_personality_context.py` for empty contexts, Tier 3 inclusion, supersession exclusion, Tier 1/2 exclusion, stable and changing version ids, returned embeddings/link counts, and fresh disk reads between calls. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 117 tests pass.
