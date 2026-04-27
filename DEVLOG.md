@@ -111,3 +111,25 @@ Contract changes: None
 Implemented `MemoryStore.query_notes` against the in-memory index, including tier validation, index-side filtering for tier, minimum scores, tags, source, and created-at windows, full note loading for matches, inbound-augmented `link_count`, validated ordering, descending/ascending sort direction, and limit truncation.
 
 Added `tests/memory_store/test_query.py` with fixed-timestamp vault fixtures spanning all tiers. Coverage includes each independent filter, combined filters, all supported ordering fields in both directions, limit behavior, invalid tier and invalid `order_by` rejection, empty result sets, and returned-note link counts. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` under Python 3.11.2 using the repo-local dependency target documented in DEVPLAN.
+
+### Phase 2 Completion: Index layer and queries
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Closed Phase 2 of Memory Store. Final verification ran the full `tests/memory_store` suite via `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 75 tests pass.
+
+Phase 2 delivered the in-memory index layer, startup index rebuild, incremental index refresh after writes, duplicate note-id detection, public `get_index`, index-backed `get_note` and `update_note`, inbound-plus-outbound `MemoryNote.link_count`, restart recovery from in-memory inbound drift, and `query_notes` filtering, ordering, and limiting.
+
+DEVLOG learning review: no trial-and-error implementation pattern appeared across the Phase 2 step entries. Each step recorded successful verification with the documented `.python_deps` test invocation.
+
+Contract Changes scan: Phase 2 entries recorded "Contract changes: None". The phase fulfilled the existing `ARCH_memory_store.md` Phase 2 contract; no upstream document propagation was required.
+
+Log review: the loop log shows one failed Claude iteration caused by an organization monthly usage limit before repository changes were made. The next Codex review iteration reconstructed state from files and completed cleanly. No project gotcha was promoted because this was an external quota interruption, not a repeatable repository workflow issue.
+
+DEVPLAN cleanup: reduced the Phase 2 step plan to a one-line completion summary referencing this entry. The four-phase Module 1 outline remains as the active Memory Store roadmap, with Phase 3 ready for its own Phase Plan.
+
+ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
+
+Frontmatter reset for next phase: `phase: 3`, `phase_title: Embedding search and graph operations`, `step: null`, `mode: Discuss`, `review_done: false`.
