@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 3
 phase_title: Embedding search and graph operations
-step: 3 of 5
+step: 4 of 5
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 3 — Embedding search and graph operations
-- **Focus** — Step 3: `add_links`
+- **Focus** — Step 4: `get_linked`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -88,7 +88,7 @@ Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and 
   - zero-norm query and stored vectors are excluded from results
   - returned notes include loaded embeddings and inbound-augmented `link_count`
 
-**Step 3 — `add_links`**
+**Step 3 — `add_links`** — Complete. See DEVLOG "Step 3: `add_links`" entry.
 
 - Implement `MemoryStore.add_links(source_id: str, target_ids: list[str]) -> None`:
   - Validates that source and every target id exist in the index. If any are missing, raise `NoteNotFoundError` *before* any disk write (atomic — no partial application).

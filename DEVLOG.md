@@ -153,3 +153,13 @@ Contract changes: None
 Implemented `MemoryStore.search_by_embedding` over the existing index and sidecar embedding store. The method validates optional tier filters, returns an empty list when no embedding storage is configured, skips notes without stored vectors, excludes zero-norm query or stored vectors from results, checks vector shapes before comparison, computes cosine similarity with numpy, loads full `MemoryNote` objects through the existing read path, and returns similarity-ranked tuples truncated by `limit`.
 
 Added `tests/memory_store/test_search.py` for cosine ranking, tier filtering, limit truncation, mixed embedded/plain vaults, dimension mismatch errors, missing embedding storage, vaults with no stored embeddings, invalid tier validation, zero-norm exclusion, returned embeddings, and inbound-augmented link counts. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 92 tests pass.
+
+### Step 3: `add_links`
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented `MemoryStore.add_links` for index-validated graph writes. The method treats empty target lists as a no-op, validates the source and all non-self targets before touching disk, preserves existing outbound link order, appends only new target ids, silently drops self-links, refreshes `updated_at` on real changes, serializes the source note, and re-registers it so inbound counts update immediately.
+
+Added `tests/memory_store/test_links.py` covering outbound link addition, duplicate and existing-link deduplication, inbound-plus-outbound link counts, missing-source and missing-target atomicity, empty-list no-op behavior, self-link dropping, and restart reload of augmented links. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 100 tests pass.

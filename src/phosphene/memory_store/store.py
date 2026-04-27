@@ -207,6 +207,38 @@ class MemoryStore:
         note.embedding = self._load_embedding(note_id)
         return self._with_computed_link_count(note)
 
+    def add_links(self, source_id: str, target_ids: list[str]) -> None:
+        """Add outbound links from a source note to existing target notes."""
+        if not target_ids:
+            return
+
+        path = self._note_path_from_index(source_id)
+        for target_id in target_ids:
+            if target_id != source_id:
+                self._note_path_from_index(target_id)
+
+        note = parse_note(path.read_text(encoding="utf-8"))
+        links = list(note.links)
+        seen = set(links)
+        for target_id in target_ids:
+            if target_id == source_id or target_id in seen:
+                continue
+            links.append(target_id)
+            seen.add(target_id)
+
+        if links == note.links:
+            return
+
+        note.links = links
+        updated_at = datetime.now(timezone.utc).replace(microsecond=0)
+        if updated_at <= note.updated_at:
+            updated_at = note.updated_at + timedelta(seconds=1)
+        note.updated_at = updated_at
+        note.link_count = len(note.links)
+
+        path.write_text(serialize_note(note), encoding="utf-8")
+        self._index.register(note, path)
+
     def _ensure_vault(self) -> None:
         if self.vault_path.exists() and not self.vault_path.is_dir():
             raise VaultError(f"vault path is not a directory: {self.vault_path}")
