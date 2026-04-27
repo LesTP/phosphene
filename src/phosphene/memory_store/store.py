@@ -239,6 +239,34 @@ class MemoryStore:
         path.write_text(serialize_note(note), encoding="utf-8")
         self._index.register(note, path)
 
+    def get_linked(self, note_id: str, depth: int = 1) -> list[MemoryNote]:
+        """Return notes reachable through outbound and inbound links."""
+        if depth < 1 or depth > 3:
+            raise ValueError("depth must be between 1 and 3")
+
+        self._note_path_from_index(note_id)
+
+        linked_ids: list[str] = []
+        visited = {note_id}
+        frontier = [note_id]
+
+        for _ in range(depth):
+            next_frontier: list[str] = []
+            for current_id in frontier:
+                current_note = self._load_note(current_id)
+                neighbor_ids = list(current_note.links) + self._index.inbound_for(current_id)
+                for neighbor_id in neighbor_ids:
+                    if neighbor_id in visited or neighbor_id not in self._index.entries:
+                        continue
+                    visited.add(neighbor_id)
+                    linked_ids.append(neighbor_id)
+                    next_frontier.append(neighbor_id)
+            frontier = next_frontier
+            if not frontier:
+                break
+
+        return [self._load_note(linked_id) for linked_id in linked_ids]
+
     def _ensure_vault(self) -> None:
         if self.vault_path.exists() and not self.vault_path.is_dir():
             raise VaultError(f"vault path is not a directory: {self.vault_path}")

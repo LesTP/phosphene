@@ -62,6 +62,14 @@ class Index:
     def inbound_count(self, note_id: str) -> int:
         return self.inbound.get(note_id, 0)
 
+    def inbound_for(self, note_id: str) -> list[str]:
+        """Return note ids that link to the given note id."""
+        return [
+            entry.note_id
+            for entry in self.entries.values()
+            if note_id in entry.links
+        ]
+
     def to_index_entry(self, note_id: str) -> IndexEntry:
         entry = self.entries[note_id]
         return IndexEntry(

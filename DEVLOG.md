@@ -163,3 +163,13 @@ Contract changes: None
 Implemented `MemoryStore.add_links` for index-validated graph writes. The method treats empty target lists as a no-op, validates the source and all non-self targets before touching disk, preserves existing outbound link order, appends only new target ids, silently drops self-links, refreshes `updated_at` on real changes, serializes the source note, and re-registers it so inbound counts update immediately.
 
 Added `tests/memory_store/test_links.py` covering outbound link addition, duplicate and existing-link deduplication, inbound-plus-outbound link counts, missing-source and missing-target atomicity, empty-list no-op behavior, self-link dropping, and restart reload of augmented links. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 100 tests pass.
+
+### Step 4: `get_linked`
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented graph traversal for `MemoryStore.get_linked`. The method validates depth in the ARCH-defined range, raises `NoteNotFoundError` for unknown origins, performs breadth-first traversal across both outbound links and inbound sources, excludes the origin and already visited notes, ignores dangling outbound ids that are not present in the index, and returns full `MemoryNote` objects through the existing read path so embeddings and inbound-augmented `link_count` are populated.
+
+Added `Index.inbound_for(note_id)` as a private helper exposing inbound source ids from the existing index state. Extended `tests/memory_store/test_links.py` for direct inbound/outbound neighbors, depth-2 and depth-3 traversal, BFS ordering, deduplication across paths, cycles, origin exclusion, invalid depth, missing origins, isolated notes, and returned embeddings/link counts. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 109 tests pass.

@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 3
 phase_title: Embedding search and graph operations
-step: 4 of 5
+step: 5 of 5
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 3 — Embedding search and graph operations
-- **Focus** — Step 4: `get_linked`
+- **Focus** — Step 5: `get_personality_context`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -106,7 +106,7 @@ Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and 
   - Self-link target silently dropped
   - Restart (`new MemoryStore` over same vault) reloads the augmented links
 
-**Step 4 — `get_linked`**
+**Step 4 — `get_linked`** — Complete. See DEVLOG "Step 4: `get_linked`" entry.
 
 - Implement `MemoryStore.get_linked(note_id: str, depth: int = 1) -> list[MemoryNote]`:
   - Validates `depth` in `[1, 3]` — `depth < 1` or `depth > 3` raises `ValueError`.
