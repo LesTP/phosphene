@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 3
 phase_title: Embedding search and graph operations
-step: 1 of 5
+step: 2 of 5
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 3 — Embedding search and graph operations
-- **Focus** — Step 1: embedding persistence (retrofit store/update/get/query to round-trip embeddings via `embedding_path`)
+- **Focus** — Step 2: `search_by_embedding`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -48,7 +48,7 @@ Four-phase plan (matching ARCH_memory_store.md public API surface). Phase 4 is s
 
 Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and a commit.
 
-**Step 1 — Embedding persistence (binary storage)**
+**Step 1 — Embedding persistence (binary storage)** — Complete. See DEVLOG "Step 1: Embedding persistence (binary storage)" entry.
 
 - New private module `phosphene.memory_store.embeddings` exposing two helpers backed by `numpy.save` / `numpy.load`:
   - `save_embedding(embedding_path: Path, note_id: str, embedding: ndarray) -> None` — writes `<embedding_path>/<note_id>.npy`. Creates the directory on first use.

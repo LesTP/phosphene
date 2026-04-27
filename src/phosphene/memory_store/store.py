@@ -6,6 +6,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from numpy import ndarray
+
 from phosphene.memory_store.errors import (
     InvalidScoreError,
     InvalidTierError,
@@ -13,6 +15,7 @@ from phosphene.memory_store.errors import (
     TitleTooLongError,
     VaultError,
 )
+from phosphene.memory_store.embeddings import load_embedding, save_embedding
 from phosphene.memory_store.index import Index
 from phosphene.memory_store.types import (
     IndexEntry,
@@ -72,6 +75,7 @@ class MemoryStore:
 
         path = note_path(self.vault_path, note.tier, note_id)
         path.write_text(serialize_note(memory_note), encoding="utf-8")
+        self._save_embedding(note_id, note.embedding)
         self._index.register(memory_note, path)
         return note_id
 
@@ -154,7 +158,9 @@ class MemoryStore:
 
         note.link_count = len(note.links)
         path.write_text(serialize_note(note), encoding="utf-8")
+        self._save_embedding(note_id, patch.embedding)
         self._index.register(note, path)
+        note.embedding = self._load_embedding(note_id)
         return self._with_computed_link_count(note)
 
     def _ensure_vault(self) -> None:
@@ -186,11 +192,21 @@ class MemoryStore:
     def _load_note(self, note_id: str) -> MemoryNote:
         path = self._note_path_from_index(note_id)
         note = parse_note(path.read_text(encoding="utf-8"))
+        note.embedding = self._load_embedding(note_id)
         return self._with_computed_link_count(note)
 
     def _with_computed_link_count(self, note: MemoryNote) -> MemoryNote:
         note.link_count = self._index.inbound_count(note.note_id) + len(note.links)
         return note
+
+    def _save_embedding(self, note_id: str, embedding: ndarray | None) -> None:
+        if self.embedding_path is not None and embedding is not None:
+            save_embedding(self.embedding_path, note_id, embedding)
+
+    def _load_embedding(self, note_id: str) -> ndarray | None:
+        if self.embedding_path is None:
+            return None
+        return load_embedding(self.embedding_path, note_id)
 
 
 def _validate_tier(tier: int) -> None:

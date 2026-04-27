@@ -133,3 +133,13 @@ DEVPLAN cleanup: reduced the Phase 2 step plan to a one-line completion summary 
 ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
 
 Frontmatter reset for next phase: `phase: 3`, `phase_title: Embedding search and graph operations`, `step: null`, `mode: Discuss`, `review_done: false`.
+
+### Step 1: Embedding persistence (binary storage)
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented private sidecar embedding persistence in `phosphene.memory_store.embeddings` using `numpy.save` and `numpy.load` keyed by note id. `MemoryStore.store_note` and `MemoryStore.update_note` now write embeddings when both an embedding vector and `embedding_path` are present, while `embedding_path=None` preserves the existing accepted-but-discarded behavior. `get_note`, `query_notes`, and `update_note` return notes hydrated from sidecar files, leaving markdown frontmatter unchanged.
+
+Added `tests/memory_store/test_embedding_persistence.py` for store/get round-trips, update overwrite behavior, missing embeddings, mixed query results, null embedding paths, restart loading, and lazy sidecar directory creation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 82 tests pass.
