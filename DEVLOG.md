@@ -183,3 +183,23 @@ Contract changes: None
 Implemented `MemoryStore.get_personality_context` for current Tier 3 personality files. The method rebuilds the index on each call so it reads the vault fresh, excludes Tier 3 notes superseded by another Tier 3 note's `supersedes` pointer, loads returned notes through the existing read path so embeddings and inbound-augmented `link_count` are populated, and derives a deterministic SHA-1 `version_id` from sorted `note_id|updated_at` pairs.
 
 Extended the private `IndexedNote` record with `supersedes` while leaving the public `IndexEntry` contract unchanged. Added `tests/memory_store/test_personality_context.py` for empty contexts, Tier 3 inclusion, supersession exclusion, Tier 1/2 exclusion, stable and changing version ids, returned embeddings/link counts, and fresh disk reads between calls. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 117 tests pass.
+
+### Phase 3 Review: Embedding search and graph operations
+
+Mode: Review
+Outcome: Review complete
+Contract changes: None
+
+Reviewed Phase 3 Memory Store implementation against `ARCH_memory_store.md`, the DEVPLAN Phase 3 step plan, and the prior decision log. All five steps land their public surfaces with matching signatures and error semantics: `search_by_embedding` (cosine ranking, tier filter, dimension check, zero-norm exclusion, empty-when-no-store), `add_links` (atomic pre-validation, dedup, self-link drop, empty no-op, restart durability), `get_linked` (BFS over outbound and inbound, depth bounds, dangling-id filtering, origin exclusion, cycle safety), `get_personality_context` (fresh per-call rebuild, supersession exclusion via `IndexedNote.supersedes`, deterministic SHA-1 `version_id`, empty-state hash matches `da39…0709`). Embedding persistence is wired through `store_note`, `update_note`, `get_note`, `query_notes`, `search_by_embedding`, `get_linked`, and `get_personality_context`; `embedding_path=None` preserves Phase 1's accepted-but-not-persisted behavior. No frontmatter format change; D-11's outbound-only on-disk `link_count` rule still holds (inbound augmentation only happens at the public read boundary). The `Index.inbound_for` helper is private; `IndexEntry` public contract is unchanged.
+
+Verification: `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` — 117 tests pass on Python 3.11.2 with `.python_deps`.
+
+Findings:
+- Must fix: None.
+- Should fix: None.
+- Optional (skipped — see D-12):
+  - `update_note` (store.py:192) sets `note.link_count = len(note.links)` inside the `patch.links is not None` branch, then unconditionally re-sets it at line 205. Dead but harmless.
+  - `search_by_embedding` (store.py:154 + 167) loads each matched note's embedding twice — once explicitly to score, then again via `_load_note`. Performance-only; sidecar reads are cheap.
+  - `get_linked` (store.py:258) calls `_load_note(current_id)` during BFS expansion when `self._index.entries[current_id].links` would suffice. Performance-only; the terminal `_load_note` for returned ids is correct since they need full `MemoryNote` materialization.
+
+DEVPLAN frontmatter updated: `review_done: true`. No upstream contract propagation required (Contract Changes scan: every Phase 3 step entry recorded "Contract changes: None"; ARCH already encoded the Phase 3 surface). Phase Complete is the next action.
