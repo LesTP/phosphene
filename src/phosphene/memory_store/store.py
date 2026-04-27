@@ -6,9 +6,11 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import numpy as np
 from numpy import ndarray
 
 from phosphene.memory_store.errors import (
+    DimensionMismatchError,
     InvalidScoreError,
     InvalidTierError,
     NoteNotFoundError,
@@ -124,6 +126,48 @@ class MemoryStore:
             reverse=query.descending,
         )
         return notes[: query.limit]
+
+    def search_by_embedding(
+        self,
+        embedding: ndarray,
+        tier: int | None = None,
+        limit: int = 10,
+    ) -> list[tuple[MemoryNote, float]]:
+        """Return notes with stored embeddings ranked by cosine similarity."""
+        if tier is not None:
+            _validate_tier(tier)
+
+        if self.embedding_path is None:
+            return []
+
+        query_norm = float(np.linalg.norm(embedding))
+        if query_norm == 0.0:
+            return []
+
+        scored_notes: list[tuple[MemoryNote, float]] = []
+        for note_id, entry in self._index.entries.items():
+            if tier is not None and entry.tier != tier:
+                continue
+
+            stored_embedding = self._load_embedding(note_id)
+            if stored_embedding is None:
+                continue
+            if stored_embedding.shape != embedding.shape:
+                raise DimensionMismatchError(
+                    "query embedding dimensions do not match stored embedding "
+                    f"for note {note_id}: {embedding.shape} != {stored_embedding.shape}"
+                )
+
+            stored_norm = float(np.linalg.norm(stored_embedding))
+            if stored_norm == 0.0:
+                continue
+
+            note = self._load_note(note_id)
+            similarity = float(np.dot(embedding, stored_embedding) / (query_norm * stored_norm))
+            scored_notes.append((note, similarity))
+
+        scored_notes.sort(key=lambda result: result[1], reverse=True)
+        return scored_notes[:limit]
 
     def update_note(self, note_id: str, patch: NotePatch) -> MemoryNote:
         """Apply a partial update to a note and return the updated note."""

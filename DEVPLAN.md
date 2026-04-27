@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 3
 phase_title: Embedding search and graph operations
-step: 2 of 5
+step: 3 of 5
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 3 — Embedding search and graph operations
-- **Focus** — Step 2: `search_by_embedding`
+- **Focus** — Step 3: `add_links`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -67,7 +67,7 @@ Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and 
   - restart (new `MemoryStore` over same `vault_path` and `embedding_path`) loads embeddings from disk on next `get_note`
   - directory created lazily — passing an `embedding_path` that does not yet exist works on first `store_note`
 
-**Step 2 — `search_by_embedding`**
+**Step 2 — `search_by_embedding`** — Complete. See DEVLOG "Step 2: `search_by_embedding`" entry.
 
 - Implement `MemoryStore.search_by_embedding(embedding: ndarray, tier: int | None = None, limit: int = 10) -> list[tuple[MemoryNote, float]]`:
   - Validates `tier` in `{1, 2, 3}` when given; raises `InvalidTierError` otherwise.
@@ -85,6 +85,8 @@ Regime: Build. Five steps. Each step ends with passing `tests/memory_store` and 
   - Empty result list when `embedding_path is None`
   - Empty result list when no notes have stored embeddings (vault populated but no `embedding=` arg ever passed)
   - `tier=4` raises `InvalidTierError`
+  - zero-norm query and stored vectors are excluded from results
+  - returned notes include loaded embeddings and inbound-augmented `link_count`
 
 **Step 3 — `add_links`**
 
