@@ -20,3 +20,13 @@ def load_embedding(embedding_path: Path, note_id: str) -> ndarray | None:
     if not path.exists():
         return None
     return np.load(path)
+
+
+def delete_embedding(embedding_path: Path | None, note_id: str) -> None:
+    """Remove a stored embedding vector if one exists."""
+    if embedding_path is None:
+        return
+
+    path = embedding_path / f"{note_id}.npy"
+    if path.exists():
+        path.unlink()

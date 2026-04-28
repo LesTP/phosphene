@@ -20,7 +20,7 @@ from phosphene.memory_store.errors import (
     TitleTooLongError,
     VaultError,
 )
-from phosphene.memory_store.embeddings import load_embedding, save_embedding
+from phosphene.memory_store.embeddings import delete_embedding, load_embedding, save_embedding
 from phosphene.memory_store.index import Index
 from phosphene.memory_store.types import (
     DensityMetrics,
@@ -31,6 +31,7 @@ from phosphene.memory_store.types import (
     NotePatch,
     NoteQuery,
     PersonalityContext,
+    DecayReport,
 )
 from phosphene.memory_store.vault import generate_note_id, note_path, parse_note, serialize_note
 
@@ -324,6 +325,47 @@ class MemoryStore:
         version_id = hashlib.sha1(version_payload.encode("utf-8")).hexdigest()
         return PersonalityContext(personality_files=notes, version_id=version_id)
 
+    def run_decay(self) -> DecayReport:
+        """Expire notes according to configured decay windows."""
+        now = datetime.now(timezone.utc)
+        expired_ids: list[str] = []
+        extended_count = 0
+        tier_breakdown = {tier: 0 for tier in sorted(_VALID_TIERS)}
+
+        for note_id, entry in list(self._index.entries.items()):
+            if entry.tier != 1:
+                continue
+
+            age = now - entry.created_at
+            base_days = self.config.tier1_base_retention_days
+            retention_days = base_days
+            was_extended = False
+            if self._index.inbound_count(note_id) >= self.config.link_density_threshold:
+                retention_days = self.config.tier1_extended_retention_days
+                was_extended = True
+
+            note = self._load_note(note_id)
+            effective_days = retention_days * (1 + (note.attractor_relevance or 0.0))
+            base_window = timedelta(days=base_days)
+            effective_window = timedelta(days=effective_days)
+
+            if age > effective_window:
+                expired_ids.append(note_id)
+                tier_breakdown[1] += 1
+                continue
+            if was_extended and age > base_window:
+                extended_count += 1
+
+        for note_id in expired_ids:
+            self._expire_note(note_id)
+
+        return DecayReport(
+            expired_count=len(expired_ids),
+            expired_ids=expired_ids,
+            extended_count=extended_count,
+            tier_breakdown=tier_breakdown,
+        )
+
     def supersede(
         self,
         note_id: str,
@@ -408,6 +450,13 @@ class MemoryStore:
         if entry is None:
             raise NoteNotFoundError(f"note not found: {note_id}")
         return entry.path
+
+    def _expire_note(self, note_id: str) -> None:
+        path = self._note_path_from_index(note_id)
+        path.unlink()
+        delete_embedding(self.embedding_path, note_id)
+        del self._index.entries[note_id]
+        self._index.rebuild_inbound()
 
     def _load_note(self, note_id: str) -> MemoryNote:
         path = self._note_path_from_index(note_id)

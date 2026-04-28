@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 4
 phase_title: Decay, supersession, and density metrics
-step: 3 of 4
+step: 4 of 4
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 4 — Decay, supersession, and density metrics
-- **Focus** — Step 3: `run_decay` — Tier 1 rules plus DecayReport infrastructure.
+- **Focus** — Step 4: `run_decay` — Tier 2 + Tier 3 rules and full DecayReport.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -69,29 +69,7 @@ Regime: Build. Four steps. Each step ends with passing `tests/memory_store` and 
 
 **Step 2 (complete)** — `supersede`: added `MemoryNote.change_summary`, implemented Tier 3 supersession, logged D-14, and verified with `tests/memory_store`; see DEVLOG Step 2.
 
-**Step 3 — `run_decay` — Tier 1 rules + DecayReport infrastructure**
-
-- Add a private `delete_embedding(embedding_path: Path, note_id: str) -> None` helper to `phosphene.memory_store.embeddings` that removes the sidecar file when present (and is a no-op when it's missing or `embedding_path` is `None`).
-- Add private `MemoryStore._expire_note(note_id: str) -> None` that: looks up the index path, deletes the markdown file, deletes the embedding sidecar (via the helper), and removes the entry from `self._index.entries` (then `rebuild_inbound`).
-- Implement `MemoryStore.run_decay() -> DecayReport`. Phase 4 Step 3 covers Tier 1 only; Tier 2 and Tier 3 are filled in by Step 4. Behavior for Tier 1:
-  - For each Tier 1 entry, compute `effective_days`:
-    - base = `config.tier1_base_retention_days`
-    - extended = `config.tier1_extended_retention_days` if `inbound_count(id) >= config.link_density_threshold` else `base`
-    - apply attractor multiplier: `effective = extended * (1 + (attractor_relevance or 0.0))`
-  - A note expires when `now - created_at > effective_days`.
-  - The `DecayReport.extended_count` counts Tier 1 notes whose retention was extended *but did not yet expire* (i.e., where extended/attractor moved them past the base deadline they would have hit). Notes already expired even with extension are counted as expired, not extended.
-  - Skeleton DecayReport returned: `expired_count`, `expired_ids`, `extended_count`, `tier_breakdown={1: n1, 2: 0, 3: 0}` (Step 4 fills in tiers 2 and 3).
-- Tests (`tests/memory_store/test_decay.py` — new file, Tier 1 only this step):
-  - empty vault → empty report (`expired_count=0`, `expired_ids=[]`, `extended_count=0`, `tier_breakdown={1: 0, 2: 0, 3: 0}`)
-  - Tier 1 note older than `base_retention_days` with no inbound links expires; markdown and embedding sidecar are removed; `get_note` raises `NoteNotFoundError`
-  - Tier 1 note older than `base_retention_days` with `>= link_density_threshold` inbound links survives and is counted in `extended_count`
-  - Tier 1 note older than `extended_retention_days` with the link threshold met still expires
-  - Attractor extension: a note with `attractor_relevance=1.0` (extended × 2) survives a window where `attractor_relevance=None` would expire
-  - Notes where `now - created_at == retention` are *not* expired (strict `>`)
-  - DecayReport `expired_ids` matches the actual deleted set; index no longer contains those ids
-  - Re-running `run_decay` immediately after a sweep is a no-op (everything already eligible was removed)
-  - Embedding sidecar for an expired note is gone; sidecars for surviving notes are intact
-  - Test fixtures simulate age by writing notes with backdated `created_at` directly, then reloading via a fresh `MemoryStore` — matches the existing `test_query.py` fixed-timestamp approach.
+**Step 3 (complete)** — `run_decay`: implemented Tier 1 decay rules, `DecayReport` skeleton, markdown and embedding sidecar expiry cleanup, and verified with `tests/memory_store`; see DEVLOG Step 3.
 
 **Step 4 — `run_decay` — Tier 2 + Tier 3 rules and full DecayReport**
 
