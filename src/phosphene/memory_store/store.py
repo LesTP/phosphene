@@ -21,6 +21,7 @@ from phosphene.memory_store.errors import (
 from phosphene.memory_store.embeddings import load_embedding, save_embedding
 from phosphene.memory_store.index import Index
 from phosphene.memory_store.types import (
+    DensityMetrics,
     IndexEntry,
     MemoryNote,
     MemoryStoreConfig,
@@ -98,6 +99,35 @@ class MemoryStore:
     def get_note(self, note_id: str) -> MemoryNote:
         """Load a note by id from any tier."""
         return self._load_note(note_id)
+
+    def get_density_metrics(self) -> DensityMetrics:
+        """Return a cheap density snapshot derived from the in-memory index."""
+        entries = list(self._index.entries.values())
+        note_count = len(entries)
+        tier_counts = {tier: 0 for tier in sorted(_VALID_TIERS)}
+        link_degree_total = 0
+        clusters: set[str] = set()
+        unresolved_count = 0
+        max_unresolvedness = 0.0
+
+        for entry in entries:
+            tier_counts[entry.tier] += 1
+            link_degree_total += self._index.inbound_count(entry.note_id) + len(entry.links)
+            if entry.tier == 2 and entry.cluster_group is not None:
+                clusters.add(entry.cluster_group)
+            if entry.unresolvedness > 0.5:
+                unresolved_count += 1
+            max_unresolvedness = max(max_unresolvedness, entry.unresolvedness)
+
+        mean_link_degree = link_degree_total / note_count if note_count else 0.0
+        return DensityMetrics(
+            note_count=note_count,
+            tier_counts=tier_counts,
+            mean_link_degree=mean_link_degree,
+            cluster_count=len(clusters),
+            unresolved_count=unresolved_count,
+            max_unresolvedness=max_unresolvedness,
+        )
 
     def query_notes(self, query: NoteQuery) -> list[MemoryNote]:
         """Return full notes matching the query filters."""

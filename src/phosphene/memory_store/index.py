@@ -19,6 +19,7 @@ class IndexedNote:
     unresolvedness: float
     tags: list[str]
     source: str | None
+    cluster_group: str | None
     supersedes: str | None
     created_at: datetime
     links: list[str]
@@ -46,6 +47,7 @@ class Index:
             unresolvedness=note.unresolvedness,
             tags=list(note.tags),
             source=note.source,
+            cluster_group=note.cluster_group,
             supersedes=note.supersedes,
             created_at=note.created_at,
             links=list(note.links),

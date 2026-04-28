@@ -223,3 +223,13 @@ DEVPLAN cleanup: removed the Phase 3 step plan from active DEVPLAN content and l
 ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "Phase 2 complete" to "Phase 3 complete".
 
 Frontmatter reset for next phase: `phase: 4`, `phase_title: Decay, supersession, and density metrics`, `step: null`, `mode: Discuss`, `review_done: false`.
+
+### Step 1: `get_density_metrics`
+
+Mode: Build
+Outcome: Complete
+Contract changes: None
+
+Implemented index-backed density metrics for Memory Store Phase 4. `IndexedNote` now carries private `cluster_group` metadata populated from `MemoryNote`, with no public `IndexEntry` change. `MemoryStore.get_density_metrics()` computes note count, always-present tier counts, mean inbound-plus-outbound link degree, Tier 2 distinct cluster count, strict unresolvedness threshold count, and max unresolvedness directly from the in-memory index without markdown reads.
+
+Added `tests/memory_store/test_density.py` covering empty vault zeros, mixed-tier counts, hand-computed link-degree averaging, Tier 2-only cluster counting, strict `unresolvedness > 0.5`, max unresolvedness across tiers, and immediate metric updates after storing notes and calling `add_links`. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 124 tests pass.

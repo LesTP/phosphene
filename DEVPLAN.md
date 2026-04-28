@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 4
 phase_title: Decay, supersession, and density metrics
-step: 1 of 4
+step: 2 of 4
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 4 — Decay, supersession, and density metrics
-- **Focus** — Step 1: `get_density_metrics` — add `cluster_group` to the index and compute the metrics snapshot from index state.
+- **Focus** — Step 2: `supersede` — add `change_summary` to `MemoryNote`, implement Tier 3 supersession, and audit the contract evolution as D-14.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
