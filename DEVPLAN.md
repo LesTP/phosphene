@@ -6,7 +6,7 @@ step: null
 mode: Review
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 4 — Decay, supersession, and density metrics
-- **Focus** — Phase Review: verify Phase 4 against ARCH_memory_store.md before completion.
+- **Focus** — Phase Complete: apply DEVLOG learning review, ARCHITECTURE status update, DEVPLAN cleanup, and frontmatter reset. Phase 4 review complete (see DEVLOG "Phase 4 Review" entry).
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store

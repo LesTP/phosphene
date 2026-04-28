@@ -263,3 +263,25 @@ Contract changes: `MemoryStoreConfig.tier2_cycle_window_days` added; `ARCH_memor
 Extended `MemoryStore.run_decay()` to cover all tiers. Tier 2 notes now expire strictly after two configured cycle windows from `created_at`, independent of inbound links or attractor relevance. Tier 3 notes expire only when they carry a `decay_deadline` and the current time is past it, so current non-superseded personality files remain pinned. `DecayReport.expired_ids`, `expired_count`, and `tier_breakdown` now aggregate expirations across tiers 1, 2, and 3 while `extended_count` remains Tier 1-only.
 
 Extended `tests/memory_store/test_decay.py` for Tier 2 window expiry/survival, Tier 2 link and attractor irrelevance, Tier 3 superseded/current retention semantics, mixed-tier reports, Tier 1-only extension counting, and density metrics after a sweep. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 154 tests pass.
+
+### Phase 4 Review: Decay, supersession, and density metrics
+
+Mode: Review
+Outcome: Review complete
+Contract changes: `ARCH_memory_store.md` Tier 2 decay rule cell rewritten to match D-15 (doc-only correction; no code or signature change).
+
+Reviewed Phase 4 Memory Store implementation against `ARCH_memory_store.md`, the DEVPLAN Phase 4 step plan, and decisions D-14/D-15. All four steps land their public surfaces with matching signatures and error semantics: `get_density_metrics` (index-only, all six fields, all three tier keys always present, strict `unresolvedness > 0.5`, distinct Tier 2 cluster groups, post-store/post-`add_links` immediacy), `supersede` (Tier 3 only, AlreadySupersededError on re-supersede, TitleTooLongError before write, metadata + embedding carry-forward, `change_summary` only on the new version, `decay_deadline = now + tier3_superseded_retention_days` on the old version, `get_personality_context` excludes superseded and includes new), and `run_decay` (Tier 1 base/extended/attractor multiplicative window with strict `>` boundary, Tier 1 extended-but-surviving counted in `extended_count`, Tier 2 strict age-only at `2 × tier2_cycle_window_days`, Tier 3 expiry only when `decay_deadline` is set and past, embedding sidecars deleted alongside markdown, idempotent reruns). Public-API drift is bounded to `MemoryNote.change_summary` (D-14) and `MemoryStoreConfig.tier2_cycle_window_days` (D-15) — both pre-approved by the step plan. `IndexedNote.cluster_group` is private; `IndexEntry` is unchanged. Supersession chain semantics align with `get_personality_context`: a Tier 3 note is treated as superseded iff some other Tier 3 entry's `supersedes` points at it, which means a freshly stored `supersedes != None` new version is the visible one and the old id drops out of the personality set.
+
+Verification: `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store` — 154 tests pass on Python 3.11.2 with `.python_deps`.
+
+Findings:
+- Must fix: None.
+- Should fix:
+  - `ARCH_memory_store.md` Tier 2 decay rule cell said "Distillation may extend retention via `update_note` (importance/attractor_relevance) ahead of the second window", but D-15 and the implementation ignore inbound links and `attractor_relevance` for Tier 2 expiry, and `update_note` cannot patch `created_at`. Rewrote the cell to read "Tier 2 expiry is age-only — inbound links and `attractor_relevance` are ignored (D-15). Distillation must promote, retier, or otherwise act on the note before the second window if it should be retained." Documentation-only correction; no code or test change.
+- Optional (skipped — same posture as D-12, performance-only with no measured hotspot):
+  - `run_decay` calls `self._load_note(note_id)` for every entry to read `attractor_relevance` and `decay_deadline`, even though Tier 2 expiry only needs the index entry. Saves at most one sidecar/markdown read per Tier 2 note per sweep; revisit if a consumer profiles run_decay.
+  - `_expire_note` calls `self._index.rebuild_inbound()` once per expired note, making a single sweep O(N × E) where E is the per-call rebuild cost. Only matters when many notes expire simultaneously; current expected per-sweep expiration counts are a handful of Tier 1/2 notes.
+
+D-12's Phase 3 optional skips were re-checked: Phase 4's `get_density_metrics` is purely index-driven and does not restructure `_load_note` or per-entry index access, so there was no opportunity to fold those cleanups in during this phase. They remain skipped under D-12.
+
+DEVPLAN frontmatter updated: `review_done: true`. No upstream contract propagation required (Steps 1–4 contract changes are confined to D-14, D-15, and the ARCH cell rewrite, all already encoded in `ARCH_memory_store.md`). Phase Complete is the next action.
