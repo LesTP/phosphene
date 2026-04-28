@@ -285,3 +285,25 @@ Findings:
 D-12's Phase 3 optional skips were re-checked: Phase 4's `get_density_metrics` is purely index-driven and does not restructure `_load_note` or per-entry index access, so there was no opportunity to fold those cleanups in during this phase. They remain skipped under D-12.
 
 DEVPLAN frontmatter updated: `review_done: true`. No upstream contract propagation required (Steps 1–4 contract changes are confined to D-14, D-15, and the ARCH cell rewrite, all already encoded in `ARCH_memory_store.md`). Phase Complete is the next action.
+
+### Phase 4 Completion: Decay, supersession, and density metrics
+
+Mode: Build
+Outcome: Complete
+Contract changes: None (all Phase 4 contract changes — D-14 `MemoryNote.change_summary`, D-15 `MemoryStoreConfig.tier2_cycle_window_days`, and the ARCH Tier 2 decay-rule rewrite — are already encoded in `ARCH_memory_store.md`).
+
+Closed Phase 4 of Memory Store, which is also Module 1's final phase. Final verification ran the full suite with the documented test command: `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 154 tests pass on Python 3.11.2 with `.python_deps`.
+
+Phase 4 delivered `get_density_metrics` (index-only, six fields, all three tier keys always present, strict `unresolvedness > 0.5`, distinct Tier 2 cluster groups), Tier 3 `supersede` (Tier 3 only, AlreadySupersededError on re-supersede, metadata + embedding carry-forward, `change_summary` only on the new version, retention deadline on the old version, `get_personality_context` exclusion of superseded notes), and `run_decay` (Tier 1 base/extended/attractor multiplicative window with strict `>` boundary, Tier 1 extended-but-surviving counted in `extended_count`, Tier 2 strict age-only at `2 × tier2_cycle_window_days`, Tier 3 expiry only when `decay_deadline` is set and past, embedding sidecars deleted alongside markdown, idempotent reruns).
+
+DEVLOG learning review: Phase 4 landed linearly across four implementation steps and one review. No trial-and-error pattern needs promotion to DEVPLAN Gotchas. The review surfaced one documentation inconsistency (ARCH Tier 2 decay-rule cell pre-dating D-15) which was corrected in-review without code or test change. Optional review cleanups were skipped under D-12 posture, not failed attempts.
+
+Contract Changes scan: Step 2 declared `MemoryNote.change_summary` (D-14), Step 4 declared `MemoryStoreConfig.tier2_cycle_window_days` (D-15), and the Phase 4 Review applied a documentation-only ARCH cell correction. All three are already encoded in `ARCH_memory_store.md`. No external module currently consumes Memory Store, so no downstream propagation is required; the additive `change_summary` field and new config option preserve all prior call sites.
+
+Log review: `logs/loop/summary.log` shows Phase 4 iterations 22–27 (one Phase Plan, four Step, one Review) completed cleanly with no escalations, no repeated tool failures, and no wasted-turn patterns. No new operational Gotchas to promote.
+
+DEVPLAN cleanup: reduced the Phase 4 step plan to a one-line completion summary referencing this entry. Module 1's four-phase outline now reads complete on all phases. `DEVLOG.md` is well below the 500-line archive threshold; no archive created.
+
+ARCHITECTURE.md: Memory Store row in the Implementation Sequence table updated from "Phase 3 complete" to "Complete" — Module 1 is the first module to reach final-phase status.
+
+Frontmatter reset: Module 1 final phase complete, so frontmatter is cleared (`module: null`, `phase: null`, `phase_title: null`, `step: null`, `mode: null`, `blocked: null`, `regime: null`, `review_done: null`). The next module's planning iteration will repopulate it.
