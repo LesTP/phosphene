@@ -44,6 +44,7 @@ def serialize_note(note: MemoryNote) -> str:
         "attractor_relevance": note.attractor_relevance,
         "cluster_group": note.cluster_group,
         "supersedes": note.supersedes,
+        "change_summary": note.change_summary,
         "created_at": _format_datetime(note.created_at),
         "updated_at": _format_datetime(note.updated_at),
         "link_count": note.link_count,
@@ -87,6 +88,7 @@ def parse_note(text: str) -> MemoryNote:
         updated_at=_parse_datetime(metadata["updated_at"]),
         link_count=metadata["link_count"],
         decay_deadline=_parse_datetime(metadata.get("decay_deadline")),
+        change_summary=metadata.get("change_summary"),
     )
 
 

@@ -11,10 +11,12 @@ import numpy as np
 from numpy import ndarray
 
 from phosphene.memory_store.errors import (
+    AlreadySupersededError,
     DimensionMismatchError,
     InvalidScoreError,
     InvalidTierError,
     NoteNotFoundError,
+    TierMismatchError,
     TitleTooLongError,
     VaultError,
 )
@@ -76,6 +78,7 @@ class MemoryStore:
             updated_at=created_at,
             link_count=len(note.links),
             decay_deadline=None,
+            change_summary=None,
         )
 
         path = note_path(self.vault_path, note.tier, note_id)
@@ -320,6 +323,64 @@ class MemoryStore:
         )
         version_id = hashlib.sha1(version_payload.encode("utf-8")).hexdigest()
         return PersonalityContext(personality_files=notes, version_id=version_id)
+
+    def supersede(
+        self,
+        note_id: str,
+        new_content: str,
+        new_title: str,
+        change_summary: str,
+    ) -> MemoryNote:
+        """Create a new Tier 3 version and schedule the old version for decay."""
+        old_path = self._note_path_from_index(note_id)
+        old_note = parse_note(old_path.read_text(encoding="utf-8"))
+
+        if old_note.tier != 3:
+            raise TierMismatchError(f"supersede requires a Tier 3 note: {note_id}")
+        if any(
+            entry.tier == 3 and entry.supersedes == note_id
+            for entry in self._index.entries.values()
+        ):
+            raise AlreadySupersededError(f"note has already been superseded: {note_id}")
+        _validate_title(new_title)
+
+        created_at = datetime.now(timezone.utc)
+        new_note_id = generate_note_id(new_title, created_at)
+        new_note = MemoryNote(
+            note_id=new_note_id,
+            tier=3,
+            content=new_content,
+            title=new_title,
+            importance=old_note.importance,
+            unresolvedness=old_note.unresolvedness,
+            links=list(old_note.links),
+            tags=list(old_note.tags),
+            source=old_note.source,
+            friction_target=old_note.friction_target,
+            embedding=self._load_embedding(note_id),
+            attractor_relevance=old_note.attractor_relevance,
+            cluster_group=old_note.cluster_group,
+            supersedes=note_id,
+            created_at=created_at,
+            updated_at=created_at,
+            link_count=len(old_note.links),
+            decay_deadline=None,
+            change_summary=change_summary,
+        )
+
+        old_note.decay_deadline = created_at + timedelta(
+            days=self.config.tier3_superseded_retention_days
+        )
+        old_note.link_count = len(old_note.links)
+
+        new_path = note_path(self.vault_path, 3, new_note_id)
+        new_path.write_text(serialize_note(new_note), encoding="utf-8")
+        self._save_embedding(new_note_id, new_note.embedding)
+        self._index.register(new_note, new_path)
+
+        old_path.write_text(serialize_note(old_note), encoding="utf-8")
+        self._index.register(old_note, old_path)
+        return self._load_note(new_note_id)
 
     def _ensure_vault(self) -> None:
         if self.vault_path.exists() and not self.vault_path.is_dir():

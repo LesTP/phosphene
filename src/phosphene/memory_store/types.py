@@ -54,6 +54,7 @@ class MemoryNote:
     updated_at: datetime
     link_count: int
     decay_deadline: datetime | None
+    change_summary: str | None = None
 
 
 @dataclass

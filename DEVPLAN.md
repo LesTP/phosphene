@@ -2,7 +2,7 @@
 module: MEMORY_STORE
 phase: 4
 phase_title: Decay, supersession, and density metrics
-step: 2 of 4
+step: 3 of 4
 mode: Code
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 4 — Decay, supersession, and density metrics
-- **Focus** — Step 2: `supersede` — add `change_summary` to `MemoryNote`, implement Tier 3 supersession, and audit the contract evolution as D-14.
+- **Focus** — Step 3: `run_decay` — Tier 1 rules plus DecayReport infrastructure.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -67,31 +67,7 @@ Regime: Build. Four steps. Each step ends with passing `tests/memory_store` and 
   - `max_unresolvedness` returns the highest score across all tiers
   - density metrics reflect freshly stored notes immediately (no rebuild needed); confirm after `add_links` updates inbound counts
 
-**Step 2 — `supersede`**
-
-- Contract evolution: add `change_summary: str | None = None` to `MemoryNote` (defaulted everywhere) and round-trip it through `serialize_note` / `parse_note`. No `NoteInput` change — `change_summary` is set only via `supersede`. Log as **D-14** in DECISIONS.md when this step lands. ARCH already says "stored in new version's frontmatter for audit"; this is the smallest faithful implementation.
-- Implement `MemoryStore.supersede(note_id: str, new_content: str, new_title: str, change_summary: str) -> MemoryNote`:
-  - `NoteNotFoundError` if `note_id` is not in the index.
-  - `TierMismatchError` if the note's tier is not 3.
-  - `AlreadySupersededError` if any other Tier 3 entry's `supersedes` already points at `note_id`.
-  - Validate new title length (`TitleTooLongError`) before any disk write.
-  - Generate a new note id from `new_title` + the current timestamp (same `generate_note_id` pattern as `store_note`).
-  - Carry forward from the old note: `links`, `tags`, `importance`, `unresolvedness`, `attractor_relevance`, `cluster_group`, `friction_target`, `embedding`, `source` (the new version inherits the old's metadata; only content/title/`change_summary`/`supersedes` are new).
-  - New note: `tier=3`, `supersedes=<old_note_id>`, `change_summary=<summary>`, `created_at=now`, `updated_at=now`, `decay_deadline=None`. Persist via `serialize_note`; if `embedding` carried forward and `embedding_path` is set, save the sidecar copy.
-  - Old note: set `decay_deadline = now + timedelta(days=config.tier3_superseded_retention_days)`. Persist via `serialize_note` (re-write to disk), then re-register with the index. `change_summary` on the old note remains `None`.
-  - Return the new note via `_load_note` (so it carries inbound-augmented `link_count`).
-- Tests (`tests/memory_store/test_supersede.py` — new file):
-  - basic supersede: old note's `supersedes` stays `None`, new note's `supersedes` matches old id; both readable via `get_note`
-  - new note's `change_summary` matches input; old note's `change_summary` is `None`
-  - new note carries forward links, tags, importance, unresolvedness, attractor_relevance, cluster_group, friction_target, source from the old note
-  - new note carries forward embedding when one is stored (round-trip verified via `get_note(new_id).embedding`)
-  - old note gets `decay_deadline ≈ now + tier3_superseded_retention_days` (assertion within ±2s)
-  - `TierMismatchError` for Tier 1 and Tier 2 source notes
-  - `AlreadySupersededError` when calling supersede twice on the same source id
-  - `NoteNotFoundError` for unknown source id
-  - `TitleTooLongError` for >150 char `new_title` — old note unchanged, no new file written
-  - `get_personality_context()` excludes the old (now superseded) note and includes the new one
-  - `change_summary` survives `parse_note` round-trip on freshly loaded vault
+**Step 2 (complete)** — `supersede`: added `MemoryNote.change_summary`, implemented Tier 3 supersession, logged D-14, and verified with `tests/memory_store`; see DEVLOG Step 2.
 
 **Step 3 — `run_decay` — Tier 1 rules + DecayReport infrastructure**
 

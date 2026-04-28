@@ -233,3 +233,13 @@ Contract changes: None
 Implemented index-backed density metrics for Memory Store Phase 4. `IndexedNote` now carries private `cluster_group` metadata populated from `MemoryNote`, with no public `IndexEntry` change. `MemoryStore.get_density_metrics()` computes note count, always-present tier counts, mean inbound-plus-outbound link degree, Tier 2 distinct cluster count, strict unresolvedness threshold count, and max unresolvedness directly from the in-memory index without markdown reads.
 
 Added `tests/memory_store/test_density.py` covering empty vault zeros, mixed-tier counts, hand-computed link-degree averaging, Tier 2-only cluster counting, strict `unresolvedness > 0.5`, max unresolvedness across tiers, and immediate metric updates after storing notes and calling `add_links`. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 124 tests pass.
+
+### Step 2: `supersede`
+
+Mode: Build
+Outcome: Complete
+Contract changes: `MemoryNote.change_summary` added; `ARCH_memory_store.md` updated; D-14 logged.
+
+Implemented Tier 3 supersession for the Memory Store. `MemoryNote` now carries a defaulted `change_summary` field that round-trips through markdown frontmatter. `MemoryStore.supersede()` validates source existence, Tier 3 scope, duplicate supersession, and replacement title length before writing; creates a new Tier 3 note with inherited metadata and embedding sidecar; records the old note id in `supersedes`; stores the audit summary on the new version; and schedules the old version for decay using `tier3_superseded_retention_days`.
+
+Added `tests/memory_store/test_supersede.py` covering readable old/new versions, change-summary placement, metadata and embedding carry-forward, old-note decay deadlines, error paths, no-write title validation, personality-context replacement semantics, and parse/reload persistence. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 136 tests pass.

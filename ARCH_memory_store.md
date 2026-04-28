@@ -52,6 +52,7 @@ class MemoryNote:
     updated_at: datetime
     link_count: int                         # computed: inbound + outbound links
     decay_deadline: datetime | None         # None = no expiry (current Tier 3, or manually pinned)
+    change_summary: str | None = None       # audit note for Tier 3 supersession updates
 
 @dataclass
 class IndexEntry:
