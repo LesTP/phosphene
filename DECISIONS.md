@@ -97,3 +97,10 @@ Priority: Important
 Decision: Add `change_summary: str | None = None` to `MemoryNote` and persist it in note frontmatter. `NoteInput` stays unchanged; the only writer for this field is `MemoryStore.supersede`, which stores the supplied audit summary on the new Tier 3 version while leaving the old note's `change_summary` unset.
 Rationale: ARCH already requires `supersede(..., change_summary)` to store the change reason in the new version's frontmatter for audit. Putting the field on `MemoryNote` is the smallest faithful schema change: it round-trips through `serialize_note` / `parse_note`, is visible through public read APIs, and does not let unrelated store/update paths manufacture change summaries.
 Revisit if: Supersession audit history needs richer structure than one summary string, such as author, review status, or machine-readable diff metadata.
+
+D-15: Tier 2 decay uses a Memory Store cycle-window config
+Date: 2026-04-28 | Status: Closed
+Priority: Important
+Decision: Add `tier2_cycle_window_days: int = 30` to `MemoryStoreConfig` and make `run_decay()` expire Tier 2 notes when `now - created_at > 2 * tier2_cycle_window_days`. Tier 2 expiry ignores inbound links and `attractor_relevance`; Distillation must promote, retier, or otherwise update notes before the second window if it wants them retained.
+Rationale: Tier 2 retention is a distillation-cycle boundary, not a graph-density rule. Reusing Tier 1 link and attractor extensions would blur Memory Store's responsibility with Distillation's promotion semantics and would let incidental links keep unpromoted patterns indefinitely. A config field keeps the cycle length explicit while preserving Memory Store as the simple age-based eviction layer for Tier 2.
+Revisit if: Distillation needs Memory Store to own richer Tier 2 retention state, such as last-reviewed cycle metadata or explicit promotion candidate flags.

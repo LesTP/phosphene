@@ -253,3 +253,13 @@ Contract changes: None
 Implemented the first `MemoryStore.run_decay()` slice for Tier 1 notes and the `DecayReport` return path. Tier 1 retention now uses the configured base window, switches to the extended window when inbound links meet `link_density_threshold`, applies the attractor multiplier, expires only on strict `now - created_at > retention`, and reports extended-but-surviving notes separately from expired notes.
 
 Added private embedding and note expiry cleanup: `delete_embedding()` removes sidecar vectors as a no-op when absent or disabled, and `MemoryStore._expire_note()` deletes markdown, deletes the sidecar, removes the index entry, and rebuilds inbound counts. Added `tests/memory_store/test_decay.py` covering empty reports, base expiry, link-density extension, extended-window expiry, attractor extension, exact-boundary survival, deleted-id/index consistency, idempotent reruns, and survivor sidecars. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 145 tests pass.
+
+### Step 4: `run_decay` Tier 2 and Tier 3 rules
+
+Mode: Build
+Outcome: Complete
+Contract changes: `MemoryStoreConfig.tier2_cycle_window_days` added; `ARCH_memory_store.md` updated; D-15 logged.
+
+Extended `MemoryStore.run_decay()` to cover all tiers. Tier 2 notes now expire strictly after two configured cycle windows from `created_at`, independent of inbound links or attractor relevance. Tier 3 notes expire only when they carry a `decay_deadline` and the current time is past it, so current non-superseded personality files remain pinned. `DecayReport.expired_ids`, `expired_count`, and `tier_breakdown` now aggregate expirations across tiers 1, 2, and 3 while `extended_count` remains Tier 1-only.
+
+Extended `tests/memory_store/test_decay.py` for Tier 2 window expiry/survival, Tier 2 link and attractor irrelevance, Tier 3 superseded/current retention semantics, mixed-tier reports, Tier 1-only extension counting, and density metrics after a sweep. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`; 154 tests pass.

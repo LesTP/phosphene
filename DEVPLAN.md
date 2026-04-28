@@ -2,8 +2,8 @@
 module: MEMORY_STORE
 phase: 4
 phase_title: Decay, supersession, and density metrics
-step: 4 of 4
-mode: Code
+step: null
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — 4 — Decay, supersession, and density metrics
-- **Focus** — Step 4: `run_decay` — Tier 2 + Tier 3 rules and full DecayReport.
+- **Focus** — Phase Review: verify Phase 4 against ARCH_memory_store.md before completion.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store
@@ -71,22 +71,7 @@ Regime: Build. Four steps. Each step ends with passing `tests/memory_store` and 
 
 **Step 3 (complete)** — `run_decay`: implemented Tier 1 decay rules, `DecayReport` skeleton, markdown and embedding sidecar expiry cleanup, and verified with `tests/memory_store`; see DEVLOG Step 3.
 
-**Step 4 — `run_decay` — Tier 2 + Tier 3 rules and full DecayReport**
-
-- Contract evolution: add `tier2_cycle_window_days: int = 30` to `MemoryStoreConfig`. Update `ARCH_memory_store.md` MemoryStoreConfig field list and the Tier 2 row in the decay-rules table to read "Two cycle windows from `created_at`. Distillation may extend retention via `update_note` (importance/attractor_relevance) ahead of the second window." Log as **D-15** in DECISIONS.md when this step lands.
-- Extend `run_decay` for Tier 2 and Tier 3:
-  - **Tier 2:** a note expires when `now - created_at > 2 * config.tier2_cycle_window_days`. No link-threshold or attractor extension at this layer (Distillation owns promotion semantics; Memory Store's job is to evict by age unless metadata moves the note out of Tier 2). Notes expire by Tier 2 rule even if they have inbound links.
-  - **Tier 3:** only superseded versions decay. A Tier 3 note expires when `decay_deadline is not None` and `now > decay_deadline`. Current (non-superseded) Tier 3 notes never expire.
-  - `tier_breakdown` is filled in for tiers 2 and 3; `expired_count` and `expired_ids` aggregate across all three tiers.
-- Tests (`tests/memory_store/test_decay.py` — extend):
-  - Tier 2 note older than `2 * cycle_window` expires; Tier 2 note inside the window survives even with no links
-  - Tier 2 expiry ignores inbound links and `attractor_relevance` (regression: a Tier 2 note that *would* have been extended under Tier 1 rules still expires on schedule)
-  - Tier 3 superseded note past `decay_deadline` expires; the supersession chain is severed — `get_note(new_id).supersedes` still references the (now deleted) old id literal but the index no longer contains the old id (acceptable; chain history lives in the new note's frontmatter)
-  - Tier 3 superseded note before `decay_deadline` survives
-  - Tier 3 current (non-superseded) note never expires regardless of age
-  - Mixed run: a vault with expirations across all three tiers reports the union in `expired_ids` and matching counts in `tier_breakdown`
-  - `extended_count` only counts Tier 1 extensions; Tier 2/3 do not contribute to it
-  - After a sweep, `get_density_metrics()` reflects the reduced `note_count` and `tier_counts`
+**Step 4 (complete)** — `run_decay`: implemented Tier 2 cycle-window expiry, Tier 3 superseded-version expiry, full multi-tier `DecayReport`, added `tier2_cycle_window_days` (D-15), and verified with `tests/memory_store`; see DEVLOG Step 4.
 
 **End of Phase 4:** `/phase-review` then `/phase-complete`. Review must verify: no public-API drift beyond `change_summary` (D-14) and `tier2_cycle_window_days` (D-15); `get_density_metrics` is index-only and cheap; `run_decay` cleans both markdown and embedding sidecars; supersession chain semantics align with `get_personality_context`.
 

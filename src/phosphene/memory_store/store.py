@@ -333,28 +333,36 @@ class MemoryStore:
         tier_breakdown = {tier: 0 for tier in sorted(_VALID_TIERS)}
 
         for note_id, entry in list(self._index.entries.items()):
-            if entry.tier != 1:
-                continue
-
-            age = now - entry.created_at
-            base_days = self.config.tier1_base_retention_days
-            retention_days = base_days
-            was_extended = False
-            if self._index.inbound_count(note_id) >= self.config.link_density_threshold:
-                retention_days = self.config.tier1_extended_retention_days
-                was_extended = True
-
             note = self._load_note(note_id)
-            effective_days = retention_days * (1 + (note.attractor_relevance or 0.0))
-            base_window = timedelta(days=base_days)
-            effective_window = timedelta(days=effective_days)
+            expired = False
 
-            if age > effective_window:
+            if entry.tier == 1:
+                age = now - entry.created_at
+                base_days = self.config.tier1_base_retention_days
+                retention_days = base_days
+                was_extended = False
+                if self._index.inbound_count(note_id) >= self.config.link_density_threshold:
+                    retention_days = self.config.tier1_extended_retention_days
+                    was_extended = True
+
+                effective_days = retention_days * (1 + (note.attractor_relevance or 0.0))
+                base_window = timedelta(days=base_days)
+                effective_window = timedelta(days=effective_days)
+
+                if age > effective_window:
+                    expired = True
+                elif was_extended and age > base_window:
+                    extended_count += 1
+            elif entry.tier == 2:
+                age = now - entry.created_at
+                retention_window = timedelta(days=2 * self.config.tier2_cycle_window_days)
+                expired = age > retention_window
+            elif entry.tier == 3:
+                expired = note.decay_deadline is not None and now > note.decay_deadline
+
+            if expired:
                 expired_ids.append(note_id)
-                tier_breakdown[1] += 1
-                continue
-            if was_extended and age > base_window:
-                extended_count += 1
+                tier_breakdown[entry.tier] += 1
 
         for note_id in expired_ids:
             self._expire_note(note_id)

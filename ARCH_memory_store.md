@@ -14,6 +14,7 @@ class MemoryStoreConfig:
     embedding_path: str | None = None       # directory for embedding vectors. None = no embedding storage.
     tier1_base_retention_days: int = 30     # Tier 1 decay window (no links)
     tier1_extended_retention_days: int = 90  # Tier 1 decay window (2+ links)
+    tier2_cycle_window_days: int = 30       # Tier 2 distillation cycle window
     tier3_superseded_retention_days: int = 90  # retention of superseded Tier 3 versions
     link_density_threshold: int = 2         # inbound link count required for extended retention
 
@@ -243,7 +244,7 @@ Decay rules (enforced internally, parameters from `MemoryStoreConfig`):
 | Tier | Rule | Default |
 |------|------|---------|
 | 1 | Base retention from `created_at`. Notes with ≥ `link_density_threshold` inbound links get extended retention. `attractor_relevance` (if set) further extends proportionally. | 30 days base, 90 days extended |
-| 2 | Unpromoted notes retained for one additional distillation cycle window. Expired after two consecutive non-promotions. | Cycle window = 30 days |
+| 2 | Two cycle windows from `created_at`. Distillation may extend retention via `update_note` (importance/attractor_relevance) ahead of the second window. | Cycle window = 30 days |
 | 3 | Superseded versions retained per `tier3_superseded_retention_days`. Current (non-superseded) versions never decay. | 90 days |
 
 - **Errors:** none
