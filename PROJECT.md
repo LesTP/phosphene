@@ -51,6 +51,21 @@ The human whose corpus seeds it. The system is a creative interlocutor — surfa
 - **Language:** Python (implied by stack — Playwright, Docker, cron, dataclasses)
 - **No monorepo tooling:** Each module is independent with typed dataclass interfaces
 
+## Deployment
+
+Phosphene is a long-running Python service, not a development tool. It calls LLM APIs, reads/writes its own markdown vault, and posts to messaging platforms. It does not execute arbitrary shell commands or modify code.
+
+**Development phase** (current through Module ~6): Run as a systemd service inside the existing `claude-code` Incus container. Shares the filesystem for easy development iteration. Use `MemoryMax=` on the systemd unit to cap memory and prevent OOM from affecting the orchestrator bots.
+
+**Production phase** (once producing real output): Migrate to a dedicated Incus container. Independent memory limit, independent restarts, independent OOM blast radius. API keys isolated from code-execution agents. Container can be snapshotted and rolled back independently.
+
+Key operational concerns:
+- **Vault storage:** Memory vault grows indefinitely. Store on the NTFS drive or NVMe SSD, not the SD card. Bind-mount into the container.
+- **API key isolation:** Phosphene's Anthropic/OpenAI/OpenRouter keys should not be accessible to development agents.
+- **Backup:** The vault is the system's accumulated personality. Periodic rsync or snapshots to NAS.
+- **Monitoring:** Self-report health (activation count, memory usage, API budget remaining) via Telegram.
+- **Resource scheduling:** Phosphene activations should avoid competing with active worker iterations during development. The Orchestrator module handles this internally; at the OS level, the dev container gets priority.
+
 ## Prior Art
 - **Generative Agents (Park et al., 2023)** — memory stream + reflection + planning. Good retrieval scoring (recency × importance × relevance). Limited: identity fixed at init, reflection feeds planning not identity revision.
 - **MemGPT / Letta** — self-managed two-tier memory (RAM/disk). Right orientation for autonomous development. Agent-editable core memory block is a starting point for personality file updates.

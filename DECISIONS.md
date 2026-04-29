@@ -91,6 +91,43 @@ Decision: In Phase 2, `MemoryNote.link_count` is computed at read time as `inbou
 Rationale: ARCH defines `link_count` as inbound + outbound, but Phase 1 wrote outbound-only into frontmatter. Of three options — (A) augment at read time from the index (chosen), (B) rewrite frontmatter on every link change to keep disk in sync, (C) migrate Phase 1 files to a new schema with separate inbound/outbound fields — option A has the smallest blast radius: zero disk format changes, zero migration, zero cascading writes when one note links another (under B, linking A→B would force a rewrite of B's frontmatter, doubling write amplification on every link). The index is the authoritative source for inbound counts at runtime; the disk value is treated as an intentionally redundant outbound count that survives without coordination. Option C would invalidate Phase 1 stored notes for no functional gain — the index already gives the correct read-time value. The trade-off is that an external reader of a `.md` file (e.g., Obsidian) sees outbound-only in the frontmatter; that is acceptable because the canonical accessor is the public API, not direct file reads (per ARCH State section: "Only the Memory Store writes to the vault. Other modules interact exclusively through this API.").
 Revisit if: A non-API consumer (Obsidian-side tooling, an external indexer) needs accurate inbound counts from raw frontmatter, at which point the index can be persisted to disk or the frontmatter field redefined. Also revisit if write amplification under option B turns out to be tolerable AND a use case appears that wants disk-side inbound counts (e.g., backups that must round-trip without the index).
 
+D-13: Seeding architecture — batch pipeline vs. incremental ingestion
+Date: 2026-04-27 | Status: Open
+Priority: Critical
+Decision: Deferred pending consideration. Must resolve before Module 2 (Seeding) phase planning begins.
+
+**Problem:** The current `ARCH_seeding.md` defines a batch pipeline — `seed()` takes the full corpus, builds a knowledge graph, clusters, synthesizes patterns, and distills personality files in one pass. Adding one more source or document requires re-running the entire pipeline. The human's corpus requires manual curation over weeks, making batch-only processing impractical.
+
+**Core question:** Is seeding conceptually different from day-to-day content ingestion? An article written 10 years ago and an article found today are both content. If the processing paths are meant to differ, how and why?
+
+**Option A — Keep dedicated batch pipeline (current ARCH):**
+- Pro: Cross-corpus knowledge graph construction sees the whole corpus at once, potentially finding structural patterns that incremental processing wouldn't.
+- Pro: Human reviews the initial personality (Tier 2/3) before the system starts running.
+- Pro: The system starts with a coherent personality rather than building one from nothing.
+- Con: Adding one source requires re-running everything.
+- Con: Manual curation over weeks is incompatible with batch-only design.
+- Con: Two separate content processing paths to build and maintain (seeding pipeline + day-to-day Source Ingestion → Attention Filter → Distillation).
+- Con: The extracted personality is an LLM's interpretation of the writing, not an organically emerged pattern.
+
+**Option B — Seeding as incremental ingestion through the day-to-day path:**
+- Seeding becomes "bulk historical ingest" — corpus items enter via Source Ingestion (human-share channel), pass through a bootstrap Attention Filter (accept all or use hardcoded criteria), land in Tier 1, and Distillation promotes them organically.
+- Pro: Add one document or one archive at any time — no re-runs.
+- Pro: Curate at your own pace.
+- Pro: One content path, not two. Source-specific parsers (LJ, Twitter, etc.) become Source Ingestion adapters.
+- Pro: System is functional from the first item. Personality emerges through the same mechanism it uses to develop.
+- Pro: More aligned with the project's philosophy — personality develops from content, not front-loaded by pipeline interpretation.
+- Con: Loses the cross-corpus knowledge graph step (Stage 2 in current ARCH). Distillation eventually finds cross-item patterns but works from individual notes, not the whole corpus at once.
+- Con: No curated initial personality review — personality emerges through Distillation cycles. (Mitigated: Tier 3 files are markdown, manually reviewable/editable at any time.)
+- Con: Bootstrap attention filter needs design — how does the filter work before personality context exists?
+
+**Option C — Hybrid: incremental ingestion + optional batch synthesis:**
+- Content enters incrementally through Source Ingestion (like Option B).
+- An optional `synthesize` command can be run at any point to perform cross-corpus analysis on accumulated Tier 1 notes — the graph/clustering step from the current pipeline, but operating on what's already in the store rather than raw corpus files.
+- Pro: Incremental curation + batch synthesis when enough material has accumulated.
+- Con: Most complex to implement. May not add enough value over letting Distillation handle it.
+
+Revisit when: Memory Store Phase 4 is complete and Module 2 planning begins. By then, Distillation (Module 7) ARCH will be more concrete, which informs whether its incremental clustering is sufficient to replace the batch graph construction step.
+
 D-14: Tier 3 supersession stores change summaries on new versions
 Date: 2026-04-28 | Status: Closed
 Priority: Important
