@@ -188,10 +188,23 @@ while [[ $ITER -le $END_ITER ]]; do
   echo "Action: $ACTION_TYPE ($ACTION_ID)"
   echo "Reason: $REASON"
 
+  # Track the last iter that actually ran — used for accurate post-loop reporting
+  # regardless of whether the loop exits naturally or via break below.
+  LAST_RAN=$ITER
+
   # Decide whether to continue
   if [[ "$SIGNAL" == "ESCALATE" ]]; then
-    echo "=== ESCALATED at iteration $ITER: $REASON ==="
-    FINAL_EXIT=1
+    # Distinguish clean phase-boundary escalations (ACTION_TYPE=COMPLETE — the
+    # worker finished a phase and is handing off for human audit per WORKER_SPEC
+    # §6) from problem escalations (3 failures, regime shift, scope creep,
+    # contract change, unclear spec — same signal, but a real problem).
+    if [[ "$ACTION_TYPE" == "COMPLETE" ]]; then
+      echo "=== Phase-boundary at iteration $ITER (awaiting human audit): $REASON ==="
+      FINAL_EXIT=0
+    else
+      echo "=== ESCALATED at iteration $ITER (action=$ACTION_TYPE): $REASON ==="
+      FINAL_EXIT=1
+    fi
     break
   elif [[ "$SIGNAL" != "CONTINUE" ]]; then
     echo "=== NO SIGNAL at iteration $ITER — ERROR STOP ==="
@@ -203,6 +216,5 @@ while [[ $ITER -le $END_ITER ]]; do
   ITER=$(( ITER + 1 ))
 done
 
-LAST_ITER=$(( ITER - 1 ))
-echo "=== Stopped after iteration $LAST_ITER ==="
+echo "=== Stopped after iteration ${LAST_RAN:-$START_ITER} ==="
 exit $FINAL_EXIT
