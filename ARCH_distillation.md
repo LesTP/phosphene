@@ -115,7 +115,7 @@ Three gates must pass before any distillation runs:
 2. Reads Tier 1 notes accumulated since last T1→T2 run via `memory_store.query_notes(tier=1, since=...)`.
 3. If `incorporate_feedback`: reads feedback events from Tier 1 (notes with `source="feedback"`), boosts importance scores of referenced notes.
 4. Embeds all Tier 1 note content via toolkit/embedding.
-5. Clusters embeddings via toolkit/clustering with RAPTOR strategy. Provides callbacks:
+5. Clusters embeddings via toolkit/clustering with RAPTOR strategy. Passes Tier 1 note contents as `texts` (required by RAPTOR for summarization) and provides callbacks:
    - `raptor_summarizer`: calls toolkit/llm_client to synthesize cluster members into a pattern description
    - `raptor_embedder`: calls toolkit/embedding to embed the summaries for re-clustering
 6. For each cluster: creates or updates a Tier 2 note via `memory_store.store_note` or `memory_store.update_note`, setting `cluster_group` to the cluster identifier.
@@ -186,6 +186,8 @@ cluster_config = ClusterConfig(
     raptor_embedder=make_raptor_embedder(config.embedding_config),
     raptor_max_depth=3,
 )
+tier1_texts = [note.content for note in tier1_notes]
+result = cluster(tier1_embeddings, cluster_config, texts=tier1_texts)
 ```
 
 The summarizer prompt is Phosphene-specific (synthesize observations into patterns with attention to tensions and friction). The embedding is pass-through to toolkit/embedding. This wiring is internal to the Distillation engine — consumers call `distill_t1_to_t2` and don't interact with RAPTOR directly.

@@ -115,7 +115,7 @@ The `seed()` call executes a multi-stage pipeline internally. The stages are:
 | 1. Parse | CorpusSource files | Text fragments with metadata | — |
 | 2. Extract | Text fragments | Entities + relationships (knowledge graph) | toolkit/llm_client |
 | 3. Embed | Text fragments + entities | Embedding vectors | toolkit/embedding |
-| 4. Cluster | Embedding vectors | Semantic clusters | toolkit/clustering |
+| 4. Cluster | Embedding vectors + text fragments | Semantic clusters | toolkit/clustering (RAPTOR with `texts` param) |
 | 5. Synthesize | Clusters + graph | PatternDrafts (Tier 2) | toolkit/llm_client |
 | 6. Distill | PatternDrafts + graph | PersonalityDrafts (Tier 3) | toolkit/llm_client |
 | 7. Derive criteria | PersonalityDrafts + corpus patterns | FilterCriterion list | toolkit/llm_client |
