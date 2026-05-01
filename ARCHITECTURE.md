@@ -5,7 +5,6 @@
 | Component | Responsibility | Dependencies |
 |-----------|---------------|--------------|
 | Memory Store | Three-tier hierarchical memory (daily log → pattern layer → personality files). Index layer, density metrics, forgetting, versioned personality files. | none (leaf) |
-| Seeding | One-time corpus-to-graph-to-personality pipeline. Produces initial Tier 2/3 files. | toolkit/embedding, Memory Store |
 | Attention Filter | Personality-driven content selection and annotation. Prompt-to-structure transition. | toolkit/llm_client, toolkit/embedding, Memory Store (read: density metrics, existing notes) |
 | Source Ingestion | Adapters for Telegram channels, RSS, Reddit → normalized content items. | none (leaf per adapter) |
 | Distillation | Tier promotion: T1→T2 (RAPTOR-style clustering), T2→T3 (two-step reflect-evolve). | toolkit/clustering, toolkit/embedding, toolkit/llm_client, Memory Store |
@@ -60,15 +59,14 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 | Order | Module | Rationale | Status |
 |-------|--------|-----------|--------|
 | 1 | Memory Store | Leaf. Everything depends on it. Three-tier CRUD, index layer, density metrics API. | Complete |
-| 2 | Seeding | Populates Memory Store with initial content. Enables testing downstream modules against real data. | Not started |
-| 3 | Attention Filter | First module that actively uses Memory Store. Tests the density metrics interface. Core novel mechanism. | Not started |
-| 4 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Start with one adapter (Telegram or RSS). | Not started |
-| 5 | Gateway | Message bus for both input and output. Needed before any user-visible output. | Not started |
-| 6 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Not started |
-| 7 | Distillation | Core developmental mechanism. T1→T2 first, then T2→T3 with reflect-evolve. Tests toolkit/clustering RAPTOR strategy. | Not started |
-| 8 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Not started |
-| 9 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
-| 10 | Scheduler + Orchestrator | Full activation lifecycle: tension-responsive scheduling, lateral-freedom budget, ambient stream injection. Last because it requires all other modules. | Not started |
+| 2 | Attention Filter | First module that actively uses Memory Store. Tests density metrics. Core novel mechanism. | Not started |
+| 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Not started |
+| 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Not started |
+| 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Not started |
+| 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Not started |
+| 7 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Not started |
+| 8 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
+| 9 | Orchestrator | Full activation lifecycle: tension-responsive scheduling, lateral-freedom budget, ambient stream injection. Last because it requires all other modules. | Not started |
 
 ### Flexible / Deferred Components
 
@@ -94,7 +92,7 @@ Both are flagged as load-bearing for downstream concerns (Reviewer Panel for `Re
 
 ## Key Decisions
 
-See DECISIONS.md for the full decision log (D-1 through D-5).
+See DECISIONS.md for the full decision log (D-1 through D-15).
 
 ## Provisional Contracts
 

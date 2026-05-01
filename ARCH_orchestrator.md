@@ -120,6 +120,18 @@ class GeneratorOutput:
 
 Manual trigger for programmatic or debugging use. Bypasses schedule gates but respects the consolidation lock for distillation.
 
+## Bootstrap Phase
+
+When Tier 3 is empty (no personality files exist yet — the system has not completed its first T2→T3 distillation cycle), the Orchestrator operates in bootstrap mode:
+
+- **Run:** `ingestion` and `distillation_t1t2` activations proceed normally — content enters via Source Ingestion, passes through the Attention Filter (which operates on prompt criteria alone at zero density), and accumulates in Tier 1. Distillation clusters Tier 1 into Tier 2 when gates pass.
+- **Run:** `distillation_t2t3` — once enough Tier 2 patterns exist and the cycle gate passes, this produces the first Tier 3 personality files. Bootstrap mode ends when `memory_store.get_personality_context().personality_files` is non-empty.
+- **Skip:** `generation`, `free_play`, and `respond` activations — the Generator raises `EmptyPersonalityError` without personality context, and generating content without a personality violates the core design principle. The Orchestrator catches `EmptyPersonalityError` and logs it without routing to platforms.
+- **Skip:** `explore` — link-following is deferred until the system has a personality basis for evaluating source quality.
+- **Run:** `decay` — maintenance runs normally.
+
+Corpus adapters in Source Ingestion with `auto_accept_sources` handle the bulk of bootstrap content. The system transitions out of bootstrap automatically once Distillation produces its first Tier 3 files.
+
 ## Activation Types
 
 | Type | Modules Involved | Default Trigger | Lateral Budget |

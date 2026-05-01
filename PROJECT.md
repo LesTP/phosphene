@@ -12,7 +12,7 @@ The human whose corpus seeds it. The system is a creative interlocutor — surfa
 ## Scope
 
 ### Core
-- Corpus seeding pipeline: human writing → knowledge graph → initial personality files
+- Corpus ingestion through Source Ingestion adapters (LiveJournal, Twitter, blog, conversations, plain text)
 - Three-tier hierarchical memory store (daily log → pattern layer → personality files)
 - Attention filter: personality-driven content selection and annotation
 - Distillation engine: tier promotion with RAPTOR-style clustering and two-step reflect-evolve
@@ -73,7 +73,7 @@ Key operational concerns:
 - **RAPTOR** — recursive clustering + abstractive summarization. Direct solution to the distillation problem. Designed for static corpora; adaptive variants exist.
 - **GLA (Generative Life Agents)** — reflect-evolve engine separating synthesis from judgment. Two-step pattern borrowed for Tier 2→3 distillation. No corpus seeding.
 - **PEPA** — personality as intrinsic organizational principle for autonomous behavior. Strongest empirical support for the project's foundational claim.
-- **MiroFish** — corpus-to-graph-to-personality pipeline. Validated, open-source, offline fork runs on Pi 5. Graph construction layer directly reusable for seeding.
+- **MiroFish** — corpus-to-graph-to-personality pipeline. Validated, open-source, offline fork runs on Pi 5. Reference for corpus processing patterns; graph construction approach replaced by incremental Distillation (D-13).
 - **Sapphire** — self-modifying system prompt, heartbeat scheduler, TOOLMAKER module. Implementation reference for free play and personality file updates.
 - **Hermes Agent** — right operational concepts (gateway, cron, Playwright, SOUL.md), brittle implementation. Conceptual reference only, not a codebase to build on.
 - **Anima Framework (Veselov)** — only known in-weights personality project. Early results in toy environments. Worth monitoring but operates on different timeline/resources.
@@ -94,7 +94,7 @@ Key operational concerns:
 - [implementation] **Ambient stream design** — the system receives two kinds of input: source content (filtered by personality) and ambient context (time, budget, interaction recency, potentially arbitrary environmental feeds). Ambient streams bypass the attention filter and are available as environmental context during any activation. What the system does with them is unconstrained. Initial set is minimal; expansion is an ongoing enclosure design question.
 - [implementation] **Third-Order Distillation Quality** — whether three-tier distillation produces genuine insight or progressive banality. Empirical question, answerable only by running the system.
 - [implementation] **Reviewer Panel Calibration** — which model signals to weight, how to handle systematic disagreement, how to prevent single-reviewer bias domination.
-- [implementation] **Identity Drift vs. Development** — how to distinguish healthy personality development from pathological drift. Seed overweighting is the initial mitigation.
+- [implementation] **Identity Drift vs. Development** — how to distinguish healthy personality development from pathological drift. Version-count inertia is the initial mitigation (personality files that survive multiple T2→T3 cycles earn more resistance to change; see D-13).
 - [watch] **In-weights ceiling** — if Veselov's Anima demonstrates capabilities wrapper-level approaches can't match, architecture may need revisiting.
 - [watch] **Model landscape changes** — specific model names and capabilities will shift. Roles and principles are stable; assignments need periodic revision.
 

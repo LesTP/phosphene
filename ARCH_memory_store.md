@@ -27,7 +27,7 @@ class NoteInput:
     unresolvedness: float = 0.0             # [0.0, 1.0] — 0 = resolved
     links: list[str] = field(default_factory=list)   # note_ids of related notes
     tags: list[str] = field(default_factory=list)
-    source: str | None = None               # provenance: "ingestion", "distillation", "seeding", "feedback"
+    source: str | None = None               # provenance: "ingestion", "distillation", "feedback"
     friction_target: str | None = None      # note_id this creates friction with
     embedding: ndarray | None = None        # pre-computed embedding vector (consumer provides)
     attractor_relevance: float | None = None  # [0.0, 1.0] — modifies decay rate. None = default.
@@ -251,7 +251,7 @@ Decay rules (enforced internally, parameters from `MemoryStoreConfig`):
 
 ## Inputs
 
-- **NoteInput** — from Attention Filter (Tier 1 annotated fragments), Distillation (Tier 2 clusters and Tier 3 personality files), Seeding (initial Tier 2/3 content), Feedback Collector (feedback events stored as Tier 1 notes with `source="feedback"`)
+- **NoteInput** — from Attention Filter (Tier 1 annotated fragments), Distillation (Tier 2 clusters and Tier 3 personality files), Feedback Collector (feedback events stored as Tier 1 notes with `source="feedback"`)
 - **NotePatch** — from any module updating note metadata (importance, unresolvedness, links, tags)
 - **ndarray** — pre-computed embedding vectors, provided by consumer alongside note content or as search queries. The Memory Store does not compute embeddings — consumers use toolkit/embedding and pass the results.
 

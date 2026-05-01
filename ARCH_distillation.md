@@ -19,7 +19,8 @@ class DistillationConfig:
     min_time_between_runs: timedelta = timedelta(hours=24)
     min_tier1_volume: int = 20                          # minimum new Tier 1 notes before T1→T2 triggers
     t2_to_t3_cycle_days: int = 30                       # T2→T3 runs on this cadence
-    seed_weight: float = 2.0                            # inertia multiplier for seed-derived personality files
+    inertia_per_cycle: float = 0.25                     # additional inertia weight per survived T2→T3 cycle
+    max_inertia: float = 3.0                              # cap on version-count inertia (effective = min(max_inertia, 1.0 + (version_count-1) * inertia_per_cycle))
     max_compression_ratio: float = 0.5                  # safety cap: max 50% content reduction per T2→T3 pass
     incorporate_feedback: bool = True                    # process feedback events during distillation
 
@@ -127,7 +128,7 @@ Three gates must pass before any distillation runs:
 
 - **Signature:** `distill_t2_to_t3(config: DistillationConfig) -> EvolutionResult`
 - **Parameters:**
-  - config: DistillationConfig — model settings, seed weight, compression cap, feedback preference
+  - config: DistillationConfig — model settings, inertia settings, compression cap, feedback preference
 - **Returns:** EvolutionResult — reflection insights, personality file changes, criteria adjustments
 - **Errors:**
   - `DistillationLockError` — another distillation is running
@@ -145,13 +146,14 @@ Three gates must pass before any distillation runs:
 
 **Step 2 — Evolution:**
 1. Reads current personality files via `memory_store.get_personality_context()`.
-2. Calls LLM (at `evolution_tier`, potentially a different model) with the reflection insights and current personality files. Prompt: decide whether and how to modify personality files. Seed-derived files carry `seed_weight` multiplier — they require proportionally more evidence to override.
+2. Calls LLM (at `evolution_tier`, potentially a different model) with the reflection insights and current personality files. Each personality file's `version_count` (number of T2→T3 cycles survived) is conveyed in the prompt. Files with higher version counts have earned more inertia — effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)` — and require proportionally stronger evidence to override.
 3. For each proposed modification:
    - Checks for contradictions with existing personality claims. Contradictions are resolved via supersession, not accumulation.
    - Enforces `max_compression_ratio` — a single pass cannot reduce personality file content by more than this ratio.
-   - Writes the update via `memory_store.supersede(note_id, new_content, new_title, change_summary)`.
-4. Computes `criteria_adjustments` from feedback data: criteria that consistently produce well-received content get weight increases; criteria that produce ignored content get decreases.
-5. Releases lock.
+   - Writes the update via `memory_store.supersede(note_id, new_content, new_title, change_summary)`. The new note starts with `version_count = 1`.
+4. For personality files that survived this cycle unchanged (in `unchanged_ids`): increments their `version_count` via `memory_store.update_note` metadata update.
+5. Computes `criteria_adjustments` from feedback data: criteria that consistently produce well-received content get weight increases; criteria that produce ignored content get decreases.
+6. Releases lock.
 
 **The reflection output is an audit artifact.** It can be reviewed independently of the evolution output to diagnose whether a personality file change was triggered by genuine insight or by a synthesis artifact.
 
@@ -195,10 +197,10 @@ The summarizer prompt is Phosphene-specific (synthesize observations into patter
 ## Inputs
 
 - **Tier 1 notes** — from Memory Store. Daily log entries stored by the Attention Filter.
-- **Tier 2 notes** — from Memory Store. Pattern clusters from prior T1→T2 runs or from Seeding.
+- **Tier 2 notes** — from Memory Store. Pattern clusters from prior T1→T2 runs.
 - **Tier 3 notes** — from Memory Store. Current personality files.
 - **Feedback events** — from Memory Store. Notes with `source="feedback"` linking back to content and carrying retention criteria metadata.
-- **DistillationConfig** — model settings, thresholds, seed weight, compression cap.
+- **DistillationConfig** — model settings, thresholds, version-count inertia settings, compression cap.
 
 ## Outputs
 
@@ -235,7 +237,8 @@ config = DistillationConfig(
     embedding_config=EmbeddingConfig(model="all-MiniLM-L6-v2"),
     min_tier1_volume=20,
     t2_to_t3_cycle_days=30,
-    seed_weight=2.0,
+    inertia_per_cycle=0.25,
+    max_inertia=3.0,
 )
 
 # Check whether distillation should run

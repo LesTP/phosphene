@@ -84,9 +84,12 @@ class PersonalitySnapshot:
 - **Returns:** GeneratorOutput with `output_mode="prompted"`
 - **Errors:**
   - `LLMAPIError` — generation LLM call failed
-  - `EmptyPersonalityError` — no Tier 3 personality files exist (system not seeded)
+  - `EmptyPersonalityError` — no Tier 3 personality files exist (no personality context yet — Distillation has not completed a T2→T3 cycle)
+
+**Design choice:** The Generator raises `EmptyPersonalityError` rather than falling back to a personality-less mode. The Orchestrator handles this by skipping generation activations during the bootstrap phase (when Tier 3 is empty) and running only ingestion and distillation until personality context emerges. This avoids generating content that doesn't come from "somewhere specific" — a core success criterion.
 
 **Behavior:**
+1. Builds a `PersonalitySnapshot`
 1. Builds a `PersonalitySnapshot`: loads Tier 3 via `memory_store.get_personality_context()`, queries relevant Tier 2 patterns via `memory_store.search_by_embedding()` (if `include_tier2_patterns`), runs skeptical memory check (if enabled).
 2. Constructs LLM prompt with: personality snapshot, ambient context, generation topic, and any specified unresolved threads.
 3. Calls toolkit/llm_client for generation.
@@ -103,10 +106,11 @@ class PersonalitySnapshot:
 - **Returns:** GeneratorOutput with `output_mode="free_play"` and `is_lateral=True`
 - **Errors:**
   - `LLMAPIError` — generation failed
-  - `EmptyPersonalityError` — not seeded
+  - `EmptyPersonalityError` — no personality context yet
 
 **Behavior:**
 1. Builds PersonalitySnapshot (same as `generate`).
+2. Loads the trigger notes
 2. Loads the trigger notes from Memory Store. These are the threads with high `unresolvedness × link_count` — material the system keeps encountering without resolving.
 3. Constructs LLM prompt with personality snapshot, trigger notes, and the affordance list. The prompt does not prescribe what to produce — it presents the unresolved material and the affordances and lets the model choose.
 4. Output may be any intent_tag. `internal_note` outputs are logged but not delivered to platforms (the Output Router handles this).
@@ -121,10 +125,11 @@ class PersonalitySnapshot:
 - **Returns:** GeneratorOutput with `output_mode="response"`
 - **Errors:**
   - `LLMAPIError` — generation failed
-  - `EmptyPersonalityError` — not seeded
+  - `EmptyPersonalityError` — no personality context yet
 
 **Behavior:**
 1. Builds PersonalitySnapshot.
+2. Queries Memory Store
 2. Queries Memory Store for notes relevant to the message content (via `search_by_embedding`).
 3. Constructs LLM prompt with personality snapshot, relevant notes, the message, and ambient context.
 4. Generates a response in the personality's voice.

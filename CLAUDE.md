@@ -29,7 +29,6 @@ you intend to inspect or edit in the same turn when possible.
 | Module | ARCH file |
 |--------|----------|
 | Memory Store | `ARCH_memory_store.md` |
-| Seeding | `ARCH_seeding.md` |
 | Attention Filter | `ARCH_attention_filter.md` |
 | Source Ingestion | `ARCH_source_ingestion.md` |
 | Gateway | `ARCH_gateway.md` |
@@ -60,25 +59,24 @@ high-level orientation.
 
 **Track A — Foundation:**
 - Module 1: Memory Store — three-tier hierarchical memory (leaf, everything depends on it)
-- Module 2: Seeding — corpus-to-personality pipeline (populates Memory Store)
 
 **Track B — Core Loop (content in):**
-- Module 3: Attention Filter — personality-driven content selection
-- Module 4: Source Ingestion — adapters for content sources (including human-share)
+- Module 2: Attention Filter — personality-driven content selection
+- Module 3: Source Ingestion — adapters for content sources (including human-share and corpus import)
 
 **Track C — Core Loop (content out):**
-- Module 5: Gateway — multi-platform message bus
-- Module 6: Generator + Output Router — content generation and delivery
+- Module 4: Gateway — multi-platform message bus
+- Module 5: Generator + Output Router — content generation and delivery
 
 **Track D — Development (personality evolves):**
-- Module 7: Distillation — tier promotion, RAPTOR clustering, reflect-evolve
+- Module 6: Distillation — tier promotion, RAPTOR clustering, reflect-evolve
 
 **Track E — Feedback and Depth:**
-- Module 8: Feedback Collector — signal normalization, silence detection
-- Module 9: Explorer — autonomous link-following
+- Module 7: Feedback Collector — signal normalization, silence detection
+- Module 8: Explorer — autonomous link-following
 
 **Track F — Orchestration (wires everything):**
-- Module 10: Orchestrator — activation lifecycle, scheduling, lateral freedom
+- Module 9: Orchestrator — activation lifecycle, scheduling, lateral freedom
 
 ## Project-Specific Notes
 - **Language:** Python 3.12+

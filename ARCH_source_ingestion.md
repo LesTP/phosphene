@@ -21,7 +21,9 @@ class ContentItem:
 
 @dataclass
 class AdapterConfig:
-    adapter_type: str                               # "telegram_channel", "telegram_bot", "rss", "reddit", "human_share"
+    adapter_type: str                               # "telegram_channel", "telegram_bot", "rss", "reddit", "human_share",
+                                                     # "corpus_livejournal", "corpus_twitter", "corpus_blog",
+                                                     # "corpus_conversations", "corpus_text"
     source_label: str                               # human-readable name (e.g., "Philosophy channel", "My shares")
     poll_interval: timedelta = timedelta(hours=4)   # how often to check for new content
     enabled: bool = True
@@ -124,6 +126,50 @@ Fetches posts from a subreddit.
   4. For URL fetching: uses simple HTTP GET with text extraction (not full Playwright). Falls back to URL-only `ContentItem` (no `content`) if fetch fails — still valuable because the URL + annotation is signal.
 
 **Why this adapter matters:** The design doc identifies the human's curated attention as high-signal data. The Twitter archive is described as "a decade of curated attention encoded as an associative network." The human_share adapter is the live, ongoing version of that — real-time curated attention feeding the personality development loop.
+
+### Corpus Adapters
+
+Corpus adapters handle bulk import of historical writing archives. They replace the former Seeding module — historical corpus enters through the same ingestion path as daily content. Each corpus adapter reads an archive format and produces `ContentItem` objects. During initial import, corpus adapter source labels should be listed in `AttentionFilterConfig.auto_accept_sources` so all corpus items enter Tier 1 with full annotation but without threshold filtering.
+
+#### corpus_livejournal
+
+Long-form reflective prose from LiveJournal HTML exports. Highest personality signal.
+
+- **params:** `{"archive_path": str}` — path to exported HTML files or directory
+- **source field:** `"corpus_livejournal"`
+- **Extraction notes:** Recurring intellectual moves, characteristic tensions, associative patterns, negative space (what is avoided or treated with unusual care). Timestamps from post dates.
+
+#### corpus_twitter
+
+Twitter/X JSON archive. Mostly links with brief reactions.
+
+- **params:** `{"archive_path": str}` — path to Twitter data export directory
+- **source field:** `"corpus_twitter"`
+- **Extraction notes:** Treat primarily as an exploratory library: the linked articles (where accessible) are the content; the tweets themselves are annotations. The pattern of *what was linked across time* is the associative network. Retweets without comment are lower-signal but still contribute to the attention map.
+
+#### corpus_blog
+
+Published blog posts in markdown or HTML.
+
+- **params:** `{"archive_path": str, "format": str}` — format is `"markdown"` or `"html"`
+- **source field:** `"corpus_blog"`
+- **Extraction notes:** Similar to LiveJournal but more curated — may underrepresent characteristic frustrations visible in private writing. Titles and publication dates preserved.
+
+#### corpus_conversations
+
+Conversation history exports (e.g., Claude project exports, chat logs).
+
+- **params:** `{"archive_path": str, "format": str}` — format is `"json"` or `"text"`
+- **source field:** `"corpus_conversations"`
+- **Extraction notes:** Recent, high-signal, unusually explicit about intellectual moves and preferences. The meta-analytical tendency (stepping back to examine conversation structure) is itself a characteristic move worth capturing.
+
+#### corpus_text
+
+Plain text files. No source-specific processing.
+
+- **params:** `{"archive_path": str}`
+- **source field:** `"corpus_text"`
+- **Extraction notes:** Fragments extracted by paragraph or section boundary. No structural assumptions about content format.
 
 ## Integration with Attention Filter
 

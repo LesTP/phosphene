@@ -24,7 +24,7 @@ class FilterCriterion:
 
 @dataclass
 class AttentionFilterConfig:
-    prompt_criteria: list[FilterCriterion]   # personality-derived criteria (from Seeding, updated by Distillation)
+    prompt_criteria: list[FilterCriterion]   # personality-derived criteria (hardcoded defaults, refined by Distillation)
     acceptance_threshold: float = 0.3        # minimum composite score for retention [0.0, 1.0]
     auto_accept_sources: list[str] = field(default_factory=list)
                                              # sources that bypass acceptance_threshold but still get full annotation
@@ -100,7 +100,7 @@ For each content item, the filter:
 
 ### Default Prompt Criteria
 
-Initial criteria operationalized from the seed personality. The Seeding pipeline may customize these; the Distillation engine may revise weights over time based on feedback signals.
+Initial criteria — hardcoded defaults operationalized from the project's design principles. The Distillation engine may revise weights over time based on feedback signals.
 
 | Name | Description | Default Weight |
 |------|-------------|----------------|
@@ -123,7 +123,9 @@ These are always computed. Their contribution to the composite score is governed
 ## Inputs
 
 - **ContentItem** — from Source Ingestion adapters or Explorer. Raw content with source metadata and extracted URLs.
-- **AttentionFilterConfig** — per-call configuration including personality-derived criteria, thresholds, and model settings. Criteria evolve over time: Seeding produces initial criteria from the corpus; Distillation may adjust weights based on accumulated feedback evidence.
+- **AttentionFilterConfig** — per-call configuration including personality-derived criteria, thresholds, and model settings. Criteria evolve over time: initial defaults are hardcoded; Distillation adjusts weights based on accumulated feedback evidence.
+
+**Bootstrap behavior:** When Memory Store is empty (no notes, density metrics at zero), the filter operates on prompt criteria alone — `prompt_weight ≈ 1.0`, structural criteria contribute zero. Corpus sources listed in `auto_accept_sources` bypass the acceptance threshold during initial import while still receiving full annotation. This allows the system to bootstrap from an empty state without requiring a separate seeding pipeline.
 
 ## Outputs
 

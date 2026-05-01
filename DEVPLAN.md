@@ -24,7 +24,7 @@ review_done: null
 - **Gotchas** —
   - toolkit/ is an external dependency — import from it, never modify it
   - Memory Store uses consumer-provided embeddings (no toolkit/embedding dependency in the store itself)
-  - All 10 ARCH files define contracts — implementation must match signatures exactly
+  - All 9 ARCH files define contracts — implementation must match signatures exactly
   - Model selection policy D-5: single primary model during establishment phase (~90 days)
   - NTFS drives: use `bash script.sh`, not `./script.sh`
   - **Test environment** — system Python is 3.11.2 with no pytest; `pip install --user` is blocked (externally-managed-environment); `python3 -m venv .venv` creates binaries that can't run on this NTFS-3G mount (no exec bits, can't chmod). Working pattern: `pip install --target .python_deps` (already pre-installed in repo root) and run with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`. Do NOT recreate `.venv` or reinstall — `.python_deps/` is gitignored and persists.
@@ -32,7 +32,7 @@ review_done: null
 ## Current Status
 
 - **Phase** — Module 1 (Memory Store) complete. No active module.
-- **Focus** — Awaiting human selection of next module from ARCHITECTURE.md's Implementation Sequence (Module 2 Seeding is next per the sequence).
+- **Focus** — Module 2 is now Attention Filter (Seeding module removed per D-13; corpus ingestion absorbed by Source Ingestion adapters). Awaiting phase planning for Attention Filter.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
