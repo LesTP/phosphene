@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 1: Attention Filter contract and scoring foundation.
-- **Focus** — Build the public Attention Filter package contract and deterministic scoring foundation before adding live embedding/LLM calls.
+- **Focus** — Phase 1 implementation steps are complete; ready for phase review before adding live embedding/LLM calls.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -68,6 +68,6 @@ Steps:
   - `score_cluster_novelty(text_sims_to_centroids)` — `1 - max_sim`
   - `score_unresolvedness_affinity(note_similarities, note_unresolvedness_scores)` — weighted sum
   - `compute_phase2_composite(scores, scoring_config)` — weighted average using `ScoringConfig` weights
-- [ ] **2.1.5** — Focused unit tests: package exports match ARCH types, `ScoringConfig` defaults, validation failures, triple-gate activation logic, blend weight edge cases, each geometric scoring helper (boundary values, degenerate inputs like zero/one cluster, empty note list), composite score with non-uniform weights.
+- [x] **2.1.5** — Focused unit tests: package exports match ARCH types, `ScoringConfig` defaults, validation failures, triple-gate activation logic, blend weight edge cases, each geometric scoring helper (boundary values, degenerate inputs like zero/one cluster, empty note list), composite score with non-uniform weights.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

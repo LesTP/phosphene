@@ -9,6 +9,17 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 2.1.5: Attention Filter focused unit tests
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Added focused unit coverage for the Attention Filter public package contract, `ScoringConfig` defaults, and deterministic Phase 2 scoring helpers.
+**Contract changes:** None — tests verify the existing `ARCH_attention_filter.md` contract.
+
+Added export and dataclass field tests for the public `phosphene.attention_filter` API surface, including construction checks for ARCH-defined data models and exception inheritance. Added geometric scoring tests covering boundary values, degenerate zero/one-cluster inputs, empty note lists, clamping behavior, mapping and matrix pairwise cluster similarities, and non-uniform Phase 2 composite weights.
+
+The Attention Filter test slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`.
+
 ### Step 2.1.1: Attention Filter public contract scaffold
 
 **Date:** 2026-05-02
