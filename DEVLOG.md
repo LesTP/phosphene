@@ -9,6 +9,48 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Documentation Reconciliation — D-13, 3.3a, 5.9 Sync
+
+**Date:** 2026-05-02
+**Regime:** Refine
+
+Reconciled all project documentation after two parallel workstreams: D-13 closure (seeding module elimination) and conceptual additions (Section 3.3a geometric formalizations, Section 5.9 configurable parameters). Work proceeded in four stages:
+
+**Stage 1 — phosphene.md D-13 cleanup (12 edits):**
+Sections 2.5, 3.3a, 4.1, 4.2, 4.6, 5.7, 5.9, 6.3 updated to reflect D-13. Exemplar pairs removed per human decision. Corpus-to-knowledge-graph technique moved to new Appendix A. "Seeding Process" → "Corpus Ingestion and Bootstrap." Seed overweighting → version-count inertia throughout.
+
+**Stage 2 — Architecture impact analysis:**
+Read all 9 ARCH files against updated phosphene.md. Identified 6 sync issues (S-1 through S-6) where 3.3a and 5.9 diverged from ARCH specs. Created temporary SYNC_ISSUES.md for structured resolution.
+
+**Stage 3 — Decision resolution (D-17 through D-22):**
+- **D-17 (Critical):** Section 3.3a adopted as implementation spec. Phase 1 = precision_surplus (LLM, intrinsic quality). Phase 2 = 7 geometric criteria: liminality, friction, unexpected_connection, structural_insight (from 3.3a) + link_density, cluster_novelty, unresolvedness_affinity (retained from ARCH). New `ScoringConfig` dataclass separates processing tuning from contract.
+- **D-18:** `phase2_max_weight = 0.7` — prompt criteria always retain ≥30% weight.
+- **D-19:** Triple-gate Phase 2 activation (note_count AND cluster_count AND mean_link_degree).
+- **D-20:** Dropped `slop_sensitivity` — redundant with existing criteria.
+- **D-21:** Deferred proactive budget — keep as conceptual note, implement when needed.
+- **D-22:** Assertion cache — Distillation extracts cluster assertions during T1→T2 for friction scoring.
+
+**Additional design work during resolution:**
+- **Novelty-addiction risk analysis:** Identified self-reinforcing feedback loop from overweighted liminality. Added two mitigations: (1) revised deployment weights prioritizing depth/challenge over novelty (friction=1.5 > structural_insight=1.3 > liminality=1.0 > cluster_novelty=0.8), (2) `min_cluster_coherence` gate in Distillation preventing weak clusters from becoming reference centroids.
+- **Precision surplus formalization options:** Evaluated 4 geometric proxy approaches (embedding specificity, information density, claim-evidence detection, compression resistance). All insufficient — precision surplus is genuinely intrinsic. Recorded as future reference, not pursued.
+
+**Stage 4 — Propagation and cleanup:**
+
+**Files changed:**
+- `phosphene.md` — D-13 cleanup (12 edits), slop_sensitivity removed from 5.9, deployment weights revised, stale "seed overweighting" fixed
+- `ARCH_attention_filter.md` — ScoringConfig dataclass, Phase 1/2 split, triple-gate activation, phase2_max_weight cap, novelty-addiction risk note, updated usage example
+- `ARCH_distillation.md` — assertion cache step and result field, min_cluster_coherence gate and result field, assertion cache in State and Downstream sections
+- `DEVPLAN.md` — Module 2 Phase 1 steps 2.1.1–2.1.5 rewritten for new ARCH spec
+- `DECISIONS.md` — D-17 through D-22 recorded
+- `ARCHITECTURE.md` — decision log reference updated to D-22
+- `prior_art.md` — 6 stale MiroFish/seeding references updated
+
+**File deleted:** `SYNC_ISSUES.md` (all items resolved and propagated).
+
+### Contract Changes
+- `ARCH_attention_filter.md`: new `ScoringConfig` type, revised `AttentionFilterConfig` fields (`scoring`, `assertion_extraction_tier`), `filter_content` behavior rewritten (triple gate, Phase 1/2 split, 7 geometric criteria), prompt criteria reduced to precision_surplus only, structural criteria replaced by Phase 2 geometric criteria table
+- `ARCH_distillation.md`: new `min_cluster_coherence` config field, new `incoherent_cluster_count` and `assertion_cache_updated` result fields, new behavior steps 6 (coherence gate) and 8 (assertion cache extraction), new State entry (assertion cache)
+
 ## Module 2 Phase 1 Plan
 
 **Date:** 2026-05-02
