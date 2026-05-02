@@ -9,6 +9,17 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 2.1.1: Attention Filter public contract scaffold
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Added the initial `phosphene.attention_filter` package surface with ARCH-defined dataclasses, `ScoringConfig` defaults, `InvalidScoreError`, and an `AttentionFilter` constructor stub.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md`.
+
+Created `types.py`, `errors.py`, `filter.py`, and package exports for Module 2. The dataclass scaffold covers `ContentItem`, `FilterCriterion`, `ScoringConfig`, `AttentionFilterConfig`, `AnnotatedFragment`, and `FilterResult`, with `DensityMetrics` and `ndarray` wiring matching downstream contracts. `filter_content` is intentionally left unimplemented because scoring, validation, and live embedding/LLM behavior belong to later Phase 1 steps.
+
+The local checkout does not include the documented sibling toolkit `llm_client` and `embedding` modules, so the scaffold uses import-time compatibility fallbacks for `LLMConfig`, `EmbeddingConfig`, and `ModelTier` while preserving the public field names and defaults.
+
 ## Documentation Reconciliation — D-13, 3.3a, 5.9 Sync
 
 **Date:** 2026-05-02
