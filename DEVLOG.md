@@ -9,6 +9,29 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 2.1 Completion: Attention Filter contract and scoring foundation
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 1 of Module 2 (Attention Filter). Final verification ran the full Attention Filter test slice with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 61 tests pass.
+
+Phase 1 delivered the public `phosphene.attention_filter` package contract, ARCH-aligned dataclasses and exports, `InvalidScoreError`, default precision-surplus prompt criteria, config validation, triple-gate Phase 2 activation, prompt/structure blend weights, deterministic geometric scoring helpers for all seven Phase 2 criteria, weighted Phase 2 composite scoring, and focused unit coverage.
+
+DEVLOG learning review: Phase 1 landed linearly across five implementation steps and one review. The review found and fixed one field-order drift against `ARCH_attention_filter.md`; no repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+
+Contract Changes scan: Phase 1 step entries recorded "Contract changes: None"; the review also recorded no contract changes. The phase fulfilled the existing `ARCH_attention_filter.md` contract, so no upstream document propagation is required.
+
+Log review: `logs/loop/summary.log` shows Module 2 Phase 1 iterations 29-35 completed cleanly with no escalations, no repeated tool failures, and no wasted-turn patterns. No new operational Gotchas to promote.
+
+DEVPLAN cleanup: reduced the Phase 1 step plan to a one-line completion summary referencing this entry. Module 2 remains in progress, with Phase 2 ready for its own Phase Plan.
+
+ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
+
+Frontmatter reset for next phase: `phase: 2`, `phase_title: Memory Store retrieval and embedding integration`, `step: null`, `mode: Discuss`, `review_done: false`.
+
 ### Phase 2.1 Review: Attention Filter contract and scoring foundation
 
 **Date:** 2026-05-02
