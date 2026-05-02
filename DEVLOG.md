@@ -42,6 +42,17 @@ Implemented `phase2_is_active()` for the note count, cluster count, and half-cro
 
 Added focused edge-case tests for empty memory, each missing gate threshold, exactly-at-threshold behavior, linear ramping, high-density capping, and custom crossover settings. The Attention Filter test slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`.
 
+### Step 2.1.4: Phase 2 geometric scoring helpers
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Added deterministic Phase 2 helper functions for all seven geometric Attention Filter criteria plus weighted Phase 2 composite scoring.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md`.
+
+Implemented helpers for liminality, friction, unexpected connection, structural insight, link density, cluster novelty, and unresolvedness affinity. Helpers accept pre-computed similarities or alignment values, clamp returned scores to `[0.0, 1.0]`, normalize link density by candidate count, and clamp unresolvedness affinity after summing weighted note tensions.
+
+Added `compute_phase2_composite()` for `ScoringConfig`-weighted averages across available Phase 2 scores and exported the helper surface from `phosphene.attention_filter`. Existing Attention Filter tests and the full project suite pass with `PYTHONPATH=src:.python_deps python3 -m pytest`.
+
 ## Documentation Reconciliation — D-13, 3.3a, 5.9 Sync
 
 **Date:** 2026-05-02
