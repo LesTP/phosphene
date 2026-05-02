@@ -92,7 +92,7 @@ Both are flagged as load-bearing for downstream concerns (Reviewer Panel for `Re
 
 ## Key Decisions
 
-See DECISIONS.md for the full decision log (D-1 through D-15).
+See DECISIONS.md for the full decision log (D-1 through D-22).
 
 ## Provisional Contracts
 

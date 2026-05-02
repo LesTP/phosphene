@@ -23,6 +23,8 @@ class DistillationConfig:
     max_inertia: float = 3.0                              # cap on version-count inertia (effective = min(max_inertia, 1.0 + (version_count-1) * inertia_per_cycle))
     max_compression_ratio: float = 0.5                  # safety cap: max 50% content reduction per T2→T3 pass
     incorporate_feedback: bool = True                    # process feedback events during distillation
+    min_cluster_coherence: float = 0.4                   # minimum mean pairwise similarity for Tier 2 promotion
+                                                         # clusters below this threshold are held in Tier 1
 
 @dataclass
 class GateStatus:
@@ -42,8 +44,10 @@ class TierPromotionResult:
     updated_cluster_ids: list[str]          # note_ids of Tier 2 notes that were updated (merged new material)
     promoted_count: int                     # Tier 1 notes that contributed to clusters
     noise_count: int                        # Tier 1 notes that didn't cluster (retained in Tier 1)
+    incoherent_cluster_count: int           # clusters below min_cluster_coherence (members retained in Tier 1)
     cluster_tree_depth: int                 # RAPTOR recursion depth reached
     feedback_processed: int                 # feedback events incorporated
+    assertion_cache_updated: list[str]      # cluster_group ids whose assertion cache was refreshed
 
 @dataclass
 class ReflectionInsight:
@@ -119,10 +123,12 @@ Three gates must pass before any distillation runs:
 5. Clusters embeddings via toolkit/clustering with RAPTOR strategy. Passes Tier 1 note contents as `texts` (required by RAPTOR for summarization) and provides callbacks:
    - `raptor_summarizer`: calls toolkit/llm_client to synthesize cluster members into a pattern description
    - `raptor_embedder`: calls toolkit/embedding to embed the summaries for re-clustering
-6. For each cluster: creates or updates a Tier 2 note via `memory_store.store_note` or `memory_store.update_note`, setting `cluster_group` to the cluster identifier.
+6. **Checks cluster coherence**: for each cluster, computes `mean(pairwise_sim(member_embeddings))`. Clusters below `config.min_cluster_coherence` are not promoted — their member notes remain in Tier 1 with unmodified decay windows. This prevents diffuse, gap-filling material from forming weak clusters that become reference centroids for the Attention Filter's geometric scoring (see novelty-addiction risk in ARCH_attention_filter.md). Clusters must earn their status as attractors.
+7. For each coherent cluster: creates or updates a Tier 2 note via `memory_store.store_note` or `memory_store.update_note`, setting `cluster_group` to the cluster identifier.
 7. Wires cross-references between related clusters via `memory_store.add_links`.
-8. Tier 1 notes that clustered are candidates for decay (their content is now captured in Tier 2). Noise items (unclustered) remain in Tier 1 with unmodified decay windows.
-9. Releases lock.
+8. **Extracts and caches assertions** from each cluster summary via a lightweight LLM call. For each new or updated cluster, the call extracts the dominant claims (assertions the cluster's material supports or contests). These are stored alongside cluster centroids as the **assertion cache** — consumed by the Attention Filter's friction scoring, which compares incoming text assertions against cached cluster assertions rather than re-extracting per filter call. Storage: JSON file per cluster in the Tier 2 directory, keyed by cluster_group identifier.
+9. Tier 1 notes that clustered are candidates for decay (their content is now captured in Tier 2). Noise items (unclustered) remain in Tier 1 with unmodified decay windows.
+10. Releases lock.
 
 ### distill_t2_to_t3
 
@@ -204,12 +210,13 @@ The summarizer prompt is Phosphene-specific (synthesize observations into patter
 
 ## Outputs
 
-- **TierPromotionResult** — new/updated Tier 2 cluster notes (written to Memory Store during the call). Counts of promoted and noise items.
+- **TierPromotionResult** — new/updated Tier 2 cluster notes (written to Memory Store during the call). Counts of promoted and noise items. List of cluster_group ids whose assertion cache was refreshed.
 - **EvolutionResult** — reflection insights (audit artifact), supersession records (personality files updated in Memory Store during the call), proposed criteria adjustments (returned to caller for Attention Filter config update — not written to Memory Store).
 - **GateStatus** — whether distillation should run.
 
 **Downstream integration:**
-- New Tier 2 clusters are available to the Attention Filter for cluster novelty scoring (via `memory_store.get_index(tier=2)` cluster_group tags)
+- New Tier 2 clusters are available to the Attention Filter for geometric scoring (Phase 2 criteria use cluster centroids and assertion cache)
+- **Assertion cache**: cluster assertions extracted during T1→T2 are consumed by the Attention Filter's friction scoring. The filter reads cached assertions rather than re-extracting per incoming item. Cache is stored as JSON per cluster in the Tier 2 directory.
 - Updated Tier 3 files are available to the Generator via `memory_store.get_personality_context()`
 - `criteria_adjustments` should be applied to `AttentionFilterConfig.prompt_criteria` weights before the next filter run
 - Supersession records provide the audit trail for personality development tracking
@@ -218,6 +225,7 @@ The summarizer prompt is Phosphene-specific (synthesize observations into patter
 
 - **Consolidation lock:** in-memory flag preventing concurrent distillation runs. If the process crashes, the lock is released on restart. The lock is not persistent — a clean restart always clears it.
 - **Last-run timestamps:** persisted to a metadata file in the Memory Store vault. Tracks when T1→T2 and T2→T3 last ran, used by `check_gates`. Updated after each successful distillation.
+- **Assertion cache:** JSON files in the Tier 2 directory, one per cluster, containing dominant assertions extracted from cluster summaries. Updated during each T1→T2 run for new and modified clusters. Consumed by the Attention Filter for friction scoring.
 - No other state. All content state lives in Memory Store.
 
 ## Usage Example

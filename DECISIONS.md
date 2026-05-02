@@ -119,3 +119,45 @@ Priority: Important
 Decision: Module 2 Phase 1 will implement the Attention Filter public dataclasses, package exports, default criteria, validation, blend-weight calculation, and deterministic structural scoring helpers before adding live embedding or LLM execution.
 Rationale: `ARCH_attention_filter.md` mixes pure contract/scoring behavior with side-effecting toolkit calls. Splitting the pure foundation first gives the next steps a small, testable surface and lets later embedding/LLM phases plug into stable types and scoring semantics without reworking the package boundary.
 Revisit if: The toolkit clients require constructor-time or config-time behavior that forces changes to the public dataclasses or validation semantics.
+
+D-17: Phase 2 geometric criteria as implementation spec (3.3a adoption)
+Date: 2026-05-02 | Status: Closed
+Priority: Critical
+Decision: Section 3.3a's geometric formalizations are the implementation spec for the Attention Filter's Phase 2 scoring. Seven criteria computed geometrically against Tier 2 cluster structure: liminality, friction, unexpected_connection, structural_insight (from 3.3a) plus link_density, cluster_novelty, unresolvedness_affinity (retained from ARCH). Phase 1 retains only precision_surplus (LLM-scored) — the one criterion that resists geometric formalization because it measures intrinsic text quality, not relational position. A `ScoringConfig` dataclass separates processing-level tuning (weights, thresholds) from the architectural contract.
+Rationale: Geometric criteria are cheaper (vector arithmetic vs. LLM calls), more reproducible, and scale with cluster count rather than LLM budget. The four 3.3a criteria and three ARCH structural criteria measure different, non-overlapping signals. Precision surplus is genuinely intrinsic (claim-evidence tightness) and doesn't reduce to vector math.
+Revisit if: Geometric formalizations prove too noisy in practice and require excessive threshold tuning. Or if a satisfactory geometric proxy for precision surplus emerges.
+
+D-18: Phase 2 weight cap at 0.7
+Date: 2026-05-02 | Status: Closed
+Priority: Important
+Decision: Phase 2 (structural) weight maxes out at `phase2_max_weight = 0.7`. Prompt criteria always retain at least 30% of the composite score. Configurable via `ScoringConfig`.
+Rationale: With D-17, Phase 1 is just precision_surplus. A 30% floor ensures the LLM's quality judgment always contributes — the system never becomes purely structural. Guards against geometric criteria converging on structurally interesting but intellectually sloppy material.
+Revisit if: Precision surplus proves so noisy that its 30% contribution is net-negative, or if a geometric proxy makes the floor unnecessary.
+
+D-19: Triple-gate Phase 2 activation
+Date: 2026-05-02 | Status: Closed
+Priority: Important
+Decision: Phase 2 activates only when all three metrics cross their thresholds: note count, cluster count, AND mean link degree. Thresholds are `ScoringConfig` parameters, calibrated during first month.
+Rationale: Phase 2 criteria depend on cluster centroids and existing notes. Activating before clusters exist produces meaningless scores. A single metric (mean_link_degree only) could activate prematurely with sparse but heavily cross-linked networks. The triple gate ensures breadth (notes), structure (clusters), and connectivity (links) all exist before structural scoring is trusted.
+Revisit if: Triple gate proves too conservative and delays Phase 2 past usefulness, or a single compound metric captures the same intent more simply.
+
+D-20: Drop slop sensitivity
+Date: 2026-05-02 | Status: Closed
+Priority: Normal
+Decision: Remove `slop_sensitivity` parameter from Section 5.9. Do not implement a dedicated AI-text detection signal.
+Rationale: Redundant with existing criteria. Precision surplus, friction, liminality, unexpected connection, structural insight, cluster novelty, and unresolvedness affinity all give generic AI text low scores. The composite importance_score falls below the acceptance threshold without a dedicated detector. Link_density is the only criterion where slop could score moderately (generic embeddings), but one moderate out of eight can't carry past threshold. A dedicated detector adds complexity and false-positive risk for a problem the existing criteria handle.
+Revisit if: Slop is observed getting through the filter during first-month calibration.
+
+D-21: Defer proactive budget
+Date: 2026-05-02 | Status: Closed
+Priority: Normal
+Decision: Keep the proactive/reactive message distinction as a conceptual note in phosphene.md (Section 4.5, KAIROS reference). Do not add to ARCH or implement. The Orchestrator's schedule and token budgets already limit output frequency.
+Rationale: Specific rate-limit parameters (2 messages per 15-minute window) are deployment tuning. The schedule constrains output frequency implicitly — generation fires once daily, free play on tension threshold. Spam risk materializes only during high-tension bursts, already constrained by token budgets. Implementing before observing actual output patterns is premature.
+Revisit if: The system produces output bursts that overwhelm the human during high-tension periods, or if multiple activation types fire in quick succession.
+
+D-22: Assertion cache at distillation time
+Date: 2026-05-02 | Status: Closed
+Priority: Important
+Decision: The Distillation engine extracts dominant assertions from each Tier 2 cluster summary during `distill_t1_to_t2` and caches them as JSON alongside cluster centroids. The Attention Filter reads cached assertions for friction scoring — the per-item LLM call only extracts claims from the incoming text, not from existing clusters.
+Rationale: Friction scoring compares incoming assertions against cluster assertions. Re-extracting cluster claims per incoming item would multiply LLM calls by items × clusters. Caching at distillation time amortizes the cost. Cluster summaries are stable between distillation runs.
+Revisit if: Cluster summaries change between distillation runs in ways that make cached assertions stale.

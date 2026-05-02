@@ -221,7 +221,7 @@ MiroFish (github.com/666ghj/MiroFish) is a Chinese open-source swarm intelligenc
 
 ### Why it appeared here
 
-You can feed it a novel and have it predict the lost ending. The *Dream of the Red Chamber* demo got the most attention. More relevantly: the pipeline from document corpus → knowledge graph → agent personality is exactly what the seeding process requires.
+You can feed it a novel and have it predict the lost ending. The *Dream of the Red Chamber* demo got the most attention. More relevantly: the pipeline from document corpus → knowledge graph → agent personality is a reference for corpus processing patterns, though the graph construction approach has been replaced by incremental Distillation (D-13). The corpus-to-knowledge-graph technique is preserved in Appendix A of the design document as a potential future tool.
 
 ### The fundamental difference
 
@@ -229,17 +229,17 @@ MiroFish points outward: use many agents to model the world. The Phosphene point
 
 ### What to take: the corpus-to-graph pipeline
 
-MiroFish's seeding pipeline is directly applicable and implementation-ready:
+MiroFish's corpus processing pipeline is a validated reference implementation:
 
 document(s) → LLM ontology extraction → knowledge graph (KuzuDB/Neo4j) → entity and relationship filtering → agent persona generation via LLM
 
-Adapted for the Phosphene: the corpus replaces the single seed document; persona generation produces Tier 2 pattern clusters and Tier 3 personality files rather than individual agent profiles; the graph persists as the initial associative network rather than being consumed by a simulation.
+Phosphene does not use this pipeline directly — corpus ingestion goes through Source Ingestion adapters into the standard Distillation path (D-13). However, the graph construction technique is preserved in Appendix A as a potential tool for future use cases (pre-ingestion corpus analysis, relationship extraction, etc.).
 
 The offline fork (github.com/nikmcfly/MiroFish-Offline) runs entirely on Neo4j + Ollama, fits the Pi 5 architecture, has an English UI. The graph construction layer is directly reusable. The OASIS simulation layer is not needed.
 
 ### Does this require amending the approach?
 
-Yes — the seeding process section (Section 4.2) should reference the MiroFish pipeline as a validated implementation starting point. The Twitter archive in particular benefits from this treatment: process it as a graph of linked articles with reactions as annotations, encoding a decade of curated attention as an associative network rather than just extracting personality from the tweet text.
+Yes — the design document references the MiroFish pipeline as a validated corpus-to-graph technique (see Appendix A). However, per D-13, the seeding process no longer uses a separate batch pipeline — corpus material enters through Source Ingestion adapters and develops personality through the same Distillation path as day-to-day content.
 
 ---
 
@@ -256,8 +256,8 @@ Yes — the seeding process section (Section 4.2) should reference the MiroFish 
 | Browser automation / link-following | Yes | **Hermes (Playwright)** |
 | Session search / conversation history | Yes | **Hermes (FTS5 + Gemini)** |
 | In-weights personality development | Research | Anima (Veselov) |
-| Corpus-to-graph-to-personality pipeline | Yes | **MiroFish** |
-| Personal corpus seeding | Partial | MIT SimulaLife research |
+| Corpus-to-graph pipeline | Yes | **MiroFish** (reference technique — see Appendix A; D-13 replaced with incremental Distillation) |
+| Corpus ingestion / seeding | Yes | Source Ingestion adapters (D-13) |
 | Attention filter / personality-driven ingestion | No | — |
 | Periodic distillation across memory tiers | Partial | Sleep-consolidation tutorial |
 | Output form emerging from personality | No | — |
@@ -278,11 +278,11 @@ Based on this survey, five additions are worth making to the design document:
 
 **3. Hermes Agent as primary infrastructure reference** (Section 5.5) — Replaces Ouroboros as the primary infrastructure candidate. Hermes provides gateway, cron, browser tools, and session search as-is. The Phosphene adds content pipeline, hierarchical memory, and distillation on top. Development sequence starts with "set up Hermes" not "build from scratch."
 
-**4. MiroFish as seeding pipeline implementation** (Section 4.2) — The corpus-to-graph pipeline is validated and directly reusable. The offline fork runs locally on Pi 5 architecture. The Twitter archive should be processed as a linked-article graph, not just extracted for tweet text.
+**4. MiroFish as corpus processing reference** (Appendix A) — The corpus-to-graph pipeline is validated and the offline fork runs locally. Per D-13, the standalone seeding pipeline was eliminated — corpus ingestion goes through Source Ingestion adapters. The MiroFish technique is preserved in Appendix A as a reference for potential future use.
 
-**5. Drift handled by seed overweighting** (Section 4.6) — Done. Lightweight structural mitigation; calibrated empirically once the system runs.
+**5. Drift handled by version-count inertia** (Section 4.6) — Done. Personality files gain resistance to change by surviving T2→T3 distillation cycles. Calibrated empirically once the system runs.
 
-The Phosphene's specific combination — **corpus-seeded attractor → filtered ingestion → Zettelkasten memory → periodic distillation → form-emergent output** — remains without direct precedent. The gap map now shows that operational infrastructure (Hermes) and the seeding pipeline (MiroFish) are both available as validated starting points. The genuinely novel work is the attention filter, the hierarchical memory with friction preservation, and the form-emergent output mechanism.
+The Phosphene's specific combination — **corpus-ingested attractor → filtered ingestion → Zettelkasten memory → periodic distillation → form-emergent output** — remains without direct precedent. The gap map now shows that operational infrastructure (Hermes) and corpus processing references (MiroFish) are available as validated starting points. The genuinely novel work is the attention filter, the hierarchical memory with friction preservation, and the form-emergent output mechanism.
 
 ---
 

@@ -187,13 +187,11 @@ MiroFish (github.com/666ghj/MiroFish) is a Chinese open-source swarm intelligenc
 
 MiroFish’s goal — prediction through collective simulation — is completely different from the Phosphene’s goal. Personality is a parameter in MiroFish, not the product. Agents are disposable instruments; individual histories don’t matter, only aggregate patterns. Phosphene is the inverse: one agent, persistent, long time horizon, where personality is the product.
 
-### What to Take: The Corpus-to-Graph Pipeline
+### What to Consider: The Corpus-to-Graph Pipeline
 
-MiroFish’s seeding pipeline is directly applicable and implementation-ready. Its flow: document(s) → LLM ontology extraction → knowledge graph (KuzuDB / Neo4j) → entity and relationship filtering → agent persona generation via LLM. This is exactly the pipeline needed to convert the writing corpus into initial Tier 2 clusters and Tier 3 personality files. Validated, working, open-source.
+MiroFish's seeding pipeline is a validated corpus-to-knowledge-graph approach. Its flow: document(s) → LLM ontology extraction → knowledge graph (KuzuDB / Neo4j) → entity and relationship filtering → agent persona generation via LLM. The offline fork (github.com/nikmcfly/MiroFish-Offline) runs entirely locally with Neo4j + Ollama, fits the Pi 5 architecture, and has an English UI.
 
-The offline fork (github.com/nikmcfly/MiroFish-Offline) runs entirely locally with Neo4j + Ollama, fits the Pi 5 architecture, and has an English UI. The graph construction layer is reusable; the OASIS simulation engine is not needed.
-
-See Section 4.2 for how this pipeline is adapted for the seeding process.
+This project initially planned to use the MiroFish pipeline for batch corpus seeding. That approach was superseded by D-13: corpus material is now ingested through Source Ingestion adapters and personality develops exclusively through the Distillation engine — the same mechanism used for day-to-day content. The corpus-to-knowledge-graph technique remains a useful tool for future analysis or diagnostics; see Appendix A.
 
 ## 2.6 In-Weights: The Anima Framework (Veselov)
 
@@ -262,6 +260,107 @@ Ambient data is injected as a lightweight context blob at activation time. Initi
 The initial ambient set is deliberately minimal. Expansion is an ongoing enclosure design question. Potential future ambient streams — a view from a window, weather data, a railroad schedule, a radio telescope feed — are legitimate if they enrich the environment the personality develops within. The test for including an ambient stream is not "will the system find this useful" (we don't know and shouldn't predict) but "does this add a real dimension to the enclosure."
 
 Budget awareness deserves special emphasis. Unlike other ambient data, the API budget is a resource constraint the system can both sense and regulate. The system can choose to spend budget on distillation or on following an interesting link, defer something expensive to a later activation, choose a cheap model for routine work so it can afford an expensive model for something it cares about. Budget-awareness is not metadata — it is self-knowledge. What the system spends under constraint is a personality expression.
+
+## 3.3a Formalizing Filter Criteria: Semantic Vectors and Network Geometry
+
+The attention filter criteria — friction, liminality, unexpected connection, precision surplus, structural insight — are currently defined qualitatively. This section specifies how each can be formalized as a computable score, and how those scores combine into the final importance signal.
+
+### The Core Insight: Criteria Are Relational, Not Intrinsic
+
+Friction and liminality are not properties of a text in isolation. A text is frictionful *relative to an existing conceptual framework*. A text is liminal *relative to an existing categorical structure*. This means the scoring function is not just f(text) — it is f(text, network_state). The scores update automatically as the memory network develops, without any changes to the filter logic.
+
+This is precisely why the attention filter transitions from prompt-weighted to structure-weighted as the network matures. Early in the system's life there is no cluster structure to measure against, so scoring falls back to exemplar similarity. Once sufficient material has accumulated, the network itself defines what counts as frictionful or liminal for this particular personality.
+
+### Two-Phase Filter Architecture
+
+The attention filter runs as two phases with combined scoring:
+
+**Phase 1 — LLM scoring (always active):** handles criteria that resist geometric formalization: precision surplus and a basic relevance pre-filter. One LLM call per content chunk. Scores precision surplus (gap between what is claimed and how precisely it is supported) and filters obvious misses before Phase 2 runs. Cheap and fast.
+
+**Phase 2 — Vector scoring against cluster structure (activates at density threshold):** handles liminality, friction, unexpected connection, and structural insight geometrically, using the current Tier 2 cluster structure as the reference space. Computationally cheap once embeddings exist — pure vector arithmetic. Requires no prompt changes as the network evolves.
+
+The combined importance score is a weighted sum of Phase 1 and Phase 2 outputs. Phase 1 weight starts at 1.0 / Phase 2 weight starts at 0.0. As network density crosses the transition threshold, Phase 2 weight increases linearly until the configured maximum (deployment parameter: `phase2_max_weight`, Phosphene default: 0.7).
+
+### Criterion Formalizations
+
+**Liminality score**
+
+A text is liminal if it falls between existing clusters rather than belonging clearly to one.
+
+```
+liminality(text) = 1 - max_similarity(text, all_cluster_centroids)
+                   × gap_factor(sim_rank_1, sim_rank_2)
+```
+
+Where `gap_factor` increases as the similarity to the top cluster and the second cluster converge — a text equidistant between two clusters is more liminal than one that narrowly missed belonging to one. High liminality score: the content is genuinely between established patterns in this personality's network.
+
+**Friction score**
+
+A text is frictionful if it is topically related to an existing cluster but contradicts or complicates its dominant claims.
+
+```
+friction(text) = topical_similarity(text, nearest_cluster)
+                × (1 - assertion_alignment(text, nearest_cluster))
+```
+
+`topical_similarity` is cosine similarity of embeddings — the text is about the same things. `assertion_alignment` requires extracting the dominant claims from the cluster summary and the incoming text and scoring their compatibility. This is one additional cheap LLM call (extract claims, score alignment) but it is the most semantically rich signal in the filter. High friction: the text knows the territory but says something the network's current model of that territory doesn't accommodate.
+
+**Unexpected connection score**
+
+A text makes an unexpected connection if it has meaningful similarity to two clusters that have low mutual similarity — it bridges things the network has not yet connected.
+
+```
+unexpected_connection(text) = max over all cluster pairs (i, j) of:
+    min(sim(text, cluster_i), sim(text, cluster_j))
+    × (1 - sim(cluster_i, cluster_j))
+```
+
+High score: the text is reasonably close to both clusters, and those clusters are far from each other. The text is doing connective work the network hasn't done.
+
+**Structural insight score**
+
+A text operates at the pattern-layer level of abstraction — it says something about how things connect rather than adding more raw material.
+
+```
+structural_insight(text) = sim(text, meta_cluster_of_tier2_summaries)
+```
+
+The Tier 2 synthesis outputs are themselves embedded and averaged into a meta-cluster representing "the kind of thing this personality synthesizes." High structural insight score: the incoming text resembles existing synthesis outputs in register and abstraction level, not just in topic.
+
+**Precision surplus (Phase 1 only)**
+
+The gap between what a text claims and how precisely it supports the claim. This is scored by the LLM in Phase 1 because it requires understanding the relationship between assertions and evidence — a judgment that doesn't reduce cleanly to vector arithmetic. Prompt: "Score the ratio of precise claim to vague gesture in this text. High score: claims are specific, evidence is tight, the text could not have been written without knowing something. Low score: claims are general, evidence is gestures toward evidence."
+
+### Criterion Initialization
+
+Before live ingestion begins, there is no cluster structure for Phase 2 to score against. The system bootstraps as follows:
+
+1. **Corpus ingestion through Source Ingestion adapters** populates Tier 1. During this period, the Attention Filter operates at `prompt_weight ≈ 1.0` — Phase 1 (LLM scoring) carries the full load. Phase 2 weight is 0.0 because no clusters exist yet. The `auto_accept_sources` config flag on corpus adapters ensures seed material enters the memory store without being filtered out by an empty-network attention filter.
+
+2. **First Distillation cycles** produce initial Tier 2 clusters via RAPTOR clustering over accumulated Tier 1 notes. These clusters become the starting reference space for Phase 2 scoring — the personality's initial associative network expressed as cluster centroids.
+
+3. **Criterion calibration pass** (optional, human-initiated): once the first clusters exist, the attention filter can be run on a held-out sample of ingested material with both Phase 1 and Phase 2 active, and the resulting scores reviewed by the human. The goal is to verify that what the filter is passing looks like what the personality would find interesting. This calibration step is not required for operation — the prompt-to-structure transition handles it automatically — but it provides an early diagnostic checkpoint.
+
+The prompt-to-structure transition mechanism (Section 3.4) governs the rest: as cluster count, note count, and mean link degree grow, Phase 2 weight increases and the system progressively relies on structural signals rather than prompt criteria.
+
+### Transition Mechanism (Prompt-to-Structure)
+
+The Phase 1 → Phase 2 weight transition is triggered by network density metrics:
+
+- **Note count**: number of Tier 1 entries retained (proxy for raw ingestion volume)
+- **Cluster count**: number of Tier 2 clusters (proxy for pattern formation)
+- **Mean link degree**: average number of wikilinks per Tier 1 note (proxy for associative network density)
+
+Transition begins when all three cross their threshold values (deployment parameters, Phosphene defaults: TBD — first-month calibration task). Phase 2 weight increases linearly from 0.0 to `phase2_max_weight` as mean link degree rises from threshold to 2× threshold. Above 2× threshold, Phase 2 weight is fixed at maximum.
+
+This is the concrete implementation of the prompt-to-structure transition that was previously specified as a principle without a mechanism.
+
+### Implementation Notes
+
+- **Embedding model**: use a single consistent model for all embeddings (cluster centroids, incoming content). Changing the embedding model invalidates all stored centroids. Deployment parameter: `embedding_model`. Phosphene default: TBD — choose at implementation time based on available options and cost.
+- **Cluster centroid storage**: cluster centroids are stored as numpy arrays alongside the Tier 2 markdown files. Updated whenever a distillation run produces new or modified clusters.
+- **Assertion extraction cache**: claim extraction from cluster summaries is cached at distillation time, not recomputed per incoming content chunk. The friction score's LLM call only extracts claims from the *incoming* text; cluster claims are pre-extracted.
+- **Phase 2 cost**: for a content chunk against N clusters, Phase 2 requires N cosine similarity computations (microseconds each) plus one LLM call for assertion extraction (the friction component). Total Phase 2 cost per chunk is dominated by the single assertion-extraction call, not by the vector arithmetic.
 
 ## 3.4 Layer 2: Attention Filter
 
@@ -480,16 +579,16 @@ These percentages are a starting guess. The right allocation will depend on sour
 
 ## 4.1 Seeding Material
 
-The agent is seeded from a corpus of writing produced by or curated by the person whose personality is being modeled. The seeding strategy is per-source — each source type has different characteristics and should be processed differently. The goal is not to extract an explicit preference list but to produce an initial memory network with enough density and structure to give the attention filter something to work with.
+The agent is seeded from a corpus of writing produced by or curated by the person whose personality is being modeled. The corpus is ingested through Source Ingestion adapters (one adapter type per source format), passed through the Attention Filter, and accumulated in the Memory Store like any other content. Personality develops exclusively through Distillation — the same mechanism used for day-to-day material (see D-13). The goal is not to extract an explicit preference list but to accumulate enough density in the memory network for the attention filter and distillation engine to have something to work with.
 
 ### Available Sources
 
-- LiveJournal archive: approximately one decade of personal prose writing. The richest source for personality derivation — long-form, reflective, spanning a significant developmental period. Process to extract: recurring intellectual moves, characteristic tensions, associative patterns, and the negative space of what is systematically avoided or treated with unusual care.
-- Twitter export: mostly links to articles with brief reactions. Should be treated primarily as an exploratory library rather than as personality evidence — a decade of curated attention is itself an associative network. Process the linked articles where accessible; use the reactions as annotations indicating the person’s angle on each piece. The pattern of what was linked, across time, is as informative as what was said about it.
+- LiveJournal archive: approximately one decade of personal prose writing. The richest source for personality derivation — long-form, reflective, spanning a significant developmental period. The corpus adapter should preserve: recurring intellectual moves, characteristic tensions, associative patterns, and the negative space of what is systematically avoided or treated with unusual care.
+- Twitter export: mostly links to articles with brief reactions. Should be treated primarily as an exploratory library rather than as personality evidence — a decade of curated attention is itself an associative network. The corpus adapter processes linked articles where accessible; reactions serve as annotations indicating the person's angle on each piece. The pattern of what was linked, across time, is as informative as what was said about it.
 - Blogs and other published writing: treat similarly to LJ but with the awareness that published writing is more curated and may underrepresent the characteristic frustrations and tensions that are more visible in private writing.
-- Model conversation history from Claude projects: recent, high-signal, unusually explicit about the person’s intellectual moves and preferences — these conversations are often the clearest articulations of the attractor. The meta-analytical tendency visible here (the habit of stepping back to examine the structure of the conversation itself) is itself a characteristic move worth capturing.
+- Model conversation history from Claude projects: recent, high-signal, unusually explicit about the person's intellectual moves and preferences — these conversations are often the clearest articulations of the attractor. The meta-analytical tendency visible here (the habit of stepping back to examine the structure of the conversation itself) is itself a characteristic move worth capturing.
 
-Each source type will require a different processing approach, to be worked out individually when implementation begins. The order should roughly follow signal density: model conversations and LJ first (highest personality signal), then published writing, then Twitter as exploratory library.
+Each source type has a dedicated Source Ingestion adapter (see ARCH_source_ingestion.md: `corpus_livejournal`, `corpus_twitter`, `corpus_blog`, `corpus_conversations`, `corpus_text`). The order of ingestion should roughly follow signal density: model conversations and LJ first (highest personality signal), then published writing, then Twitter as exploratory library.
 
 ### What to Derive
 
@@ -507,29 +606,28 @@ Each source type will require a different processing approach, to be worked out 
 - Executor’s eye: attention to where implementation friction lives, not just conceptual elegance
 - Register fluency: the ability to move between technical and cultural domains without treating either as primary
 
-These are a starting characterization, not a fixed inventory. They should be revised as the seeding process runs — some may turn out to be surface features of particular periods rather than deep structural patterns, and new ones will likely emerge from the LJ material.
+These are a starting characterization, not a fixed inventory. They should be revised as corpus ingestion progresses — some may turn out to be surface features of particular periods rather than deep structural patterns, and new ones will likely emerge from the LJ material.
 
-## 4.2 Seeding Process
+## 4.2 Corpus Ingestion and Bootstrap
 
-The seeding process should not produce a fixed personality document that gets loaded into every context. It should produce:
+There is no separate seeding process. Corpus material enters through Source Ingestion adapters and follows the same path as day-to-day content: Source Ingestion → Attention Filter → Memory Store (Tier 1) → Distillation → Tier 2/3. This is a deliberate design choice (D-13): one personality development mechanism from day one.
 
-- An initial set of Tier 3 personality files, representing the starting attractor state
-- An initial set of Tier 2 pattern layer entries, representing the characteristic tensions and associative clusters from the corpus
-- An initial set of attention filter criteria, operationalized from the intellectual moves above
+The bootstrap problem — the Attention Filter has nothing to filter against when the memory store is empty — is solved by two mechanisms:
+
+- **`auto_accept_sources` config on corpus adapters**: during initial corpus ingestion, content from corpus adapters bypasses the filter's normal rejection threshold. This ensures seed material enters the memory store without being filtered out by an empty-network attention filter.
+- **`prompt_weight ≈ 1.0` at zero density**: the attention filter starts in pure prompt-weighted mode (Phase 1 LLM scoring only). Structural scoring (Phase 2) activates only after the first Distillation cycles produce cluster structure. The prompt-to-structure transition handles this automatically.
+
+The seeding phase produces no special artifacts. What emerges is:
+
+- Tier 1 notes accumulated from corpus material, with cross-references and importance scores
+- Tier 2 pattern clusters from the first Distillation cycles, representing the characteristic tensions and associative clusters in the corpus
+- Tier 3 personality files from the first T2→T3 distillation, representing the starting attractor state
 
 These are starting points, not constraints. The expectation is that the personality will develop away from the seed as the agent processes new material. A personality that remains identical to its seed has not developed — it has stagnated.
 
-### [PROVISIONAL] Seeding Pipeline Implementation
+### [PROVISIONAL] Version-Count Inertia
 
-MiroFish (github.com/666ghj/MiroFish) provides a validated, reusable implementation of the corpus-to-knowledge-graph-to-personality pipeline that directly maps onto the seeding process. Its flow:
-
-- Document(s) → LLM ontology extraction → knowledge graph (KuzuDB by default, Neo4j in the offline fork)
-- Knowledge graph → entity and relationship filtering → agent persona generation via LLM
-- Persona generation produces: personality traits, background, stance, social relationships, initial memory
-
-For the Phosphene, this pipeline is adapted as follows: the corpus replaces the single seed document; the persona generation step produces Tier 2 pattern clusters and Tier 3 personality files rather than individual agent profiles; and the graph persists as the initial associative network rather than being consumed by a simulation. The Twitter archive in particular should be processed as a graph of linked articles with reactions as annotations — a decade of curated attention encoded as an associative network.
-
-The offline fork (github.com/nikmcfly/MiroFish-Offline) runs entirely locally with Neo4j + Ollama and fits the Pi 5 architecture. The graph construction layer is directly reusable; the OASIS simulation engine is not needed.
+Identity drift is mitigated not by a fixed seed overweighting coefficient but by version-count inertia: personality files that survive multiple T2→T3 distillation cycles earn proportionally more resistance to change. Effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)`. Early personality files are easy to revise; mature ones require more accumulated evidence to shift. This allows the personality to develop freely during the bootstrap period while naturally stabilizing as the attractor consolidates.
 
 ## 4.3 Expected Behaviors
 
@@ -592,9 +690,9 @@ A second implementation reference: KAIROS, an unreleased always-on daemon in the
 
 The system is designed to develop, and development will inevitably mean the personality drifts from the seed over time. This is not a failure mode — people’s personalities also change over time. The ‘stopped reading’ signal is sufficient as a primary indicator that something has gone wrong, and it will catch severe or rapid drift.
 
-A lightweight structural mitigation: **weight the seed material more heavily than new ingested content** in the distillation process. When the evolution pass compares candidate insights against existing personality files, the seed-derived files carry more inertia than recently-acquired pattern layer entries. This slows drift without preventing development — new material can still shift the personality, but it has to accumulate enough weight to do so.
+A lightweight structural mitigation: **version-count inertia** on personality files. Files that survive multiple T2→T3 distillation cycles earn proportionally more resistance to change (effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)`). Early personality files are easy to revise; mature ones require more accumulated evidence to shift. When the evolution pass compares candidate insights against existing personality files, mature files carry more inertia than recently-created ones. This slows drift without preventing development — new material can still shift the personality, but it has to accumulate enough weight to do so.
 
-The right balance between seed inertia and new material influence is an empirical question that can only be calibrated by running the system for a while. Start with a relatively high seed weight and adjust based on observed behavior.
+The right balance between inertia parameters is an empirical question that can only be calibrated by running the system for a while. Start with moderate inertia and adjust based on observed behavior.
 
 # 5. Technical Implementation
 
@@ -743,7 +841,6 @@ The alternative — pulling in external frameworks — carries the risk demonstr
 - explorer/ — Playwright subprocess, pre-fetch scoring, source evaluation protocol, subscription management with human-approval gate. Useful for any content-ingestion agent: openclaw, market intelligence, research assistant.
 - attention_filter/ — LLM-based content scoring against a criteria set, annotation rather than summarization, structured fragment output. The criteria are Phosphene-specific but the scaffolding is generic. Replace criteria for domain-specific filtering.
 - distillation/ — RAPTOR-style clustering, threshold-triggered synthesis, two-step reflect-evolve. Reusable for any system that needs to build hierarchical knowledge from accumulating content.
-- graph_builder/ — MiroFish-style corpus-to-knowledge-graph pipeline (Neo4j + Ollama). Reusable for seeding any personality or domain model from a document corpus.
 
 ### Modules That Are Phosphene-Specific
 
@@ -796,6 +893,135 @@ The feedback collector receives events from all platforms, normalizes them into 
 - Reviewer signals are logged with model identity attached. Disagreement between reviewers is computed and stored as a separate field.
 - The feedback collector does not interpret signals — it normalizes and stores. Interpretation happens in the distillation engine when feedback events are incorporated into the pattern layer.
 
+## 5.9 Configurable Parameters: The Phosphene Deployment vs. the Platform
+
+The architecture described in this document was designed with one specific deployment in mind — Phosphene, seeded from one person's corpus, oriented toward a specific kind of intellectual output. But most of the design decisions that were resolved one way could have been resolved differently. Making these decisions explicit as configurable parameters serves two purposes: it clarifies what the actual design choices were and why, and it opens the path toward the system being a reusable platform that other deployments can configure without forking the codebase.
+
+The following parameters are organized by layer. Each entry states the current Phosphene value, the range of sensible alternatives, and what changing it would do.
+
+A `deployment.yaml` at the root of the project sets all of these. The codebase reads from it; nothing is hardcoded into module logic.
+
+### Attention Filter Parameters
+
+**Filter axis weights** — a numeric weight (0.0–2.0) for each Phase 2 scoring axis plus Phase 1 precision_surplus. These are starting points for empirical calibration — expect revision after the first month of operation.
+
+*Phosphene values:* friction=1.5, structural_insight=1.3, unexpected_connection=1.3, unresolvedness_affinity=1.2, precision_surplus=1.2 (Phase 1), liminality=1.0, link_density=1.0, cluster_novelty=0.8.
+
+The weighting prioritizes depth and challenge over novelty: friction is highest because it challenges existing structure without dissolving it. Structural insight and unexpected connection are next — depth of synthesis and bridge-building. Liminality and cluster novelty are at or below baseline — they capture gap-filling and new territory, which is useful as a tiebreaker but risks novelty addiction if dominant (see ARCH_attention_filter.md, Phase 2 risk note). Cluster novelty is the lowest because pure "beyond everything" novelty is the weakest signal for personality development.
+
+*What changing it does:* a deployment for a scientist would upweight structural_insight and precision_surplus. A cultural critic deployment would upweight liminality and unexpected_connection. A contrarian deployment might invert the friction axis — seeking smooth consensus specifically to challenge it. These weights are the highest-leverage parameter in the system because they shape everything that enters the memory store.
+
+**Prompt-to-structure transition threshold** — the network density metric (mean link degree, note count, or cluster count) at which the filter begins weighting structural signals over explicit criteria.
+
+*Phosphene value:* TBD — first-month calibration task. Start prompt-weighted; begin monitoring density metrics from day one.
+
+*What changing it does:* a lower threshold produces faster structural self-organization, risking premature convergence. A higher threshold keeps the personality closer to the explicit criteria for longer, risking rigidity.
+
+### Memory Store Parameters
+
+**Tier 1 retention window** — how many days raw annotated fragments are retained before archiving or requiring promotion.
+
+*Phosphene value:* 30 days.
+
+*Range:* 7 days (fast-cycling, prioritizes recency) to 90 days (slow accumulation before pruning).
+
+**Tier 2 synthesis cadence** — how frequently the pattern layer is synthesized from Tier 1.
+
+*Phosphene value:* weekly.
+
+*Range:* daily (rapid pattern formation, noisier) to monthly (slower, more conservative synthesis).
+
+**Tier 3 distillation cadence** — how frequently personality files are proposed for update.
+
+*Phosphene value:* monthly.
+
+*Range:* weekly (fast personality development, higher drift risk) to quarterly (stable, slower to develop).
+
+**Compression safety cap** — maximum fraction of a tier that can be pruned in a single distillation pass.
+
+*Phosphene value:* 50%.
+
+*What changing it does:* lower cap produces slower, more conservative compression. Higher cap allows more aggressive pruning, which accelerates development but risks losing material that would have been valuable later.
+
+### Inertia and Drift Parameters
+
+**Version-count inertia per cycle** (`inertia_per_cycle`) — how much additional resistance a personality file gains per surviving T2→T3 distillation cycle. Effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)`.
+
+*Phosphene value:* TBD — calibrate empirically after the first T2→T3 cycles.
+
+*Range:* 0.0 (no inertia; all personality files equally revisable regardless of age) to 1.0 (rapid stabilization; files become hard to revise after a few cycles).
+
+*What changing it does:* lower values produce a system that remains fluid longer. Higher values produce one that locks in early patterns. A deployment without strong seed material would use lower inertia to allow more development.
+
+**Maximum inertia cap** (`max_inertia`) — ceiling on how much resistance any personality file can accumulate.
+
+*Phosphene value:* TBD — likely 3.0–5.0 range.
+
+*What changing it does:* prevents any personality file from becoming permanently immutable. Even the most established claims can be revised if enough evidence accumulates.
+
+**Corpus sources** — the writing archive(s) ingested through Source Ingestion corpus adapters during the bootstrap phase.
+
+*Phosphene value:* LiveJournal archive (primary — highest personality signal, ingested via `corpus_livejournal` adapter), Twitter export (secondary — processed as linked-article graph with reactions as annotations, via `corpus_twitter`), blog posts (tertiary — more curated, underrepresents tensions, via `corpus_blog`), Claude conversation history (secondary — highest signal for intellectual moves, via `corpus_conversations`).
+
+*What changing it does:* a deployment with no long-form writing archive would weight conversation history and shorter-form material more heavily. A deployment seeded from academic writing would produce different initial associative networks than one seeded from personal journaling.
+
+### Free Play Parameters
+
+**Free play frequency** — how often the unstructured impulse fires when tension threshold is not met.
+
+*Phosphene value:* weekly floor (tension threshold may trigger more frequently).
+
+*Range:* daily (high autonomy, high output volume) to never (fully reactive system, no unsolicited outputs).
+
+**Tension threshold** — the accumulated unresolved tension score that triggers a free play session ahead of schedule.
+
+*Phosphene value:* TBD — calibrate empirically after the first month of operation.
+
+**Proactive budget** — maximum proactive messages per budget window (following KAIROS pattern).
+
+*Phosphene value:* 2 per 15-minute window, reactive messages unrestricted.
+
+*What changing it does:* higher budget produces a more talkative, initiating system. A deployment intended as a background system with occasional surfacing would set this to 1 or 0.
+
+**Affordances list** — which output modes are available during free play.
+
+*Phosphene value:* post to Discord, send Telegram message, write draft essay, propose source subscription, request conversation with human, generate internal note.
+
+*What changing it does:* a deployment with Substack integration would add "publish draft." A deployment without Discord would remove that affordance. The affordances list defines the shape of initiative — what the system can spontaneously do constrains what kind of personality can emerge.
+
+### Reviewer Panel Parameters
+
+**Panel composition** — which models serve as reviewers and in which roles.
+
+*Phosphene value:* adversarial reviewer (separate invocation, any capable model), Claude (structural coherence), Gemini (factual grounding), Grok (adversarial external reader), GPT (accessibility). All provisional; revisit as model landscape evolves.
+
+**Panel trigger policy** — which output types receive automated review.
+
+*Phosphene value:* free play outputs → full panel; high-importance prompted outputs → two or three reviewers; routine outputs → none.
+
+*What changing it does:* a deployment oriented toward public writing would run the full panel on all outputs before publication. A private journaling deployment would disable automated review entirely and rely solely on human evaluation.
+
+### Output and Delivery Parameters
+
+**Platform set** — which platforms the gateway connects to.
+
+*Phosphene value:* Telegram (primary control interface), Discord (primary output channel), Telegraph (long-form overflow).
+
+*What changing it does:* a deployment oriented toward public output would add Bluesky or Mastodon via Publora. A deployment for internal use only might use only Telegram.
+
+**Intent tag routing table** — the mapping from (intent_tag, output_mode) to (platform, format, feedback_affordance).
+
+*Phosphene value:* see Section 5.8 routing heuristics.
+
+*What changing it does:* a deployment where all outputs go to one channel collapses the routing table to a single entry. A deployment with richer platform set expands it.
+
+### A Note on Specificity
+
+The parameters above are where the personality actually lives in the architecture — more than in the seed document and more than in the module structure. Two deployments with different attention filter weights, different compression ratios, different inertia settings, different source profiles, and different affordances lists would develop in genuinely divergent directions even from similar seeds. The architecture is the chassis; the deployment configuration is what makes it a particular vehicle.
+
+This also means the attention filter axis weights deserve more careful specification than "friction, unexpected connection, precision surplus." For Phosphene specifically, these should be operationalized from the seed corpus at a level of specificity that a different person's corpus couldn't satisfy equally well. "Friction" is too broad. The specific *kinds* of friction that appear in the seed — where precision meets imprecision, where synthesis refuses to flatten, where the executor's eye meets the theorist's frame — are the actual parameters. The generic labels are placeholders for values that should be derived from the seeding process itself.
+
+
 # 6. Open Questions and Further Development
 
 ## 6.1 Identified Gaps
@@ -828,17 +1054,39 @@ Section 5.4 proposes a multi-model reviewer panel with assigned roles. The key u
 
 Suggested order of implementation. Each step is a standalone module with a defined interface; earlier steps do not need to be complete before later steps can be prototyped in parallel.
 
-    7. Run MiroFish offline corpus pipeline on seed material (github.com/nikmcfly/MiroFish-Offline) — produces initial knowledge graph and draft Tier 2/3 personality files. Review and adjust manually.
-    8. Build three-tier memory store — the architecture everything else depends on
-    9. Write and manually calibrate the attention filter prompt — test on a small sample before automating
+    7. Build three-tier memory store — the architecture everything else depends on
+    8. Write and manually calibrate the attention filter prompt — test on a small sample before automating
+    9. Build source ingestion adapters — corpus adapters first (bootstrap), then live channel adapters
     10. Build gateway module (Telegram + Discord) — one module per platform, simple message bus. Reference: Hermes concepts.
-    11. Source ingestion (Telegram channels, initially) — start narrow, expand
-    12. Discord output and basic prompted generation
-    13. Distillation engine (Tier 1 → Tier 2 first, then Tier 2 → Tier 3 with two-step reflect-evolve)
-    14. Feedback collection and daily log review
-    15. Explorer module (link-following and subscription proposals) — Playwright subprocess, isolated interface
-    16. Free play — only after sufficient accumulated unresolved tension, using Hermes’s cron and gateway for delivery
+    11. Discord output and basic prompted generation
+    12. Distillation engine (Tier 1 → Tier 2 first, then Tier 2 → Tier 3 with two-step reflect-evolve)
+    13. Feedback collection and daily log review
+    14. Explorer module (link-following and subscription proposals) — Playwright subprocess, isolated interface
+    15. Free play — only after sufficient accumulated unresolved tension, using Hermes's cron and gateway for delivery
 
 
 Phosphene — working draft, March 2026
 This document is intended as a living reference. Update as the project develops.
+
+---
+
+# Appendix A: Corpus-to-Knowledge-Graph Technique (Reference)
+
+*This technique was originally planned as Phosphene's seeding pipeline. It was superseded by D-13 (corpus ingestion through Source Ingestion adapters, personality development exclusively through Distillation). The technique itself remains a useful tool for corpus analysis, diagnostics, or future applications.*
+
+## MiroFish Pipeline
+
+MiroFish (github.com/666ghj/MiroFish) is a corpus-to-knowledge-graph-to-personality engine. Its pipeline:
+
+1. Document(s) → LLM ontology extraction → knowledge graph (KuzuDB by default, Neo4j in the offline fork)
+2. Knowledge graph → entity and relationship filtering → agent persona generation via LLM
+3. Persona generation produces: personality traits, background, stance, social relationships, initial memory
+
+The offline fork (github.com/nikmcfly/MiroFish-Offline) runs entirely locally with Neo4j + Ollama, fits the Pi 5 architecture, and has an English UI. The graph construction layer is reusable; the OASIS simulation engine is not needed.
+
+## Potential Future Uses
+
+- **Diagnostic analysis**: run the pipeline on the accumulated memory store at any point to produce a knowledge graph snapshot — useful for visualizing the associative network's structure and identifying blind spots or over-connected clusters.
+- **Corpus comparison**: run the pipeline on the original seed corpus and on a later snapshot of the personality's outputs to visualize how the associative structure has diverged from the seed.
+- **Cross-corpus structural patterns**: if incremental Distillation proves unable to find structural patterns that span widely separated corpus sources (the D-13 revisit-if condition), a batch knowledge graph run could serve as a supplementary analysis step.
+- **New deployment seeding**: if the platform is used for additional deployments with different seed corpora, the batch pipeline might be more appropriate for a different deployment's needs even though it was superseded for Phosphene's.

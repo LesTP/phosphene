@@ -23,16 +23,51 @@ class FilterCriterion:
     weight: float = 1.0                     # relative weight in prompt-based composite score
 
 @dataclass
+class ScoringConfig:
+    """Processing-level tuning parameters for Phase 1/Phase 2 scoring.
+    Separates tunable weights and thresholds from the architectural contract.
+    Deployment-specific overrides go in deployment.yaml."""
+
+    # Phase 1 (LLM) criterion weight
+    precision_surplus_weight: float = 1.0            # weight for LLM-scored precision surplus
+
+    # Phase 2 geometric criterion weights (active after triple-gate transition)
+    liminality_weight: float = 1.0
+    friction_weight: float = 1.0
+    unexpected_connection_weight: float = 1.0
+    structural_insight_weight: float = 1.0
+    link_density_weight: float = 1.0
+    cluster_novelty_weight: float = 1.0
+    unresolvedness_affinity_weight: float = 1.0
+
+    # Phase 2 scoring thresholds
+    link_density_sim_threshold: float = 0.4          # embedding similarity above which a note counts as "connected"
+    gap_factor_exponent: float = 2.0                 # controls liminality gap_factor curve steepness
+    assertion_alignment_threshold: float = 0.5       # friction: below this alignment = frictionful
+
+    # Transition: triple gate (S-3) — Phase 2 activates when ALL three are met
+    note_count_threshold: int = 50                   # minimum Tier 1 notes before Phase 2 activates
+    cluster_count_threshold: int = 3                 # minimum Tier 2 clusters before Phase 2 activates
+    # mean_link_degree threshold is density_crossover on AttentionFilterConfig
+
+    # Blend curve
+    phase2_max_weight: float = 0.7                   # cap on Phase 2 weight (S-2) — prompt retains at least 1 - this
+
+@dataclass
 class AttentionFilterConfig:
-    prompt_criteria: list[FilterCriterion]   # personality-derived criteria (hardcoded defaults, refined by Distillation)
+    prompt_criteria: list[FilterCriterion]   # Phase 1 personality-derived criteria (LLM-evaluated)
+                                             # Default: precision_surplus only. See Default Prompt Criteria.
+    scoring: ScoringConfig = field(default_factory=ScoringConfig)
+                                             # Phase 2 weights, thresholds, and transition parameters
     acceptance_threshold: float = 0.3        # minimum composite score for retention [0.0, 1.0]
     auto_accept_sources: list[str] = field(default_factory=list)
                                              # sources that bypass acceptance_threshold but still get full annotation
                                              # e.g., ["human_share"] — human-curated content always enters Tier 1
     density_crossover: float = 3.0           # mean_link_degree at which prompt/structure blend reaches 50/50
     similarity_candidates: int = 20          # how many existing notes to retrieve for friction/connection detection
-    llm_config: LLMConfig                    # toolkit/llm_client — for criteria evaluation and annotation
-    llm_tier: ModelTier = ModelTier.DEFAULT   # model tier for filter LLM calls
+    llm_config: LLMConfig                    # toolkit/llm_client — for Phase 1 criteria evaluation and annotation
+    llm_tier: ModelTier = ModelTier.DEFAULT   # model tier for Phase 1 LLM calls
+    assertion_extraction_tier: ModelTier = ModelTier.COMMODITY  # model tier for friction assertion extraction
     embedding_config: EmbeddingConfig         # toolkit/embedding — for content embedding
 
 @dataclass
@@ -88,44 +123,78 @@ For each content item, the filter:
 
 1. **Embeds** the content via toolkit/embedding.
 2. **Queries** Memory Store for similar existing notes (`search_by_embedding`) and density metrics (`get_density_metrics`).
-3. **Computes blend weight** from density metrics. When `mean_link_degree` is near zero, `prompt_weight ≈ 1.0`. At `density_crossover`, blend is 50/50. Beyond, `structure_weight` dominates.
-4. **Evaluates prompt criteria** — calls LLM with the criterion descriptions, the content item, and relevant existing notes. Each criterion produces a score in [0.0, 1.0].
-5. **Evaluates structural criteria** (always computed, weight increases with density):
-   - *Link density*: how many existing notes the content connects to (from embedding similarity above threshold)
-   - *Cluster novelty*: whether the content falls within an existing Tier 2 cluster or opens new territory
-   - *Unresolvedness affinity*: whether the content engages with notes that have high unresolvedness
-6. **Computes composite score** — weighted combination of prompt and structure scores, blended by prompt_weight/structure_weight.
-7. **Accepts or rejects** based on `acceptance_threshold`. Items from `auto_accept_sources` bypass the threshold but still receive the full annotation pass — importance, unresolvedness, friction, and connections are computed normally.
-8. For accepted items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified. For auto-accepted items, the annotation captures what the system finds interesting *about* the content, even though it was pre-accepted.
+3. **Checks triple gate** for Phase 2 activation: Phase 2 is active only when `note_count >= scoring.note_count_threshold` AND `cluster_count >= scoring.cluster_count_threshold` AND `mean_link_degree >= density_crossover × 0.5` (half the crossover point). If any gate fails, `structure_weight = 0.0` and `prompt_weight = 1.0`.
+4. **Computes blend weight** (when triple gate passes): `structure_weight` increases linearly from 0.0 to `scoring.phase2_max_weight` as `mean_link_degree` rises from `density_crossover × 0.5` to `density_crossover × 2.0`. Above `density_crossover × 2.0`, `structure_weight` is fixed at `scoring.phase2_max_weight`. `prompt_weight = 1.0 - structure_weight` (always ≥ `1 - phase2_max_weight`, default 0.3).
+5. **Evaluates Phase 1 (prompt criteria)** — calls LLM with the criterion descriptions, the content item, and relevant existing notes. Each criterion produces a score in [0.0, 1.0]. Default: precision_surplus only.
+6. **Evaluates Phase 2 (geometric criteria)** — always computed when triple gate passes, weight increases with density:
+   - *Liminality*: `1 - max_sim(text, centroids) × gap_factor(rank1, rank2)` — between clusters
+   - *Friction*: `topical_sim(text, nearest_cluster) × (1 - assertion_alignment(text, cluster))` — contradicts a cluster's claims. Uses one LLM call (at `assertion_extraction_tier`) to extract claims from the incoming text; cluster claims are read from the assertion cache produced by the Distillation engine (see S-6, ARCH_distillation.md).
+   - *Unexpected connection*: `max over cluster pairs: min(sim(text, ci), sim(text, cj)) × (1 - sim(ci, cj))` — bridges distant clusters
+   - *Structural insight*: `sim(text, meta_cluster_of_tier2_summaries)` — operates at pattern-layer abstraction level
+   - *Link density*: `count(notes where sim(text, note) > scoring.link_density_sim_threshold)` — centrality / familiarity
+   - *Cluster novelty*: `1 - max(sim(text, all_centroids))` — genuinely new territory (beyond all clusters, distinct from liminality which is *between*)
+   - *Unresolvedness affinity*: `sum(sim(text, note_i) × note_i.unresolvedness)` over similar notes — engages with live tensions (hybrid: vector similarity × note metadata)
+7. **Computes composite score** — weighted combination of Phase 1 and Phase 2 scores, blended by `prompt_weight` / `structure_weight`. Phase 1 sub-score is the weighted average of prompt criteria scores. Phase 2 sub-score is the weighted average of geometric criteria scores (using `scoring.*_weight` values).
+8. **Accepts or rejects** based on `acceptance_threshold`. Items from `auto_accept_sources` bypass the threshold but still receive the full annotation pass — importance, unresolvedness, friction, and connections are computed normally.
+9. For accepted items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified. For auto-accepted items, the annotation captures what the system finds interesting *about* the content, even though it was pre-accepted.
 
-### Default Prompt Criteria
+### Default Prompt Criteria (Phase 1)
 
-Initial criteria — hardcoded defaults operationalized from the project's design principles. The Distillation engine may revise weights over time based on feedback signals.
+Phase 1 criteria are evaluated by the LLM. They handle scoring dimensions that resist geometric formalization — intrinsic text quality rather than relational position in the memory network.
 
-| Name | Description | Default Weight |
-|------|-------------|----------------|
-| `friction` | Does this contradict, complicate, or sit in tension with existing content? | 1.0 |
-| `unexpected_connection` | Does this link to existing notes across topical boundaries in an unpredicted way? | 1.0 |
-| `precision_surplus` | Does this say something more specific than the domain usually allows? | 0.8 |
-| `structural_insight` | Does this identify a mechanism or pattern rather than an analogy or illustration? | 0.8 |
-| `liminal_position` | Does this occupy a space between established categories? | 0.7 |
+Default `prompt_criteria` (one criterion — precision surplus is the only Phase 1 signal):
 
-### Structural Criteria (built-in)
+```python
+default_prompt_criteria = [
+    FilterCriterion(
+        name="precision_surplus",
+        description="Score the ratio of precise claim to vague gesture in this text. "
+                    "High score: claims are specific, evidence is tight, the text could not "
+                    "have been written without knowing something. Low score: claims are general, "
+                    "evidence is gestures toward evidence.",
+        weight=1.0,
+    ),
+]
+```
 
-These are always computed. Their contribution to the composite score is governed by `structure_weight`.
+**Why only one Phase 1 criterion:** Friction, unexpected connection, structural insight, and liminal position are all *relational* — they measure how the incoming text relates to the existing memory network. These are formalized as geometric computations in Phase 2, where they are cheaper, more reproducible, and scale with cluster count rather than LLM budget. Precision surplus is *intrinsic* — it measures the text's internal argumentative quality (claim-evidence tightness), which doesn't reduce to vector arithmetic. It remains the sole Phase 1 signal.
 
-| Name | Signal | Source |
-|------|--------|--------|
-| `link_density` | Number of existing notes the content connects to (embedding similarity above threshold) | `memory_store.search_by_embedding` |
-| `cluster_novelty` | Content falls outside existing Tier 2 clusters, or bridges two clusters | `memory_store.get_index(tier=2)` cluster_group tags |
-| `unresolvedness_affinity` | Content engages with notes that have high unresolvedness scores | `memory_store.search_by_embedding` + note unresolvedness |
+**Precision surplus formalization options (recorded for future reference, not pursued now):**
+- *Embedding specificity proxy*: distance from nearest cluster centroid within a topical band. Measures unusualness, not precision — insufficient.
+- *Information density*: ratio of named entities / quantities / technical terms to total length. NLP-computable but different from argumentative precision.
+- *Claim-evidence structure detection*: lightweight NLP to detect assertion vs. evidence sentences. Essentially a simplified LLM call — not a real savings.
+- *Compression resistance*: `1 - sim(text_embedding, summary_embedding)`. Requires an LLM call to summarize — doesn't avoid the LLM.
+
+### Phase 2 Geometric Criteria
+
+Phase 2 criteria are computed geometrically against the Tier 2 cluster structure and existing Memory Store notes. Phase 2 activates after the triple gate: note count, cluster count, and mean link degree must all cross their respective `ScoringConfig` thresholds.
+
+Seven scoring dimensions, each with a configurable weight in `ScoringConfig`:
+
+| Criterion | Formula | What it captures |
+|-----------|---------|-----------------|
+| **Liminality** | `1 - max_sim(text, centroids) × gap_factor(rank1, rank2)` | Between clusters — equidistant to two clusters is more liminal than narrowly missing one |
+| **Friction** | `topical_sim(text, nearest) × (1 - assertion_alignment(text, cluster))` | Topically related but contradicts cluster claims. One LLM call for assertion extraction from incoming text; cluster claims from Distillation assertion cache |
+| **Unexpected connection** | `max over pairs: min(sim(text, ci), sim(text, cj)) × (1 - sim(ci, cj))` | Bridges two clusters that have low mutual similarity |
+| **Structural insight** | `sim(text, meta_cluster_of_tier2_summaries)` | Operates at pattern-layer abstraction level — resembles synthesis outputs in register |
+| **Link density** | `count(notes where sim(text, note) > threshold)` | Centrality / familiarity — how many things this relates to |
+| **Cluster novelty** | `1 - max(sim(text, all_centroids))` | Genuinely new territory — beyond all clusters (distinct from liminality which is *between*) |
+| **Unresolvedness affinity** | `sum(sim(text, note_i) × note_i.unresolvedness)` | Engages with live tensions (hybrid: vector similarity × note metadata) |
+
+**Cost:** For a content chunk against N clusters, Phase 2 requires N cosine similarity computations (microseconds each) plus one LLM call at `assertion_extraction_tier` for the friction component's claim extraction from the incoming text. Cluster claims are pre-cached by the Distillation engine (see Assertion Cache in ARCH_distillation.md). Total Phase 2 cost per chunk is dominated by the single assertion-extraction call, not by the vector arithmetic.
+
+**Novelty-addiction risk:** Overweighting liminality and cluster_novelty creates a self-reinforcing feedback loop. Liminal material enters Tier 1 → Distillation clusters it → new clusters form in the liminal zones → those clusters become reference centroids → the liminality formula now measures distance from the new, interpolated centroids → what was liminal is now central, and the new liminal zone is further out. The system develops an ever-expanding low-resolution map of everything rather than a deep, specific map of what matters — associatively rich but shallow outputs.
+
+Two mitigations:
+1. **Weight ordering:** Deployment weights should prioritize depth/challenge (friction, structural_insight, unresolvedness_affinity) over novelty (liminality, cluster_novelty). Liminality should be a tiebreaker, not a dominant signal. See Section 5.9 in phosphene.md for Phosphene's calibrated weights.
+2. **Cluster coherence gate:** The Distillation engine enforces `min_cluster_coherence` — clusters below a mean pairwise similarity threshold are not promoted to Tier 2. This prevents diffuse, gap-filling material from forming weak clusters that then become the reference centroids for the next round of geometric scoring. See `distill_t1_to_t2` step 6 in ARCH_distillation.md.
 
 ## Inputs
 
 - **ContentItem** — from Source Ingestion adapters or Explorer. Raw content with source metadata and extracted URLs.
-- **AttentionFilterConfig** — per-call configuration including personality-derived criteria, thresholds, and model settings. Criteria evolve over time: initial defaults are hardcoded; Distillation adjusts weights based on accumulated feedback evidence.
+- **AttentionFilterConfig** — per-call configuration including Phase 1 criteria, `ScoringConfig` (Phase 2 weights and thresholds), and model settings. Phase 1 criteria evolve over time: initial defaults are hardcoded; Distillation adjusts weights based on accumulated feedback evidence. Phase 2 criterion weights are set via `ScoringConfig` and can be overridden per deployment in `deployment.yaml`.
 
-**Bootstrap behavior:** When Memory Store is empty (no notes, density metrics at zero), the filter operates on prompt criteria alone — `prompt_weight ≈ 1.0`, structural criteria contribute zero. Corpus sources listed in `auto_accept_sources` bypass the acceptance threshold during initial import while still receiving full annotation. This allows the system to bootstrap from an empty state without requiring a separate seeding pipeline.
+**Bootstrap behavior:** When Memory Store is empty (no notes, density metrics at zero), the triple gate fails and the filter operates on Phase 1 criteria alone — `prompt_weight = 1.0`, Phase 2 contributes zero. Corpus sources listed in `auto_accept_sources` bypass the acceptance threshold during initial import while still receiving full annotation. This allows the system to bootstrap from an empty state without requiring a separate seeding pipeline.
 
 ## Outputs
 
@@ -160,12 +229,15 @@ for fragment in result.accepted:
 
 None. The Attention Filter is stateless — it reads from Memory Store on each call and produces output. All criteria configuration is passed per-call via `AttentionFilterConfig`. The prompt-to-structure transition is computed dynamically from Memory Store density metrics, not tracked internally.
 
-Criteria weight adjustments (from feedback calibration) are stored externally — either in configuration files or as part of the personality context managed by the Distillation engine. The filter receives the current weights in each `config.prompt_criteria` and applies them.
+Criteria weight adjustments (from feedback calibration) are stored externally — either in configuration files or as part of the personality context managed by the Distillation engine. The filter receives the current Phase 1 weights in each `config.prompt_criteria` and Phase 2 weights via `config.scoring`.
 
 ## Usage Example
 
 ```python
-from attention_filter import AttentionFilter, AttentionFilterConfig, FilterCriterion, ContentItem
+from attention_filter import (
+    AttentionFilter, AttentionFilterConfig, ScoringConfig,
+    FilterCriterion, ContentItem,
+)
 from memory_store import MemoryStore, MemoryStoreConfig, NoteInput
 from llm_client import LLMConfig, ModelTier
 from embedding import EmbeddingConfig
@@ -173,18 +245,38 @@ from embedding import EmbeddingConfig
 store = MemoryStore(MemoryStoreConfig(vault_path="./memory"))
 af = AttentionFilter(memory_store=store)
 
-# Initial criteria from seed personality
+# Phase 1: precision surplus only (default)
+# Phase 2: geometric criteria with deployment-specific weights
 config = AttentionFilterConfig(
     prompt_criteria=[
-        FilterCriterion("friction", "Does this contradict or complicate existing content?"),
-        FilterCriterion("unexpected_connection", "Does this link across topical boundaries?"),
-        FilterCriterion("precision_surplus", "Does this say something unusually specific?", weight=0.8),
-        FilterCriterion("structural_insight", "Does this identify a mechanism, not just an analogy?", weight=0.8),
-        FilterCriterion("liminal_position", "Does this sit between established categories?", weight=0.7),
+        FilterCriterion(
+            "precision_surplus",
+            "Score the ratio of precise claim to vague gesture in this text. "
+            "High score: claims are specific, evidence is tight. "
+            "Low score: claims are general, evidence is gestures toward evidence.",
+            weight=1.0,
+        ),
     ],
+    scoring=ScoringConfig(
+        # Phosphene deployment weights (from deployment.yaml)
+        # Starting points for empirical calibration — depth/challenge over novelty
+        friction_weight=1.5,
+        structural_insight_weight=1.3,
+        unexpected_connection_weight=1.3,
+        unresolvedness_affinity_weight=1.2,
+        liminality_weight=1.0,
+        link_density_weight=1.0,
+        cluster_novelty_weight=0.8,
+        # Triple gate thresholds (TBD — first-month calibration)
+        note_count_threshold=50,
+        cluster_count_threshold=3,
+        phase2_max_weight=0.7,
+    ),
     acceptance_threshold=0.3,
     density_crossover=3.0,
-    llm_config=LLMConfig(provider="anthropic", api_key="sk-...", models={"default": "claude-sonnet-..."}),
+    llm_config=LLMConfig(provider="anthropic", api_key="sk-...",
+                         models={"default": "claude-sonnet-..."}),
+    assertion_extraction_tier=ModelTier.COMMODITY,
     embedding_config=EmbeddingConfig(model="all-MiniLM-L6-v2"),
 )
 
