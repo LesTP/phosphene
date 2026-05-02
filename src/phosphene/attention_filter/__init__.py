@@ -9,6 +9,7 @@ from phosphene.attention_filter.types import (
     FilterCriterion,
     FilterResult,
     ScoringConfig,
+    default_prompt_criteria,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "FilterResult",
     "InvalidScoreError",
     "ScoringConfig",
+    "default_prompt_criteria",
 ]

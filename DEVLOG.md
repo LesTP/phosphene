@@ -20,6 +20,17 @@ Created `types.py`, `errors.py`, `filter.py`, and package exports for Module 2. 
 
 The local checkout does not include the documented sibling toolkit `llm_client` and `embedding` modules, so the scaffold uses import-time compatibility fallbacks for `LLMConfig`, `EmbeddingConfig`, and `ModelTier` while preserving the public field names and defaults.
 
+### Step 2.1.2: Default prompt criterion and config validation
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Added precision-surplus default prompt criterion construction and fail-fast validation for Attention Filter scoring/config thresholds.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md`.
+
+Added `default_prompt_criteria()` with the ARCH-defined precision-surplus criterion and made `AttentionFilterConfig` default to a fresh precision-surplus-only list. Added validation for `acceptance_threshold`, `density_crossover`, non-negative `ScoringConfig` weights, `phase2_max_weight`, and positive triple-gate thresholds.
+
+Focused tests now cover default criterion construction, fresh-list behavior, config defaulting, accepted boundary values, and representative invalid values. The full suite passes with `PYTHONPATH=src:.python_deps python3 -m pytest`.
+
 ## Documentation Reconciliation — D-13, 3.3a, 5.9 Sync
 
 **Date:** 2026-05-02
