@@ -78,15 +78,15 @@ def test_arch_dataclass_field_names_match_contract() -> None:
     ]
     assert [field.name for field in fields(AttentionFilterConfig)] == [
         "prompt_criteria",
-        "llm_config",
-        "embedding_config",
         "scoring",
         "acceptance_threshold",
         "auto_accept_sources",
         "density_crossover",
         "similarity_candidates",
+        "llm_config",
         "llm_tier",
         "assertion_extraction_tier",
+        "embedding_config",
     ]
     assert [field.name for field in fields(AnnotatedFragment)] == [
         "content",

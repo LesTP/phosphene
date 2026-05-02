@@ -9,6 +9,20 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 2.1 Review: Attention Filter contract and scoring foundation
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Reviewed Module 2 Phase 1 against `ARCH_attention_filter.md` and marked the phase review done.
+**Contract changes:** None — corrected implementation/test field order to match the existing ARCH contract.
+
+Findings:
+- Must fix: `AttentionFilterConfig` field order drifted from `ARCH_attention_filter.md`; corrected the keyword-only dataclass and export test expectation so the public contract order is authoritative.
+- Should fix: None.
+- Optional: None.
+
+The full test suite passes with `PYTHONPATH=src:.python_deps python3 -m pytest`.
+
 ### Step 2.1.5: Attention Filter focused unit tests
 
 **Date:** 2026-05-02

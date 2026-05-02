@@ -111,15 +111,15 @@ class ScoringConfig:
 @dataclass(kw_only=True)
 class AttentionFilterConfig:
     prompt_criteria: list[FilterCriterion] = field(default_factory=default_prompt_criteria)
-    llm_config: LLMConfig
-    embedding_config: EmbeddingConfig
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     acceptance_threshold: float = 0.3
     auto_accept_sources: list[str] = field(default_factory=list)
     density_crossover: float = 3.0
     similarity_candidates: int = 20
+    llm_config: LLMConfig
     llm_tier: ModelTier = ModelTier.DEFAULT
     assertion_extraction_tier: ModelTier = ModelTier.COMMODITY
+    embedding_config: EmbeddingConfig
 
     def __post_init__(self) -> None:
         _require_probability(self.acceptance_threshold, "acceptance_threshold")

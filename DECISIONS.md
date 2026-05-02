@@ -161,3 +161,10 @@ Priority: Important
 Decision: The Distillation engine extracts dominant assertions from each Tier 2 cluster summary during `distill_t1_to_t2` and caches them as JSON alongside cluster centroids. The Attention Filter reads cached assertions for friction scoring — the per-item LLM call only extracts claims from the incoming text, not from existing clusters.
 Rationale: Friction scoring compares incoming assertions against cluster assertions. Re-extracting cluster claims per incoming item would multiply LLM calls by items × clusters. Caching at distillation time amortizes the cost. Cluster summaries are stable between distillation runs.
 Revisit if: Cluster summaries change between distillation runs in ways that make cached assertions stale.
+
+D-23: Attention Filter ARCH field order is authoritative
+Date: 2026-05-02 | Status: Closed
+Priority: Normal
+Decision: Keep `AttentionFilterConfig` field order aligned with `ARCH_attention_filter.md`; use `@dataclass(kw_only=True)` to permit required toolkit config fields after defaulted fields without changing the public contract order.
+Rationale: Phase 1 exposes the public contract before live embedding/LLM behavior. Matching ARCH field order keeps introspection-based contract tests honest while preserving ergonomic keyword-only construction.
+Revisit if: Later integration requires positional construction or a toolkit config wrapper that changes the public constructor contract.
