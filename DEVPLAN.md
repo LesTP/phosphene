@@ -2,7 +2,7 @@
 module: 2
 phase: 1
 phase_title: Attention Filter contract and scoring foundation
-step: 2.1.3
+step: 2.1.4
 mode: autonomous
 blocked: false
 regime: Build
@@ -58,7 +58,7 @@ Steps:
 
 - [x] **2.1.1** — Scaffold `phosphene.attention_filter` package exports and public dataclasses matching `ARCH_attention_filter.md`: `ContentItem`, `FilterCriterion`, `ScoringConfig`, `AttentionFilterConfig`, `AnnotatedFragment`, `FilterResult`. Add `InvalidScoreError`. `ScoringConfig` carries Phase 1 weight (`precision_surplus_weight`), Phase 2 criterion weights (7), scoring thresholds (`link_density_sim_threshold`, `gap_factor_exponent`, `assertion_alignment_threshold`), triple-gate thresholds (`note_count_threshold`, `cluster_count_threshold`), and `phase2_max_weight`.
 - [x] **2.1.2** — Add default prompt criterion construction (precision_surplus only) and config validation: `acceptance_threshold` in [0.0, 1.0], `density_crossover` > 0, `ScoringConfig` weights non-negative, `phase2_max_weight` in [0.0, 1.0], triple-gate thresholds positive.
-- [ ] **2.1.3** — Implement triple-gate check and blend calculation from `DensityMetrics`. Triple gate: Phase 2 activates when `note_count >= threshold` AND `cluster_count >= threshold` AND `mean_link_degree >= density_crossover × 0.5`. Blend: `structure_weight` ramps linearly from 0.0 to `phase2_max_weight` as `mean_link_degree` goes from `density_crossover × 0.5` to `density_crossover × 2.0`, capped at `phase2_max_weight`. `prompt_weight = 1.0 - structure_weight`. Cover edge cases: empty memory (gate fails → pure prompt), high density (cap hit), exactly-at-threshold.
+- [x] **2.1.3** — Implement triple-gate check and blend calculation from `DensityMetrics`. Triple gate: Phase 2 activates when `note_count >= threshold` AND `cluster_count >= threshold` AND `mean_link_degree >= density_crossover × 0.5`. Blend: `structure_weight` ramps linearly from 0.0 to `phase2_max_weight` as `mean_link_degree` goes from `density_crossover × 0.5` to `density_crossover × 2.0`, capped at `phase2_max_weight`. `prompt_weight = 1.0 - structure_weight`. Cover edge cases: empty memory (gate fails → pure prompt), high density (cap hit), exactly-at-threshold.
 - [ ] **2.1.4** — Implement deterministic Phase 2 geometric scoring helpers. Each takes pre-computed embeddings/similarities and returns a score in [0.0, 1.0] (helpers that produce unbounded values must normalize — `link_density` by `min(count / similarity_candidates, 1.0)`, `unresolvedness_affinity` by clamping the weighted sum to [0.0, 1.0]):
   - `score_liminality(text_sims_to_centroids)` — inter-cluster gap formula with `gap_factor_exponent`
   - `score_friction(topical_sim, assertion_alignment)` — product of similarity and misalignment (assertion extraction itself is a later-phase LLM call; this helper takes pre-computed alignment)

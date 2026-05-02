@@ -31,6 +31,17 @@ Added `default_prompt_criteria()` with the ARCH-defined precision-surplus criter
 
 Focused tests now cover default criterion construction, fresh-list behavior, config defaulting, accepted boundary values, and representative invalid values. The full suite passes with `PYTHONPATH=src:.python_deps python3 -m pytest`.
 
+### Step 2.1.3: Phase 2 gate and blend weights
+
+**Date:** 2026-05-02
+**Mode:** autonomous
+**Outcome:** Added deterministic Phase 2 triple-gate activation and prompt/structure blend weight calculation from `DensityMetrics`.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md`.
+
+Implemented `phase2_is_active()` for the note count, cluster count, and half-crossover mean link degree gate. Implemented `compute_blend_weights()` so structure weight stays at zero before the gate, ramps linearly from `density_crossover * 0.5` to `density_crossover * 2.0`, caps at `phase2_max_weight`, and keeps prompt weight as the complement.
+
+Added focused edge-case tests for empty memory, each missing gate threshold, exactly-at-threshold behavior, linear ramping, high-density capping, and custom crossover settings. The Attention Filter test slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`.
+
 ## Documentation Reconciliation — D-13, 3.3a, 5.9 Sync
 
 **Date:** 2026-05-02

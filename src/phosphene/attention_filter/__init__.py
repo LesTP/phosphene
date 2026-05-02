@@ -1,7 +1,11 @@
 """Public Attention Filter API surface."""
 
 from phosphene.attention_filter.errors import AttentionFilterError, InvalidScoreError
-from phosphene.attention_filter.filter import AttentionFilter
+from phosphene.attention_filter.filter import (
+    AttentionFilter,
+    compute_blend_weights,
+    phase2_is_active,
+)
 from phosphene.attention_filter.types import (
     AnnotatedFragment,
     AttentionFilterConfig,
@@ -22,5 +26,7 @@ __all__ = [
     "FilterResult",
     "InvalidScoreError",
     "ScoringConfig",
+    "compute_blend_weights",
     "default_prompt_criteria",
+    "phase2_is_active",
 ]
