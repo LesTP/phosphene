@@ -1,12 +1,12 @@
 ---
-module: null
-phase: null
-phase_title: null
-step: null
-mode: null
-blocked: null
-regime: null
-review_done: null
+module: 2
+phase: 1
+phase_title: Attention Filter contract and scoring foundation
+step: 2.1.1
+mode: autonomous
+blocked: false
+regime: Build
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -31,8 +31,8 @@ review_done: null
 
 ## Current Status
 
-- **Phase** — Module 1 (Memory Store) complete. No active module.
-- **Focus** — Module 2 is now Attention Filter (Seeding module removed per D-13; corpus ingestion absorbed by Source Ingestion adapters). Awaiting phase planning for Attention Filter.
+- **Phase** — Module 2 (Attention Filter), Phase 1: Attention Filter contract and scoring foundation.
+- **Focus** — Build the public Attention Filter package contract and deterministic scoring foundation before adding live embedding/LLM calls.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -43,5 +43,23 @@ Four-phase plan (matching ARCH_memory_store.md public API surface) — all phase
 - **Phase 2 (complete)** — Index layer and queries: `get_index`, `query_notes`, inbound link counting, and index-backed `get_note` / `update_note`. See DEVLOG "Phase 2 Completion" entry.
 - **Phase 3 (complete)** — Embedding search and graph operations: `search_by_embedding`, `add_links`, `get_linked`, `get_personality_context`, plus sidecar embedding persistence on read paths. See DEVLOG "Phase 3 Completion" entry.
 - **Phase 4 (complete)** — Decay, supersession, and density metrics: `supersede`, `run_decay`, `get_density_metrics`. See DEVLOG "Phase 4 Completion" entry.
+
+## Module 2: Attention Filter (in progress)
+
+Planned phases follow `ARCH_attention_filter.md`: first stabilize the public contract and deterministic scoring helpers, then add Memory Store retrieval/embedding integration, then LLM criteria and annotation, then full batch orchestration.
+
+### Phase 1 (in progress): Attention Filter contract and scoring foundation
+
+Regime: Build
+
+Outcome: a testable `phosphene.attention_filter` package exposing the ARCH-defined dataclasses, errors, default prompt criteria, config validation, prompt/structure blend calculation, and deterministic structural scoring helpers. This phase deliberately excludes live toolkit embedding calls and LLM prompt execution; those are later phases.
+
+Steps:
+
+- [ ] **2.1.1** — Scaffold `phosphene.attention_filter` package exports, public dataclasses, and `InvalidScoreError` matching `ARCH_attention_filter.md`.
+- [ ] **2.1.2** — Add default prompt criteria construction and validation for threshold, density crossover, candidate count, and criterion weights.
+- [ ] **2.1.3** — Implement deterministic prompt/structure blend calculation from `DensityMetrics`, including empty-memory and high-density cases.
+- [ ] **2.1.4** — Implement structural scoring helpers for link density, cluster novelty, unresolvedness affinity, friction target, and connection extraction from Memory Store search/index data.
+- [ ] **2.1.5** — Add focused unit tests for package exports, dataclass defaults, validation failures, blend weights, and structural scoring edge cases.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

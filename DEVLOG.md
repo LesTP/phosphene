@@ -9,6 +9,22 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Module 2 Phase 1 Plan
+
+**Date:** 2026-05-02
+**Decision:** Planned Attention Filter Phase 1 as a Build phase for the public contract and deterministic scoring foundation.
+
+Updated `DEVPLAN.md` to activate Module 2 Phase 1 with five implementation steps: package/dataclass scaffold, default criteria and validation, blend-weight calculation, structural scoring helpers, and focused unit tests. Updated `ARCHITECTURE.md` to mark Attention Filter in progress and logged D-16 in `DECISIONS.md`.
+
+No source implementation was changed in this planning action.
+
+## Module 1 Audit Closure
+
+**Date:** 2026-05-02
+**Decision:** Human audit recorded; Module 1 (Memory Store) is accepted as audited and complete.
+
+Updated `DEVPLAN.md` Current Status to reflect that Module 1 is no longer only phase-complete but also audited complete. No implementation changes, test changes, or architecture changes were required.
+
 ## D-13: Remove Seeding Module
 
 **Date:** 2026-05-01

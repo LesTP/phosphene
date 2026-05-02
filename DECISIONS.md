@@ -112,3 +112,10 @@ Priority: Important
 Decision: Add `tier2_cycle_window_days: int = 30` to `MemoryStoreConfig` and make `run_decay()` expire Tier 2 notes when `now - created_at > 2 * tier2_cycle_window_days`. Tier 2 expiry ignores inbound links and `attractor_relevance`; Distillation must promote, retier, or otherwise update notes before the second window if it wants them retained.
 Rationale: Tier 2 retention is a distillation-cycle boundary, not a graph-density rule. Reusing Tier 1 link and attractor extensions would blur Memory Store's responsibility with Distillation's promotion semantics and would let incidental links keep unpromoted patterns indefinitely. A config field keeps the cycle length explicit while preserving Memory Store as the simple age-based eviction layer for Tier 2.
 Revisit if: Distillation needs Memory Store to own richer Tier 2 retention state, such as last-reviewed cycle metadata or explicit promotion candidate flags.
+
+D-16: Attention Filter starts with deterministic contract and scoring foundation
+Date: 2026-05-02 | Status: Closed
+Priority: Important
+Decision: Module 2 Phase 1 will implement the Attention Filter public dataclasses, package exports, default criteria, validation, blend-weight calculation, and deterministic structural scoring helpers before adding live embedding or LLM execution.
+Rationale: `ARCH_attention_filter.md` mixes pure contract/scoring behavior with side-effecting toolkit calls. Splitting the pure foundation first gives the next steps a small, testable surface and lets later embedding/LLM phases plug into stable types and scoring semantics without reworking the package boundary.
+Revisit if: The toolkit clients require constructor-time or config-time behavior that forces changes to the public dataclasses or validation semantics.
