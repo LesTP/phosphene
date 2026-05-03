@@ -11,10 +11,12 @@ from phosphene.attention_filter import (
     InvalidScoreError,
 )
 from phosphene.attention_filter.filter import (
+    _IncomingAssertion,
     _ItemRetrievalContext,
     _SimilarNoteContext,
     _extract_incoming_assertions,
     _parse_assertion_extraction_payload,
+    _prepare_friction_from_assertions,
 )
 
 
@@ -183,3 +185,64 @@ def test_assertion_extraction_propagates_llm_errors_unchanged() -> None:
         )
 
     assert exc_info.value is failure
+
+
+def test_friction_preparation_pairs_assertions_with_cached_clusters() -> None:
+    context = _ItemRetrievalContext(
+        item=make_context().item,
+        embedding=object(),
+        similar_notes=(
+            _SimilarNoteContext(
+                note_id="note-a",
+                similarity=0.82,
+                unresolvedness=0.5,
+                metadata={"cluster_group": "cluster-b"},
+            ),
+            _SimilarNoteContext(
+                note_id="note-b",
+                similarity=0.91,
+                unresolvedness=0.3,
+                metadata={"cluster_group": "cluster-a"},
+            ),
+            _SimilarNoteContext(
+                note_id="note-c",
+                similarity=0.73,
+                unresolvedness=0.2,
+                metadata={"cluster_group": "cluster-b"},
+            ),
+            _SimilarNoteContext(
+                note_id="note-d",
+                similarity=0.99,
+                unresolvedness=0.1,
+                metadata={"cluster_group": None},
+            ),
+        ),
+    )
+    assertions = (
+        _IncomingAssertion("Sync is not storage.", 0.8),
+        _IncomingAssertion("Local-first tools need conflict models.", 0.6),
+    )
+
+    preparation = _prepare_friction_from_assertions(context, assertions)
+
+    assert preparation.incoming_assertions is assertions
+    assert [cluster.cluster_group for cluster in preparation.cached_clusters] == [
+        "cluster-a",
+        "cluster-b",
+    ]
+    assert preparation.cached_clusters[0].note_ids == ("note-b",)
+    assert preparation.cached_clusters[0].max_similarity == pytest.approx(0.91)
+    assert preparation.cached_clusters[0].assertion_cache_path == "tier2/cluster-a.json"
+    assert preparation.cached_clusters[1].note_ids == ("note-a", "note-c")
+    assert preparation.cached_clusters[1].max_similarity == pytest.approx(0.82)
+    assert preparation.cached_clusters[1].assertion_cache_path == "tier2/cluster-b.json"
+
+
+def test_friction_preparation_allows_assertions_without_cached_clusters() -> None:
+    context = make_context()
+    assertions = (_IncomingAssertion("A standalone claim.", 1.0),)
+
+    preparation = _prepare_friction_from_assertions(context, assertions)
+
+    assert preparation.incoming_assertions is assertions
+    assert preparation.cached_clusters == ()

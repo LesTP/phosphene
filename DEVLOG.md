@@ -53,6 +53,19 @@ The private `_evaluate_items()` path now carries extracted incoming assertions a
 
 Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter` (100 passed).
 
+### Step 2.3.4: Friction preparation from assertions and cached-cluster contract
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added private friction-preparation records that pair incoming assertions with retrieved cluster cache references.
+**Contract changes:** None — implementation follows the existing private Attention Filter path and the Distillation assertion-cache contract without changing public dataclasses.
+
+Added `_CachedClusterReference` and `_FrictionPreparation` as private records for the future friction scorer. `_prepare_friction_from_assertions()` now groups retrieved similar notes by non-empty `cluster_group`, carries the incoming assertions from the extraction boundary, preserves note ids per cluster, records each cluster's maximum retrieved similarity, and names the Distillation assertion-cache location as a Tier 2 JSON file keyed by cluster group.
+
+The change remains read-only and preparatory: it does not read assertion-cache files yet, does not write to Memory Store, does not change public Attention Filter dataclasses, and does not produce accepted fragments or annotations. Focused tests cover assertion pairing, deterministic cluster grouping, assertion-cache path formation, missing-cluster handling, and private evaluator wiring.
+
+Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter` (102 passed).
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03

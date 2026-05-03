@@ -86,12 +86,27 @@ class _IncomingAssertion:
 
 
 @dataclass(frozen=True)
+class _CachedClusterReference:
+    cluster_group: str
+    note_ids: tuple[str, ...]
+    max_similarity: float
+    assertion_cache_path: str
+
+
+@dataclass(frozen=True)
+class _FrictionPreparation:
+    incoming_assertions: tuple[_IncomingAssertion, ...]
+    cached_clusters: tuple[_CachedClusterReference, ...]
+
+
+@dataclass(frozen=True)
 class _ItemEvaluation:
     retrieval: _ItemRetrievalContext
     structural: _MemoryStructuralEvaluation
     prompt_scores: Mapping[str, float]
     prompt_score: float
     incoming_assertions: tuple[_IncomingAssertion, ...]
+    friction_preparation: _FrictionPreparation
     composite_score: float
     prompt_weight: float
     structure_weight: float
@@ -412,6 +427,43 @@ def _extract_incoming_assertions(
     return _parse_assertion_extraction_payload(response_text)
 
 
+def _assertion_cache_path(cluster_group: str) -> str:
+    return f"tier2/{cluster_group}.json"
+
+
+def _prepare_friction_from_assertions(
+    context: _ItemRetrievalContext,
+    incoming_assertions: Sequence[_IncomingAssertion],
+) -> _FrictionPreparation:
+    """Pair incoming claims with retrieved clusters that have assertion caches."""
+
+    cluster_notes: dict[str, list[_SimilarNoteContext]] = {}
+    for note in context.similar_notes:
+        raw_cluster_group = note.metadata.get("cluster_group")
+        if not isinstance(raw_cluster_group, str):
+            continue
+
+        cluster_group = raw_cluster_group.strip()
+        if not cluster_group:
+            continue
+
+        cluster_notes.setdefault(cluster_group, []).append(note)
+
+    cached_clusters = tuple(
+        _CachedClusterReference(
+            cluster_group=cluster_group,
+            note_ids=tuple(note.note_id for note in notes),
+            max_similarity=max(_clamp_probability(note.similarity) for note in notes),
+            assertion_cache_path=_assertion_cache_path(cluster_group),
+        )
+        for cluster_group, notes in sorted(cluster_notes.items())
+    )
+    return _FrictionPreparation(
+        incoming_assertions=tuple(incoming_assertions),
+        cached_clusters=cached_clusters,
+    )
+
+
 def _prompt_criterion_weight(
     criterion: FilterCriterion, scoring_config: ScoringConfig
 ) -> float:
@@ -693,6 +745,10 @@ def _evaluate_items(
             config,
             llm_complete_callable=llm_complete_callable,
         )
+        friction_preparation = _prepare_friction_from_assertions(
+            context,
+            incoming_assertions,
+        )
         composite_score = _clamp_probability(
             prompt_score * prompt_weight
             + structural.structure_score * structure_weight
@@ -704,6 +760,7 @@ def _evaluate_items(
                 prompt_scores=prompt_scores,
                 prompt_score=prompt_score,
                 incoming_assertions=incoming_assertions,
+                friction_preparation=friction_preparation,
                 composite_score=composite_score,
                 prompt_weight=prompt_weight,
                 structure_weight=structure_weight,

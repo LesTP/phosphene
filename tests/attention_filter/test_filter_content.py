@@ -226,6 +226,10 @@ def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() 
         "incoming claim"
     ]
     assert evaluation.incoming_assertions[0].confidence == pytest.approx(0.7)
+    assert evaluation.friction_preparation.incoming_assertions is (
+        evaluation.incoming_assertions
+    )
+    assert evaluation.friction_preparation.cached_clusters == ()
     assert evaluation.prompt_score == pytest.approx((0.8 * 4.0 + 0.2) / 5.0)
     assert evaluation.structural.structure_score == pytest.approx((0.5 + 0.45) / 2.0)
     assert evaluation.composite_score == pytest.approx(
