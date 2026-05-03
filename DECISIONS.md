@@ -168,3 +168,10 @@ Priority: Normal
 Decision: Keep `AttentionFilterConfig` field order aligned with `ARCH_attention_filter.md`; use `@dataclass(kw_only=True)` to permit required toolkit config fields after defaulted fields without changing the public contract order.
 Rationale: Phase 1 exposes the public contract before live embedding/LLM behavior. Matching ARCH field order keeps introspection-based contract tests honest while preserving ergonomic keyword-only construction.
 Revisit if: Later integration requires positional construction or a toolkit config wrapper that changes the public constructor contract.
+
+D-24: Attention Filter Phase 2 is retrieval plumbing, not LLM scoring
+Date: 2026-05-03 | Status: Closed
+Priority: Important
+Decision: Module 2 Phase 2 will wire the embedding boundary, Memory Store density metrics, similar-note retrieval, and Memory Store-backed structural signals before implementing live LLM prompt scoring, assertion extraction, or annotation generation. Non-empty item evaluation may build private context for later phases, but accepted `AnnotatedFragment` production remains deferred until the LLM scoring and annotation phase.
+Rationale: The Attention Filter ARCH behavior combines embedding, Memory Store retrieval, LLM prompt scoring, assertion extraction, geometric scoring, acceptance, and annotation in one public method. Building all of that in one phase would hide failures across too many dependencies. Splitting retrieval plumbing first gives deterministic tests around the Memory Store boundary and keeps the current no-toolkit checkout workable through fakes, while preserving the ARCH contract for the later LLM phase.
+Revisit if: The toolkit embedding API requires a public configuration or constructor change, or if downstream phases need `filter_content` to produce provisional non-LLM fragments before annotation exists.

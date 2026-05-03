@@ -2,8 +2,8 @@
 module: 2
 phase: 2
 phase_title: Memory Store retrieval and embedding integration
-step: null
-mode: Discuss
+step: 1 of 4
+mode: Code
 blocked: false
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 2: Memory Store retrieval and embedding integration.
-- **Focus** — Phase 1 is complete; ready to plan Phase 2 before adding live LLM prompt execution.
+- **Focus** — Step 1: embedding bridge and empty-batch/density snapshot behavior for Attention Filter.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -48,8 +48,58 @@ Four-phase plan (matching ARCH_memory_store.md public API surface) — all phase
 
 Planned phases follow `ARCH_attention_filter.md`: first stabilize the public contract (including `ScoringConfig`) and deterministic geometric scoring helpers, then add Memory Store retrieval/embedding integration, then LLM Phase 1 scoring (precision_surplus) and assertion extraction (friction), then full batch orchestration with triple-gate blend.
 
-### Phase 1 (complete): Attention Filter contract and scoring foundation
+### Phase 1 (audited complete): Attention Filter contract and scoring foundation
 
-Delivered ARCH-aligned public dataclasses/exports, default precision-surplus criteria, config validation, triple-gate blend helpers, deterministic Phase 2 geometric scoring helpers, and focused tests. See DEVLOG "Phase 2.1 Completion" entry.
+Delivered ARCH-aligned public dataclasses/exports, default precision-surplus criteria, config validation, triple-gate blend helpers, deterministic Phase 2 geometric scoring helpers, and focused tests. Audited complete. See DEVLOG "Phase 2.1 Completion" and "Phase 2.1 Audit Closure" entries.
+
+### Phase 2 (in progress): Memory Store retrieval and embedding integration
+
+Regime: Build. Four steps. Each step ends with focused `tests/attention_filter` coverage plus the existing Memory Store and Attention Filter tests passing under the repo test pattern.
+
+Scope boundary: this phase wires embeddings, Memory Store density reads, and similar-note retrieval into the Attention Filter. It does not add live LLM prompt scoring, assertion extraction, or final annotation generation; those remain later Module 2 phases.
+
+**Step 1 — Embedding bridge and empty-batch result**
+
+- Add a private embedding boundary in `phosphene.attention_filter` that embeds `ContentItem.content` via toolkit embedding using `config.embedding_config`.
+- Keep toolkit imports isolated so tests can use fakes and the current checkout can still import without the sibling toolkit present.
+- Implement `filter_content([], config)` to read `memory_store.get_density_metrics()`, compute prompt/structure weights, and return an empty `FilterResult`.
+- Preserve toolkit embedding errors from the embedding boundary; do not wrap them in Attention Filter-specific errors.
+- Tests:
+  - empty item list returns `accepted=[]`, `rejected_count=0`, `total_count=0`, and the current density snapshot/blend weights.
+  - embedding bridge passes content and `embedding_config` through to the configured/toolkit embedding callable.
+  - embedding failures propagate unchanged.
+
+**Step 2 — Similar-note retrieval context**
+
+- For each non-empty item, embed once and call `memory_store.search_by_embedding(embedding, limit=config.similarity_candidates)`.
+- Normalize retrieved Memory Store notes into a private per-item context carrying note ids, similarity scores, unresolvedness scores, and note metadata needed by existing scoring helpers.
+- Ensure retrieval is read-only: no Memory Store writes, no direct vault reads, no index mutation.
+- Tests:
+  - search is called once per item with the computed embedding and configured candidate limit.
+  - retrieved note ids, similarities, and unresolvedness values are preserved in context order.
+  - zero retrieval candidates produce an empty context without error.
+
+**Step 3 — Memory-backed structural scores**
+
+- Use the retrieval context to compute Memory Store-backed structural signals available before Distillation caches exist: `link_density`, `unresolvedness_affinity`, and connection ids above `scoring.link_density_sim_threshold`.
+- Keep cluster-dependent geometric criteria (`liminality`, `unexpected_connection`, `structural_insight`, `cluster_novelty`) at their degenerate helper behavior until Tier 2 centroid/cache integration is planned.
+- Keep `friction_target` unset in this phase because ARCH friction requires assertion extraction and cached cluster assertions, both deferred.
+- Tests:
+  - link-density and unresolvedness-affinity inputs are derived from retrieved candidates, not recomputed from raw files.
+  - connection ids include only candidates above the similarity threshold.
+  - no candidates produce zero structural score and no connections.
+
+**Step 4 — Partial non-LLM pipeline wiring**
+
+- Wire the embedding, density, retrieval, blend, and Memory Store-backed structural calculations into a private item evaluation path that later LLM scoring can consume.
+- Keep public `filter_content` behavior honest: non-empty batches may prepare the evaluation context, but accepted/rejected fragment production remains deferred until LLM scoring and annotation are implemented.
+- Add regression tests showing that non-empty evaluation performs embedding/retrieval/density work deterministically with fakes while not manufacturing ARCH annotations without the LLM phase.
+
+### Phase 2 Acceptance
+
+- Existing Phase 1 Attention Filter tests still pass.
+- New tests cover embedding boundary behavior, Memory Store density reads, similar-note retrieval, link-density connections, and unresolvedness-affinity scoring.
+- Memory Store remains a read-only dependency from the Attention Filter.
+- No live LLM scoring, assertion extraction, Distillation assertion-cache reads, or annotation generation are introduced in this phase.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

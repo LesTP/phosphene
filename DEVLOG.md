@@ -9,6 +9,20 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Phase 2.2 Plan: Memory Store retrieval and embedding integration
+
+**Date:** 2026-05-03
+**Decision:** Planned Module 2 Phase 2 as four Build steps: embedding bridge and empty-batch results, similar-note retrieval context, Memory Store-backed structural scores, and partial non-LLM pipeline wiring.
+
+This phase is scoped to deterministic embedding/retrieval plumbing. Live LLM prompt scoring, assertion extraction, Distillation assertion-cache reads, acceptance decisions, and annotation generation remain deferred to later Attention Filter phases. See D-24.
+
+## Phase 2.1 Audit Closure
+
+**Date:** 2026-05-03
+**Decision:** Human audit recorded; Module 2 Phase 1 (Attention Filter contract and scoring foundation) is accepted as audited and complete.
+
+Updated `DEVPLAN.md` Current Status and the Module 2 Phase 1 summary to reflect audit closure for 2.1. No implementation changes, test changes, or architecture changes were required.
+
 ### Phase 2.1 Completion: Attention Filter contract and scoring foundation
 
 **Date:** 2026-05-02
