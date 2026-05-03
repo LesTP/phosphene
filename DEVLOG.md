@@ -253,3 +253,26 @@ Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention
 - Must fix: none.
 - Should fix: none.
 - Optional: none recorded.
+
+### Phase 2.2 Completion: Memory Store retrieval and embedding integration
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 2 of Module 2 (Attention Filter). Final verification ran the required Attention Filter plus Memory Store test slices with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 225 tests pass.
+
+Phase 2 delivered the private toolkit embedding boundary, empty-batch `FilterResult` behavior backed by Memory Store density metrics, per-item similar-note retrieval contexts, Memory Store-backed structural scores for `link_density` and `unresolvedness_affinity`, connection id extraction above the configured similarity threshold, and partial non-LLM pipeline wiring. The public non-empty `filter_content` path now performs deterministic density, embedding, retrieval, and structural preparation while intentionally leaving accepted fragments, rejected counts, LLM annotations, final scoring, assertion extraction, and Memory Store writes for later Attention Filter phases.
+
+DEVLOG learning review: Phase 2 landed linearly across one plan, four implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+
+Contract Changes scan: Phase 2 step entries recorded "Contract changes: None"; the review also recorded no contract changes. D-24 and D-25 document the retrieval-only phase boundary, but no upstream contract propagation is required.
+
+Log review: `logs/loop/summary.log` shows Module 2 Phase 2 iterations 37-42 completed cleanly with no escalations, no repeated tool failures, and no wasted-turn patterns. No new operational Gotchas to promote.
+
+DEVPLAN cleanup: reduced the Phase 2 step plan to a one-line completion summary referencing this entry. Module 2 remains in progress, with Phase 3 ready for its own Phase Plan after human audit.
+
+ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
+
+Frontmatter reset for next phase: `phase: 3`, `phase_title: LLM Phase 1 scoring and assertion extraction`, `step: null`, `mode: Discuss`, `review_done: false`.
