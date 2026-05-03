@@ -210,3 +210,10 @@ Priority: Important
 Decision: Accept Module 2 Phase 4 as architecturally aligned after gating incoming assertion extraction and friction preparation behind the Phase 2 triple gate. Prompt scoring, retrieval, acceptance decisions, annotation generation, fragment assembly, rejected counts, and Memory Store read-only behavior remain unchanged.
 Rationale: `ARCH_attention_filter.md` says Phase 2 geometric scoring is active only after the triple gate. Running the friction assertion-extraction LLM call during pure prompt-mode bootstrap spent Phase 2 cost when `structure_weight` was zero and no structural friction score could affect acceptance. Gating that call preserves the prompt-only bootstrap path while retaining assertion preparation once the Memory Store has enough density for Phase 2.
 Revisit if: Annotation quality in prompt-only mode needs incoming assertion text even when structural scoring is inactive; in that case add a separate low-cost annotation enrichment path rather than reusing the Phase 2 friction boundary.
+
+D-30: Source Ingestion starts with adapter foundation before live fetchers
+Date: 2026-05-03 | Status: Closed
+Priority: Important
+Decision: Module 3 Phase 1 will implement the Source Ingestion public dataclasses, errors, package exports, config validation, manager polling orchestration, adapter registry boundary, and deterministic normalization helpers before adding concrete Telegram, RSS, Reddit, human-share, or corpus archive fetchers.
+Rationale: `ARCH_source_ingestion.md` defines many external adapters and archive formats behind one uniform contract. Building the manager and adapter boundary first gives later network and corpus adapters a small tested surface, keeps the module leaf-like, and avoids hiding API, parsing, and state-marker failures inside the initial package scaffold.
+Revisit if: A concrete adapter needs public configuration or result-shape changes that cannot fit the registry/protocol boundary.

@@ -1,10 +1,10 @@
 ---
-module: null
-phase: null
-phase_title: null
-step: null
-mode: Complete
-blocked: false
+module: SOURCE_INGESTION
+phase: 1
+phase_title: Source Ingestion contract and adapter foundation
+step: 3.1.1
+mode: Discuss
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -31,8 +31,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 2 (Attention Filter) complete.
-- **Focus** — Awaiting human audit before Module 3 (Source Ingestion) planning.
+- **Phase** — Module 3 Phase 1: Source Ingestion contract and adapter foundation
+- **Focus** — Step 3.1.1: package/dataclass scaffold and public exports
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -63,5 +63,19 @@ Delivered private LLM prompt scoring, precision-surplus composite integration, i
 ### Phase 4 (complete): Full batch orchestration and annotation output
 
 Delivered annotation generation, acceptance and auto-accept decisions, public `AnnotatedFragment` assembly, rejected counts, batch metadata, and Phase 2 assertion-extraction gating while preserving read-only Memory Store behavior. Reviewed and completed. See DEVLOG "Phase 2.4 Review" and "Phase 2.4 Completion" entries.
+
+## Module 3: Source Ingestion (in progress)
+
+Planned phases follow `ARCH_source_ingestion.md`: first stabilize the public contract, manager orchestration, adapter registry boundary, shared content normalization, and state-marker abstraction without live network adapters; then add concrete autonomous adapters, human-share handling, corpus import adapters, and persistence/integration hardening.
+
+### Phase 1 (active): Source Ingestion contract and adapter foundation
+
+Build the `phosphene.source_ingestion` package foundation as a leaf module with ARCH-aligned dataclasses, errors, validation, manager polling behavior, adapter registration, deterministic link/content normalization helpers, and focused unit coverage. Do not implement live Telegram/RSS/Reddit HTTP/API fetching or corpus archive parsing in this phase.
+
+- [ ] **Step 3.1.1** — Add the public package scaffold: ARCH-defined dataclasses, errors, package exports, and constructor-compatible `SourceIngestion` stub.
+- [ ] **Step 3.1.2** — Add config validation and adapter lookup semantics, including unknown adapter types, duplicate labels, missing required params/credentials, enabled filtering, and `AdapterNotFoundError`.
+- [ ] **Step 3.1.3** — Implement the internal adapter protocol/registry and manager polling orchestration with deterministic fake adapters for tests, per-adapter `IngestionResult` assembly, and per-item error capture.
+- [ ] **Step 3.1.4** — Add shared normalization helpers for URL extraction, content truncation, timestamp preservation, and `ContentItem` assembly without network fetching.
+- [ ] **Step 3.1.5** — Add focused Source Ingestion unit tests covering public exports, config defaults, manager behavior, adapter errors, normalization helpers, and empty/no-enabled-adapter polling.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

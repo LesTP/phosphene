@@ -9,12 +9,108 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Module 3 Phase 1 Plan
+
+**Date:** 2026-05-03
+**Decision:** Planned Source Ingestion Phase 1 as a Build phase for the public contract and adapter foundation.
+
+Updated `DEVPLAN.md` to activate Module 3 Phase 1 with five implementation steps: package/dataclass scaffold, config validation and adapter lookup semantics, internal adapter protocol and manager polling orchestration, shared normalization helpers, and focused unit tests. Updated `ARCHITECTURE.md` to mark Source Ingestion in progress and logged D-30 in `DECISIONS.md`.
+
+No source implementation was changed in this planning action.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
 **Decision:** Planned Module 2 Phase 4 as four Build steps: annotation generation boundary, acceptance and retention decision helpers, `AnnotatedFragment` assembly, and public `filter_content` batch regression coverage.
 
 This phase is scoped to completing the public Attention Filter output path over the private evaluation records delivered by Phases 2-3. It will produce accepted fragments, rejected counts, generated annotations, and batch metadata while preserving the read-only Memory Store boundary. Cluster-cache scoring that depends on Distillation-owned centroid/assertion files remains deferred behind the existing friction-preparation records until that cache contract has an implementation owner. See D-28.
+
+
+### Step 2.4.1: Annotation generation boundary and parsing
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the private accepted-candidate annotation LLM boundary for Attention Filter Phase 4. The implementation builds a structured `generate_attention_filter_annotation` payload from the private `_ItemEvaluation` record, including original content metadata, composite/prompt/structure scores, prompt and structural score maps, friction preparation, connections, and similar-note context. Annotation calls reuse `config.llm_config` and `config.llm_tier`, matching the existing prompt-scoring tier boundary.
+
+Added annotation parsing with JSON-object validation, non-empty string enforcement, whitespace normalization, and unchanged propagation of LLM provider errors. The new `_generate_annotations` helper wraps already-accepted private evaluations without deciding acceptance or assembling public `AnnotatedFragment` objects, preserving the step boundary for later Phase 4 work.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 113 tests pass.
+
+### Step 2.4.2: Acceptance decisions and retention criteria
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added deterministic private retention decisions for Attention Filter Phase 4. The implementation now applies the composite-score acceptance threshold with exact-edge inclusion, supports `auto_accept_sources` as a threshold bypass, derives stable retention criteria from non-zero prompt and structural score maps, and computes batch rejected counts from the resulting decisions.
+
+The public non-empty `filter_content` path now reports `rejected_count` from those decisions while still returning no accepted fragments until Step 2.4.3 assembles `AnnotatedFragment` objects. The Attention Filter remains read-only against Memory Store; the new regression coverage verifies no write APIs are called.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 119 tests pass.
+
+### Step 2.4.3: AnnotatedFragment assembly
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added public `AnnotatedFragment` assembly for accepted Attention Filter evaluations. The new helpers map generated annotations and retention decisions into consumer-ready fragments with original content metadata, composite importance score, unresolvedness affinity, prompt and structural scores, friction target, connections, linked URLs, and the precomputed embedding.
+
+The non-empty public `filter_content` path now generates annotations for accepted evaluations and returns assembled fragments while preserving accurate rejected counts and read-only Memory Store behavior. Regression coverage verifies exact field mapping, accepted-decision retention criteria propagation, annotation call ordering, embedding passthrough, connection mapping, and no Memory Store write API calls.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 275 tests pass.
+
+### Step 2.4.4: Public batch orchestration regression
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added public end-to-end regression coverage for the full non-empty `AttentionFilter.filter_content` orchestration path. The new test drives a mixed batch through fake embedding and LLM boundaries with one threshold-accepted RSS item, one rejected RSS item, and one low-score `human_share` item accepted through `auto_accept_sources`.
+
+The regression verifies deterministic LLM call ordering across prompt scoring, assertion extraction, and annotation generation; config and tier propagation for each LLM boundary; per-item embedding search limits and embedding passthrough; prompt/structure blend metadata; rejected counts; retention criteria attribution; read-only Memory Store behavior; and the existing empty-batch stability alongside the Attention Filter plus Memory Store slices.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 276 tests pass.
+
+## Phase 2.4 Review - Attention Filter Full Batch Orchestration
+
+**Date:** 2026-05-03
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 2 Phase 4 against `ARCH_attention_filter.md`; one architecture/cost issue was fixed.
+
+Validated the public `filter_content` path for annotation generation, acceptance and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, batch metadata, and read-only Memory Store behavior. Fixed the Phase 2 boundary so incoming assertion extraction and friction preparation run only after the triple gate activates Phase 2; prompt-only bootstrap mode now avoids the friction LLM call while still scoring prompt criteria and generating annotations for accepted content.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (277 passed).
+
+### Findings
+- Must fix: Gate assertion extraction behind Phase 2 activation; fixed in `src/phosphene/attention_filter/filter.py` with regression coverage.
+- Should fix: Remove stale scaffold wording from `AttentionFilter` class docstring; fixed.
+- Optional: none recorded.
+
+### Phase 2.4 Completion: Full batch orchestration and annotation output
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 4 of Module 2 (Attention Filter). Final verification ran the Attention Filter plus Memory Store slices with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 277 tests pass.
+
+Phase 4 delivered the full public `filter_content` output path: annotation generation, threshold and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, prompt/structure blend metadata, and read-only Memory Store behavior. Review fixes gate incoming assertion extraction behind Phase 2 activation and remove stale scaffold wording.
+DEVLOG learning review: Phase 4 landed linearly across one plan, four implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 4 step entries and review recorded no contract changes. D-28 is closed by this completion and D-29 records the Phase 2 assertion-extraction gating fix; no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 2 Phase 4 iterations 52-57 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 4 to a one-line completion summary, marked Module 2 complete, and cleared active frontmatter pending human audit before Module 3 planning.
+ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 3 complete" to "Complete".
+
+<!-- HISTORY — do not read past this line. Completed entries kept for audit. -->
 
 ## Phase 2.3 Plan: LLM Phase 1 scoring and assertion extraction
 
@@ -414,87 +510,3 @@ Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestra
 Updated `DEVPLAN.md` Current Status to move Module 2 from awaiting human audit to ready for Phase 4 planning. No implementation changes, test changes, or architecture changes were required.
 
 Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: true`.
-
-### Step 2.4.1: Annotation generation boundary and parsing
-
-**Date:** 2026-05-03
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added the private accepted-candidate annotation LLM boundary for Attention Filter Phase 4. The implementation builds a structured `generate_attention_filter_annotation` payload from the private `_ItemEvaluation` record, including original content metadata, composite/prompt/structure scores, prompt and structural score maps, friction preparation, connections, and similar-note context. Annotation calls reuse `config.llm_config` and `config.llm_tier`, matching the existing prompt-scoring tier boundary.
-
-Added annotation parsing with JSON-object validation, non-empty string enforcement, whitespace normalization, and unchanged propagation of LLM provider errors. The new `_generate_annotations` helper wraps already-accepted private evaluations without deciding acceptance or assembling public `AnnotatedFragment` objects, preserving the step boundary for later Phase 4 work.
-
-Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 113 tests pass.
-
-### Step 2.4.2: Acceptance decisions and retention criteria
-
-**Date:** 2026-05-03
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added deterministic private retention decisions for Attention Filter Phase 4. The implementation now applies the composite-score acceptance threshold with exact-edge inclusion, supports `auto_accept_sources` as a threshold bypass, derives stable retention criteria from non-zero prompt and structural score maps, and computes batch rejected counts from the resulting decisions.
-
-The public non-empty `filter_content` path now reports `rejected_count` from those decisions while still returning no accepted fragments until Step 2.4.3 assembles `AnnotatedFragment` objects. The Attention Filter remains read-only against Memory Store; the new regression coverage verifies no write APIs are called.
-
-Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 119 tests pass.
-
-### Step 2.4.3: AnnotatedFragment assembly
-
-**Date:** 2026-05-03
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added public `AnnotatedFragment` assembly for accepted Attention Filter evaluations. The new helpers map generated annotations and retention decisions into consumer-ready fragments with original content metadata, composite importance score, unresolvedness affinity, prompt and structural scores, friction target, connections, linked URLs, and the precomputed embedding.
-
-The non-empty public `filter_content` path now generates annotations for accepted evaluations and returns assembled fragments while preserving accurate rejected counts and read-only Memory Store behavior. Regression coverage verifies exact field mapping, accepted-decision retention criteria propagation, annotation call ordering, embedding passthrough, connection mapping, and no Memory Store write API calls.
-
-Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 275 tests pass.
-
-### Step 2.4.4: Public batch orchestration regression
-
-**Date:** 2026-05-03
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added public end-to-end regression coverage for the full non-empty `AttentionFilter.filter_content` orchestration path. The new test drives a mixed batch through fake embedding and LLM boundaries with one threshold-accepted RSS item, one rejected RSS item, and one low-score `human_share` item accepted through `auto_accept_sources`.
-
-The regression verifies deterministic LLM call ordering across prompt scoring, assertion extraction, and annotation generation; config and tier propagation for each LLM boundary; per-item embedding search limits and embedding passthrough; prompt/structure blend metadata; rejected counts; retention criteria attribution; read-only Memory Store behavior; and the existing empty-batch stability alongside the Attention Filter plus Memory Store slices.
-
-Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 276 tests pass.
-
-## Phase 2.4 Review - Attention Filter Full Batch Orchestration
-
-**Date:** 2026-05-03
-**Regime:** Build
-**Mode:** autonomous
-**Outcome:** Reviewed Module 2 Phase 4 against `ARCH_attention_filter.md`; one architecture/cost issue was fixed.
-
-Validated the public `filter_content` path for annotation generation, acceptance and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, batch metadata, and read-only Memory Store behavior. Fixed the Phase 2 boundary so incoming assertion extraction and friction preparation run only after the triple gate activates Phase 2; prompt-only bootstrap mode now avoids the friction LLM call while still scoring prompt criteria and generating annotations for accepted content.
-
-Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (277 passed).
-
-### Findings
-- Must fix: Gate assertion extraction behind Phase 2 activation; fixed in `src/phosphene/attention_filter/filter.py` with regression coverage.
-- Should fix: Remove stale scaffold wording from `AttentionFilter` class docstring; fixed.
-- Optional: none recorded.
-
-### Phase 2.4 Completion: Full batch orchestration and annotation output
-
-**Date:** 2026-05-03
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Closed Phase 4 of Module 2 (Attention Filter). Final verification ran the Attention Filter plus Memory Store slices with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 277 tests pass.
-
-Phase 4 delivered the full public `filter_content` output path: annotation generation, threshold and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, prompt/structure blend metadata, and read-only Memory Store behavior. Review fixes gate incoming assertion extraction behind Phase 2 activation and remove stale scaffold wording.
-DEVLOG learning review: Phase 4 landed linearly across one plan, four implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
-Contract Changes scan: Phase 4 step entries and review recorded no contract changes. D-28 is closed by this completion and D-29 records the Phase 2 assertion-extraction gating fix; no upstream contract propagation is required.
-Log review: `logs/loop/summary.log` shows Module 2 Phase 4 iterations 52-57 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
-DEVPLAN cleanup: reduced Phase 4 to a one-line completion summary, marked Module 2 complete, and cleared active frontmatter pending human audit before Module 3 planning.
-ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 3 complete" to "Complete".
