@@ -29,6 +29,19 @@ Implemented the empty-list public path for `AttentionFilter.filter_content`: it 
 
 Focused tests cover empty-batch counts, density snapshot and blend metadata, embedding pass-through, and unchanged embedding error propagation. The Memory Store and Attention Filter test slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`.
 
+### Step 2.2.2: Similar-note retrieval context
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added private retrieval contexts for non-empty Attention Filter items backed by one embedding call and one Memory Store similarity search per item.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md` and keeps the context private.
+
+Added `_SimilarNoteContext` and `_ItemRetrievalContext` as private normalization records for similar-note retrieval. `_prepare_retrieval_contexts()` embeds each incoming content item once, calls `memory_store.search_by_embedding(embedding, limit=config.similarity_candidates)`, and preserves the returned candidate order while carrying note ids, similarity scores, unresolvedness scores, and selected note metadata for later structural scoring.
+
+The retrieval path is read-only: it calls Memory Store search only, does not touch vault files directly, and does not call Memory Store write APIs. The public non-empty `filter_content` path now prepares the retrieval context before raising the existing deferred-implementation error, leaving scoring, acceptance, and annotation for later Phase 2 steps.
+
+Focused tests cover per-item embedding/search calls with configured limits, ordered preservation of note ids/similarities/unresolvedness values and metadata, and empty retrieval candidates. The Memory Store and Attention Filter test slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`.
+
 ## Phase 2.1 Audit Closure
 
 **Date:** 2026-05-03

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from itertools import combinations
 from typing import Any, Protocol
 
@@ -30,6 +31,33 @@ class _EmbeddingCallable(Protocol):
     def __call__(self, texts: list[str], config: object) -> Any: ...
 
 
+@dataclass(frozen=True)
+class _SimilarNoteContext:
+    note_id: str
+    similarity: float
+    unresolvedness: float
+    metadata: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class _ItemRetrievalContext:
+    item: ContentItem
+    embedding: object
+    similar_notes: tuple[_SimilarNoteContext, ...]
+
+    @property
+    def note_ids(self) -> list[str]:
+        return [note.note_id for note in self.similar_notes]
+
+    @property
+    def similarities(self) -> list[float]:
+        return [note.similarity for note in self.similar_notes]
+
+    @property
+    def unresolvedness_scores(self) -> list[float]:
+        return [note.unresolvedness for note in self.similar_notes]
+
+
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
 
@@ -46,6 +74,62 @@ def _embed_content(
 
     result = embedding_callable([content], config.embedding_config)
     return result.vectors[0]
+
+
+def _normalize_similar_note(note: object, similarity: float) -> _SimilarNoteContext:
+    return _SimilarNoteContext(
+        note_id=str(getattr(note, "note_id")),
+        similarity=float(similarity),
+        unresolvedness=float(getattr(note, "unresolvedness")),
+        metadata={
+            "tier": getattr(note, "tier"),
+            "title": getattr(note, "title"),
+            "importance": getattr(note, "importance"),
+            "link_count": getattr(note, "link_count"),
+            "tags": list(getattr(note, "tags")),
+            "source": getattr(note, "source"),
+            "friction_target": getattr(note, "friction_target"),
+            "cluster_group": getattr(note, "cluster_group"),
+        },
+    )
+
+
+def _retrieve_similar_notes(
+    memory_store: object, embedding: object, config: AttentionFilterConfig
+) -> tuple[_SimilarNoteContext, ...]:
+    results = memory_store.search_by_embedding(
+        embedding,
+        limit=config.similarity_candidates,
+    )
+    return tuple(
+        _normalize_similar_note(note, similarity) for note, similarity in results
+    )
+
+
+def _prepare_retrieval_contexts(
+    memory_store: object,
+    items: Sequence[ContentItem],
+    config: AttentionFilterConfig,
+    *,
+    embedding_callable: _EmbeddingCallable = _toolkit_embed,
+) -> list[_ItemRetrievalContext]:
+    contexts: list[_ItemRetrievalContext] = []
+    for item in items:
+        embedding = _embed_content(
+            item.content,
+            config,
+            embedding_callable=embedding_callable,
+        )
+        similar_notes = _retrieve_similar_notes(memory_store, embedding, config)
+        contexts.append(
+            _ItemRetrievalContext(
+                item=item,
+                embedding=embedding,
+                similar_notes=similar_notes,
+            )
+        )
+
+    return contexts
 
 
 def _clamp_probability(value: float) -> float:
@@ -248,6 +332,7 @@ class AttentionFilter:
                 density_snapshot=density_snapshot,
             )
 
+        _prepare_retrieval_contexts(self.memory_store, items, config)
         raise NotImplementedError(
             "AttentionFilter.filter_content for non-empty batches is implemented in a later phase"
         )

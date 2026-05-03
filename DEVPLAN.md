@@ -2,7 +2,7 @@
 module: 2
 phase: 2
 phase_title: Memory Store retrieval and embedding integration
-step: 2 of 4
+step: 3 of 4
 mode: Code
 blocked: false
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 2: Memory Store retrieval and embedding integration.
-- **Focus** — Step 2: similar-note retrieval context for Attention Filter.
+- **Focus** — Step 3: Memory-backed structural scores.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -62,15 +62,9 @@ Scope boundary: this phase wires embeddings, Memory Store density reads, and sim
 
 Added the private embedding boundary, import-isolated toolkit embedding call, empty-batch `FilterResult` path with density snapshot/blend weights, and focused tests. See DEVLOG "Step 2.2.1".
 
-**Step 2 — Similar-note retrieval context**
+**Step 2 (complete) — Similar-note retrieval context**
 
-- For each non-empty item, embed once and call `memory_store.search_by_embedding(embedding, limit=config.similarity_candidates)`.
-- Normalize retrieved Memory Store notes into a private per-item context carrying note ids, similarity scores, unresolvedness scores, and note metadata needed by existing scoring helpers.
-- Ensure retrieval is read-only: no Memory Store writes, no direct vault reads, no index mutation.
-- Tests:
-  - search is called once per item with the computed embedding and configured candidate limit.
-  - retrieved note ids, similarities, and unresolvedness values are preserved in context order.
-  - zero retrieval candidates produce an empty context without error.
+Added private per-item retrieval contexts that embed each item once, call `memory_store.search_by_embedding` with the configured candidate limit, preserve ordered note ids/similarities/unresolvedness values, and normalize candidate metadata without Memory Store writes. See DEVLOG "Step 2.2.2".
 
 **Step 3 — Memory-backed structural scores**
 
