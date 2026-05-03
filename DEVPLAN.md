@@ -1,12 +1,12 @@
 ---
-module: 2
-phase: 4
-phase_title: Full batch orchestration and annotation output
-step: 4
-mode: Review
+module: null
+phase: null
+phase_title: null
+step: null
+mode: Complete
 blocked: false
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -31,8 +31,8 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 2 (Attention Filter), Phase 4 in progress: Full batch orchestration and annotation output.
-- **Focus** — Phase 4 review complete; next action is Phase Complete.
+- **Phase** — Module 2 (Attention Filter) complete.
+- **Focus** — Awaiting human audit before Module 3 (Source Ingestion) planning.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -44,7 +44,7 @@ Four-phase plan (matching ARCH_memory_store.md public API surface) — all phase
 - **Phase 3 (complete)** — Embedding search and graph operations: `search_by_embedding`, `add_links`, `get_linked`, `get_personality_context`, plus sidecar embedding persistence on read paths. See DEVLOG "Phase 3 Completion" entry.
 - **Phase 4 (complete)** — Decay, supersession, and density metrics: `supersede`, `run_decay`, `get_density_metrics`. See DEVLOG "Phase 4 Completion" entry.
 
-## Module 2: Attention Filter (in progress)
+## Module 2: Attention Filter (complete)
 
 Planned phases follow `ARCH_attention_filter.md`: first stabilize the public contract (including `ScoringConfig`) and deterministic geometric scoring helpers, then add Memory Store retrieval/embedding integration, then LLM Phase 1 scoring (precision_surplus) and assertion extraction (friction), then full batch orchestration with triple-gate blend.
 
@@ -60,13 +60,8 @@ Delivered embedding boundary integration, Memory Store density reads, similar-no
 
 Delivered private LLM prompt scoring, precision-surplus composite integration, incoming assertion extraction, friction-preparation records, and public-path regression coverage while preserving the no-accepted-fragments boundary before orchestration. Reviewed and completed. See DEVLOG "Phase 2.3 Review" and "Phase 2.3 Completion" entries.
 
-### Phase 4 (planned): Full batch orchestration and annotation output
+### Phase 4 (complete): Full batch orchestration and annotation output
 
-Scope: turn the private per-item evaluation records from Phases 2-3 into the public `FilterResult` contract: threshold/auto-accept decisions, generated annotations, accepted `AnnotatedFragment` objects, rejected counts, and batch metadata. The Attention Filter remains read-only against Memory Store; consumers store accepted fragments later. Cluster-cache scoring beyond retrieved-note structural signals stays behind the existing preparation boundary until Distillation owns the assertion/centroid cache format.
-
-- [x] **Step 2.4.1 — Annotation generation boundary and parsing.** Added the private LLM annotation request/parser over accepted evaluation candidates, with tests for prompt payload shape, config/tier propagation, annotation text normalization, malformed payload handling, unchanged LLM error propagation, and multi-candidate wrapping.
-- [x] **Step 2.4.2 — Acceptance decisions and retention criteria.** Added deterministic decision helpers for composite thresholding, `auto_accept_sources` bypass, rejected counts, and retention criteria attribution from prompt and structure score maps. Tests cover threshold edges, auto-accepted low-score items, zero-score rejects, batch accepted/rejected bookkeeping, and no Memory Store writes.
-- [x] **Step 2.4.3 — AnnotatedFragment assembly.** Built public fragments from accepted evaluations with original content metadata, annotation, importance score, unresolvedness, prompt/structure scores, friction target, connections, linked URLs, and embedding. Tests verify exact field mapping and that accepted fragments carry consumer-ready data without calling Memory Store write APIs.
-- [x] **Step 2.4.4 — Public batch orchestration regression.** Added end-to-end public `filter_content` regression coverage with fake embedding and LLM boundaries across mixed accepted/rejected batches, auto-accept behavior, prompt/structure blend metadata, LLM call ordering, empty batch stability, and the Attention Filter plus Memory Store slices.
+Delivered annotation generation, acceptance and auto-accept decisions, public `AnnotatedFragment` assembly, rejected counts, batch metadata, and Phase 2 assertion-extraction gating while preserving read-only Memory Store behavior. Reviewed and completed. See DEVLOG "Phase 2.4 Review" and "Phase 2.4 Completion" entries.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

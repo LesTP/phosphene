@@ -198,7 +198,7 @@ Rationale: This preserves the D-26 phase boundary and avoids exposing partial pu
 Revisit if: The next orchestration phase needs additional public state from private evaluations, or if Source Ingestion requires provisional accepted fragments before annotations can be generated.
 
 D-28: Attention Filter Phase 4 completes public output without Memory Store writes
-Date: 2026-05-03 | Status: Open
+Date: 2026-05-03 | Status: Closed
 Priority: Important
 Decision: Module 2 Phase 4 will complete the public `filter_content` orchestration path by generating annotations, applying acceptance and auto-accept decisions, assembling `AnnotatedFragment` objects, and returning accurate rejected counts and batch metadata. The Attention Filter remains read-only against Memory Store; consumers such as Orchestrator map accepted fragments to `NoteInput` and perform storage later.
 Rationale: `ARCH_attention_filter.md` defines Attention Filter as a selector/annotator whose outputs are passed to Memory Store by consumers, not written internally. Keeping Phase 4 focused on public output completion prevents a cross-module ownership leak into Memory Store writes and lets Source Ingestion consume the filter without a hidden persistence side effect. Cluster-cache scoring that requires Distillation-owned assertion/centroid files is kept behind the existing private preparation records until Distillation defines and writes those cache artifacts.

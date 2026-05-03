@@ -482,3 +482,19 @@ Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention
 - Must fix: Gate assertion extraction behind Phase 2 activation; fixed in `src/phosphene/attention_filter/filter.py` with regression coverage.
 - Should fix: Remove stale scaffold wording from `AttentionFilter` class docstring; fixed.
 - Optional: none recorded.
+
+### Phase 2.4 Completion: Full batch orchestration and annotation output
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 4 of Module 2 (Attention Filter). Final verification ran the Attention Filter plus Memory Store slices with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 277 tests pass.
+
+Phase 4 delivered the full public `filter_content` output path: annotation generation, threshold and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, prompt/structure blend metadata, and read-only Memory Store behavior. Review fixes gate incoming assertion extraction behind Phase 2 activation and remove stale scaffold wording.
+DEVLOG learning review: Phase 4 landed linearly across one plan, four implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 4 step entries and review recorded no contract changes. D-28 is closed by this completion and D-29 records the Phase 2 assertion-extraction gating fix; no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 2 Phase 4 iterations 52-57 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 4 to a one-line completion summary, marked Module 2 complete, and cleared active frontmatter pending human audit before Module 3 planning.
+ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 3 complete" to "Complete".
