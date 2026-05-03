@@ -3,7 +3,7 @@ module: 2
 phase: 2
 phase_title: Memory Store retrieval and embedding integration
 step: 4 of 4
-mode: Code
+mode: Review
 blocked: false
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 2: Memory Store retrieval and embedding integration.
-- **Focus** — Step 4: Partial non-LLM pipeline wiring.
+- **Focus** — Phase 2 review.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -70,11 +70,9 @@ Added private per-item retrieval contexts that embed each item once, call `memor
 
 Added private Memory Store-backed structural evaluation over retrieval contexts, including `link_density`, `unresolvedness_affinity`, connection ids above threshold, and unset `friction_target`. See DEVLOG "Step 2.2.3".
 
-**Step 4 — Partial non-LLM pipeline wiring**
+**Step 4 (complete) — Partial non-LLM pipeline wiring**
 
-- Wire the embedding, density, retrieval, blend, and Memory Store-backed structural calculations into a private item evaluation path that later LLM scoring can consume.
-- Keep public `filter_content` behavior honest: non-empty batches may prepare the evaluation context, but accepted/rejected fragment production remains deferred until LLM scoring and annotation are implemented.
-- Add regression tests showing that non-empty evaluation performs embedding/retrieval/density work deterministically with fakes while not manufacturing ARCH annotations without the LLM phase.
+Added private non-LLM item evaluations that combine retrieval contexts, Memory Store-backed structural scores, and current blend weights. Non-empty public `filter_content` now performs density, embedding, retrieval, and structural preparation with no Memory Store writes and returns batch metadata without manufacturing accepted fragments, rejected counts, LLM annotations, or final scoring. See DEVLOG "Step 2.2.4".
 
 ### Phase 2 Acceptance
 

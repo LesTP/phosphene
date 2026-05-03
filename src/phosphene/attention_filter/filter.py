@@ -66,6 +66,14 @@ class _MemoryStructuralEvaluation:
     friction_target: str | None
 
 
+@dataclass(frozen=True)
+class _ItemEvaluation:
+    retrieval: _ItemRetrievalContext
+    structural: _MemoryStructuralEvaluation
+    prompt_weight: float
+    structure_weight: float
+
+
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
 
@@ -76,9 +84,12 @@ def _embed_content(
     content: str,
     config: AttentionFilterConfig,
     *,
-    embedding_callable: _EmbeddingCallable = _toolkit_embed,
+    embedding_callable: _EmbeddingCallable | None = None,
 ) -> object:
     """Embed one content item through the toolkit boundary."""
+
+    if embedding_callable is None:
+        embedding_callable = _toolkit_embed
 
     result = embedding_callable([content], config.embedding_config)
     return result.vectors[0]
@@ -119,7 +130,7 @@ def _prepare_retrieval_contexts(
     items: Sequence[ContentItem],
     config: AttentionFilterConfig,
     *,
-    embedding_callable: _EmbeddingCallable = _toolkit_embed,
+    embedding_callable: _EmbeddingCallable | None = None,
 ) -> list[_ItemRetrievalContext]:
     contexts: list[_ItemRetrievalContext] = []
     for item in items:
@@ -358,6 +369,34 @@ def _compute_memory_structural_evaluation(
     )
 
 
+def _evaluate_items_non_llm(
+    memory_store: object,
+    items: Sequence[ContentItem],
+    config: AttentionFilterConfig,
+    *,
+    prompt_weight: float,
+    structure_weight: float,
+    embedding_callable: _EmbeddingCallable | None = None,
+) -> list[_ItemEvaluation]:
+    """Prepare deterministic per-item context before LLM scoring exists."""
+
+    retrieval_contexts = _prepare_retrieval_contexts(
+        memory_store,
+        items,
+        config,
+        embedding_callable=embedding_callable,
+    )
+    return [
+        _ItemEvaluation(
+            retrieval=context,
+            structural=_compute_memory_structural_evaluation(context, config),
+            prompt_weight=prompt_weight,
+            structure_weight=structure_weight,
+        )
+        for context in retrieval_contexts
+    ]
+
+
 class AttentionFilter:
     """Personality-driven content selector.
 
@@ -384,7 +423,18 @@ class AttentionFilter:
                 density_snapshot=density_snapshot,
             )
 
-        _prepare_retrieval_contexts(self.memory_store, items, config)
-        raise NotImplementedError(
-            "AttentionFilter.filter_content for non-empty batches is implemented in a later phase"
+        _evaluate_items_non_llm(
+            self.memory_store,
+            items,
+            config,
+            prompt_weight=prompt_weight,
+            structure_weight=structure_weight,
+        )
+        return FilterResult(
+            accepted=[],
+            rejected_count=0,
+            total_count=len(items),
+            prompt_weight=prompt_weight,
+            structure_weight=structure_weight,
+            density_snapshot=density_snapshot,
         )

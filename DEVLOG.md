@@ -16,6 +16,19 @@
 
 This phase is scoped to deterministic embedding/retrieval plumbing. Live LLM prompt scoring, assertion extraction, Distillation assertion-cache reads, acceptance decisions, and annotation generation remain deferred to later Attention Filter phases. See D-24.
 
+### Step 2.2.4: Partial non-LLM pipeline wiring
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Wired density, embedding, retrieval, blend weights, and Memory Store-backed structural calculations into a private non-LLM item evaluation path.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md` and leaves LLM-dependent acceptance and annotation deferred.
+
+Added `_ItemEvaluation` and `_evaluate_items_non_llm()` as private preparation records for later LLM scoring. The path embeds each non-empty content item, retrieves similar Memory Store notes, computes the currently available structural signals, and carries the run's prompt/structure blend weights alongside the per-item context.
+
+Updated public non-empty `filter_content` behavior so it performs deterministic preparation work and returns `FilterResult` batch metadata without producing accepted fragments, rejection decisions, annotations, live LLM scoring, assertion extraction, or Memory Store writes. The embedding boundary now resolves its default callable at runtime, which preserves the production toolkit boundary while allowing public-path regression tests to monkeypatch deterministic fakes.
+
+Focused tests cover non-empty density/embedding/retrieval work, configured similarity limits, read-only Memory Store behavior, and the absence of manufactured annotations or rejected counts before the LLM phase. The Memory Store and Attention Filter test slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`.
+
 ### Step 2.2.1: Embedding bridge and empty-batch result
 
 **Date:** 2026-05-03
