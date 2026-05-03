@@ -2,7 +2,7 @@
 module: SOURCE_INGESTION
 phase: 1
 phase_title: Source Ingestion contract and adapter foundation
-step: 3.1.1
+step: 3.1.2
 mode: Discuss
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 1: Source Ingestion contract and adapter foundation
-- **Focus** — Step 3.1.1: package/dataclass scaffold and public exports
+- **Focus** — Step 3.1.2: config validation and adapter lookup semantics
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -72,7 +72,7 @@ Planned phases follow `ARCH_source_ingestion.md`: first stabilize the public con
 
 Build the `phosphene.source_ingestion` package foundation as a leaf module with ARCH-aligned dataclasses, errors, validation, manager polling behavior, adapter registration, deterministic link/content normalization helpers, and focused unit coverage. Do not implement live Telegram/RSS/Reddit HTTP/API fetching or corpus archive parsing in this phase.
 
-- [ ] **Step 3.1.1** — Add the public package scaffold: ARCH-defined dataclasses, errors, package exports, and constructor-compatible `SourceIngestion` stub.
+- [x] **Step 3.1.1** — Add the public package scaffold: ARCH-defined dataclasses, errors, package exports, and constructor-compatible `SourceIngestion` stub.
 - [ ] **Step 3.1.2** — Add config validation and adapter lookup semantics, including unknown adapter types, duplicate labels, missing required params/credentials, enabled filtering, and `AdapterNotFoundError`.
 - [ ] **Step 3.1.3** — Implement the internal adapter protocol/registry and manager polling orchestration with deterministic fake adapters for tests, per-adapter `IngestionResult` assembly, and per-item error capture.
 - [ ] **Step 3.1.4** — Add shared normalization helpers for URL extraction, content truncation, timestamp preservation, and `ContentItem` assembly without network fetching.

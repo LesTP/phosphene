@@ -18,6 +18,19 @@ Updated `DEVPLAN.md` to activate Module 3 Phase 1 with five implementation steps
 
 No source implementation was changed in this planning action.
 
+### Step 3.1.1: Source Ingestion public package scaffold
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the initial `phosphene.source_ingestion` package surface with ARCH-defined public dataclasses, Source Ingestion errors, package exports, and a constructor-compatible `SourceIngestion` manager stub. The scaffold covers `ContentItem`, `AdapterConfig`, `IngestionConfig`, `IngestionResult`, and `IngestionError` with the field order and defaults specified in `ARCH_source_ingestion.md`.
+
+The manager stores its `IngestionConfig` but leaves polling behavior intentionally unimplemented for later Phase 1 steps, where validation, adapter lookup, registry orchestration, and normalization are explicitly scoped. Added focused export/default tests for the new public surface.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion tests/attention_filter tests/memory_store`; 280 tests pass.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
