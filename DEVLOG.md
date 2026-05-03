@@ -27,6 +27,19 @@ Added `_toolkit_complete()` as the Attention Filter's private boundary to `toolk
 
 The existing non-LLM public `filter_content` behavior remains unchanged for this step; prompt composite wiring is deferred to Step 2.3.2. Focused fake-call tests cover request construction, `llm_config` and `llm_tier` propagation, multi-score parsing, invalid payload handling, unchanged LLM error propagation, and the no-criteria no-call case. The Attention Filter slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`.
 
+### Step 2.3.2: Precision-surplus prompt composite integration
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Wired Phase 1 prompt scoring into the private per-item Attention Filter evaluation path. The evaluator now preserves the existing embedding, Memory Store retrieval, and structural-score context, calls the configured prompt scoring LLM boundary, computes a weighted prompt composite from configured criteria, and blends it with the current structural score using the density-derived prompt/structure weights.
+
+Precision surplus uses both the per-criterion weight and `ScoringConfig.precision_surplus_weight`, keeping the public scoring knob effective while allowing future prompt criteria to use their own weights. The public non-empty `FilterResult` behavior remains intentionally annotation-free: no accepted fragments are emitted and no Memory Store writes occur before the later orchestration/annotation phase.
+
+Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (241 passed).
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03

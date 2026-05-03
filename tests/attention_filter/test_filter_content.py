@@ -2,13 +2,16 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import numpy as np
+import pytest
 
 from phosphene.attention_filter import (
     AttentionFilter,
     AttentionFilterConfig,
     ContentItem,
+    FilterCriterion,
     ScoringConfig,
 )
+from phosphene.attention_filter.filter import _evaluate_items
 from phosphene.memory_store import DensityMetrics
 
 
@@ -114,7 +117,7 @@ def make_item(content: str) -> ContentItem:
     )
 
 
-def test_filter_content_non_empty_prepares_non_llm_evaluation_without_annotations(
+def test_filter_content_non_empty_scores_prompt_without_annotations(
     monkeypatch,
 ) -> None:
     import phosphene.attention_filter.filter as filter_module
@@ -135,7 +138,11 @@ def test_filter_content_non_empty_prepares_non_llm_evaluation_without_annotation
         embedding_calls.append((texts, config))
         return EmbeddingResult(vectors=[embeddings[len(embedding_calls) - 1]])
 
+    def fake_complete(**_kwargs: object) -> str:
+        return '{"scores": {"precision_surplus": 0.9}}'
+
     monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
 
     result = AttentionFilter(store).filter_content(
         [make_item("first"), make_item("second")],
@@ -154,3 +161,63 @@ def test_filter_content_non_empty_prepares_non_llm_evaluation_without_annotation
     assert result.prompt_weight == 0.65
     assert result.structure_weight == 0.35
     assert result.density_snapshot is density
+
+
+def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() -> None:
+    embedding = np.array([1.0, 0.0])
+    embedding_config = object()
+    llm_config = object()
+    llm_calls = 0
+    store = FakeMemoryStore(
+        metrics(),
+        [[(FakeNote("note-a", unresolvedness=0.5), 0.9)]],
+    )
+
+    def fake_embed(texts: list[str], config: object) -> EmbeddingResult:
+        assert texts == ["incoming"]
+        assert config is embedding_config
+        return EmbeddingResult(vectors=[embedding])
+
+    def fake_complete(**kwargs: object) -> str:
+        nonlocal llm_calls
+        llm_calls += 1
+        assert kwargs["config"] is llm_config
+        return '{"scores": {"precision_surplus": 0.8, "custom": 0.2}}'
+
+    config = make_config(
+        embedding_config=embedding_config,
+        llm_config=llm_config,
+        prompt_criteria=[
+            FilterCriterion("precision_surplus", "Precision", weight=2.0),
+            FilterCriterion("custom", "Custom", weight=1.0),
+        ],
+        scoring=ScoringConfig(
+            precision_surplus_weight=2.0,
+            link_density_weight=1.0,
+            unresolvedness_affinity_weight=1.0,
+        ),
+        similarity_candidates=2,
+    )
+
+    evaluations = _evaluate_items(
+        store,
+        [make_item("incoming")],
+        config,
+        prompt_weight=0.6,
+        structure_weight=0.4,
+        embedding_callable=fake_embed,
+        llm_complete_callable=fake_complete,
+    )
+
+    assert llm_calls == 1
+    assert len(evaluations) == 1
+    evaluation = evaluations[0]
+    assert evaluation.retrieval.note_ids == ["note-a"]
+    assert evaluation.structural.connections == ("note-a",)
+    assert evaluation.prompt_scores == {"precision_surplus": 0.8, "custom": 0.2}
+    assert evaluation.prompt_score == pytest.approx((0.8 * 4.0 + 0.2) / 5.0)
+    assert evaluation.structural.structure_score == pytest.approx((0.5 + 0.45) / 2.0)
+    assert evaluation.composite_score == pytest.approx(
+        evaluation.prompt_score * 0.6
+        + evaluation.structural.structure_score * 0.4
+    )

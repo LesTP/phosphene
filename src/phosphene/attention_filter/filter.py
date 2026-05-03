@@ -84,6 +84,8 @@ class _ItemEvaluation:
     retrieval: _ItemRetrievalContext
     structural: _MemoryStructuralEvaluation
     prompt_scores: Mapping[str, float]
+    prompt_score: float
+    composite_score: float
     prompt_weight: float
     structure_weight: float
 
@@ -304,6 +306,41 @@ def _score_prompt_criteria(
     return _parse_prompt_score_payload(response_text, config.prompt_criteria)
 
 
+def _prompt_criterion_weight(
+    criterion: FilterCriterion, scoring_config: ScoringConfig
+) -> float:
+    weight = criterion.weight
+    if criterion.name == "precision_surplus":
+        weight *= scoring_config.precision_surplus_weight
+    return weight
+
+
+def compute_prompt_composite(
+    scores: Mapping[str, float],
+    criteria: Sequence[FilterCriterion],
+    scoring_config: ScoringConfig,
+) -> float:
+    """Compute weighted average across configured Phase 1 prompt criteria."""
+
+    weighted_sum = 0.0
+    total_weight = 0.0
+    for criterion in criteria:
+        if criterion.name not in scores:
+            continue
+
+        weight = _prompt_criterion_weight(criterion, scoring_config)
+        if weight == 0.0:
+            continue
+
+        weighted_sum += _clamp_probability(scores[criterion.name]) * weight
+        total_weight += weight
+
+    if total_weight == 0.0:
+        return 0.0
+
+    return _clamp_probability(weighted_sum / total_weight)
+
+
 def phase2_is_active(metrics: DensityMetrics, config: AttentionFilterConfig) -> bool:
     """Return whether memory density has crossed the Phase 2 triple gate."""
 
@@ -514,7 +551,7 @@ def _compute_memory_structural_evaluation(
     )
 
 
-def _evaluate_items_non_llm(
+def _evaluate_items(
     memory_store: object,
     items: Sequence[ContentItem],
     config: AttentionFilterConfig,
@@ -522,8 +559,9 @@ def _evaluate_items_non_llm(
     prompt_weight: float,
     structure_weight: float,
     embedding_callable: _EmbeddingCallable | None = None,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
 ) -> list[_ItemEvaluation]:
-    """Prepare deterministic per-item context before LLM scoring exists."""
+    """Prepare private per-item scoring context for later annotation phases."""
 
     retrieval_contexts = _prepare_retrieval_contexts(
         memory_store,
@@ -531,16 +569,36 @@ def _evaluate_items_non_llm(
         config,
         embedding_callable=embedding_callable,
     )
-    return [
-        _ItemEvaluation(
-            retrieval=context,
-            structural=_compute_memory_structural_evaluation(context, config),
-            prompt_scores={},
-            prompt_weight=prompt_weight,
-            structure_weight=structure_weight,
+    evaluations: list[_ItemEvaluation] = []
+    for context in retrieval_contexts:
+        structural = _compute_memory_structural_evaluation(context, config)
+        prompt_scores = _score_prompt_criteria(
+            context,
+            config,
+            llm_complete_callable=llm_complete_callable,
         )
-        for context in retrieval_contexts
-    ]
+        prompt_score = compute_prompt_composite(
+            prompt_scores,
+            config.prompt_criteria,
+            config.scoring,
+        )
+        composite_score = _clamp_probability(
+            prompt_score * prompt_weight
+            + structural.structure_score * structure_weight
+        )
+        evaluations.append(
+            _ItemEvaluation(
+                retrieval=context,
+                structural=structural,
+                prompt_scores=prompt_scores,
+                prompt_score=prompt_score,
+                composite_score=composite_score,
+                prompt_weight=prompt_weight,
+                structure_weight=structure_weight,
+            )
+        )
+
+    return evaluations
 
 
 class AttentionFilter:
@@ -569,7 +627,7 @@ class AttentionFilter:
                 density_snapshot=density_snapshot,
             )
 
-        _evaluate_items_non_llm(
+        _evaluate_items(
             self.memory_store,
             items,
             config,

@@ -10,10 +10,12 @@ from phosphene.attention_filter import (
     ContentItem,
     FilterCriterion,
     InvalidScoreError,
+    ScoringConfig,
 )
 from phosphene.attention_filter.filter import (
     _ItemRetrievalContext,
     _SimilarNoteContext,
+    compute_prompt_composite,
     _parse_prompt_score_payload,
     _score_prompt_criteria,
 )
@@ -157,6 +159,31 @@ def test_prompt_scoring_parses_multiple_scores() -> None:
     )
 
     assert scores == {"precision_surplus": 1.0, "custom": 0.25}
+
+
+def test_prompt_composite_uses_criterion_weights_and_scoring_weight() -> None:
+    criteria = [
+        FilterCriterion(name="precision_surplus", description="Precision", weight=2.0),
+        FilterCriterion(name="custom", description="Custom", weight=1.0),
+    ]
+
+    score = compute_prompt_composite(
+        {"precision_surplus": 0.75, "custom": 0.15},
+        criteria,
+        ScoringConfig(precision_surplus_weight=2.0),
+    )
+
+    assert score == pytest.approx((0.75 * 4.0 + 0.15) / 5.0)
+
+
+def test_prompt_composite_returns_zero_without_active_weights() -> None:
+    score = compute_prompt_composite(
+        {"precision_surplus": 1.0},
+        [FilterCriterion(name="precision_surplus", description="Precision", weight=0.0)],
+        ScoringConfig(),
+    )
+
+    assert score == 0.0
 
 
 @pytest.mark.parametrize(
