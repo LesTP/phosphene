@@ -9,6 +9,13 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Phase 2.3 Plan: LLM Phase 1 scoring and assertion extraction
+
+**Date:** 2026-05-03
+**Decision:** Planned Module 2 Phase 3 as five Build steps: LLM prompt scoring boundary, precision-surplus prompt composite integration, incoming assertion extraction boundary, friction preparation against the assertion-cache contract, and public-path regression coverage.
+
+This phase is scoped to live LLM enrichment of the existing private Attention Filter evaluation path. It adds Phase 1 precision-surplus scoring and incoming-text assertion extraction while keeping accepted fragments, rejection decisions, generated annotations, final public batch orchestration, and Memory Store writes deferred to the next Attention Filter phase. See D-26.
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03
@@ -276,3 +283,13 @@ DEVPLAN cleanup: reduced the Phase 2 step plan to a one-line completion summary 
 ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
 
 Frontmatter reset for next phase: `phase: 3`, `phase_title: LLM Phase 1 scoring and assertion extraction`, `step: null`, `mode: Discuss`, `review_done: false`.
+
+## Phase 2.2 Audit Closure — Attention Filter Memory Retrieval Integration
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Accepted
+
+**Decision:** Human review recorded; Module 2 Phase 2 (Attention Filter Memory Store retrieval and embedding integration) is accepted as reviewed complete.
+
+Updated `DEVPLAN.md` Current Status to move Module 2 from awaiting human audit to ready for Phase 3 planning. No implementation changes, test changes, or architecture changes were required.

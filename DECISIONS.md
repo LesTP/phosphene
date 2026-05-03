@@ -182,3 +182,10 @@ Priority: Important
 Decision: Accept Module 2 Phase 2 as architecturally aligned with no required code fixes. The reviewed output intentionally prepares retrieval and Memory Store-backed structural context while leaving accepted fragments, rejected counts, LLM annotations, final scoring, assertion extraction, and Memory Store writes for later Attention Filter phases.
 Rationale: This preserves the D-24 phase boundary and avoids manufacturing partial public results before live LLM scoring and annotation exist. Focused Attention Filter and Memory Store tests pass, and the current implementation remains read-only against Memory Store.
 Revisit if: Phase 3 LLM scoring needs additional public state from the retrieval contexts, or if integration requires provisional non-LLM fragments before annotation is implemented.
+
+D-26: Attention Filter Phase 3 enriches private evaluations before public acceptance
+Date: 2026-05-03 | Status: Closed
+Priority: Important
+Decision: Module 2 Phase 3 will add live LLM Phase 1 prompt scoring and incoming-text assertion extraction to the private Attention Filter evaluation path, but will not yet produce accepted `AnnotatedFragment` objects, rejection counts, generated annotations, or Memory Store writes from the public non-empty `filter_content` path.
+Rationale: ARCH requires prompt scoring, assertion extraction, friction scoring, final blended acceptance, and annotation generation, but bundling all of those into one implementation phase would make LLM failures, parser behavior, acceptance policy, and annotation output hard to isolate. Phase 3 narrows the LLM surface: precision surplus is parsed and composited, incoming assertions are extracted at `assertion_extraction_tier`, and friction preparation respects the existing Distillation assertion-cache contract. The next phase can then wire acceptance and annotation over a tested evaluation record.
+Revisit if: The toolkit LLM API forces a public result-shape change, or if downstream Source Ingestion requires accepted fragments before annotation generation is available.
