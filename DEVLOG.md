@@ -16,6 +16,19 @@
 
 This phase is scoped to deterministic embedding/retrieval plumbing. Live LLM prompt scoring, assertion extraction, Distillation assertion-cache reads, acceptance decisions, and annotation generation remain deferred to later Attention Filter phases. See D-24.
 
+### Step 2.2.1: Embedding bridge and empty-batch result
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added the private toolkit embedding boundary and implemented empty-batch `filter_content` results backed by Memory Store density metrics.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md`.
+
+Added `_embed_content()` as an isolated boundary around `toolkit.embedding.embed`, passing `ContentItem.content` as a one-item batch and `config.embedding_config` through unchanged. The toolkit import stays inside the default embedding callable so the package remains importable without the sibling toolkit checkout, while tests can inject fakes directly. Embedding exceptions are not wrapped.
+
+Implemented the empty-list public path for `AttentionFilter.filter_content`: it reads `memory_store.get_density_metrics()`, computes prompt/structure blend weights with the existing density helpers, and returns an empty `FilterResult` with zero totals. Non-empty filtering remains explicitly deferred to later Phase 2 steps.
+
+Focused tests cover empty-batch counts, density snapshot and blend metadata, embedding pass-through, and unchanged embedding error propagation. The Memory Store and Attention Filter test slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`.
+
 ## Phase 2.1 Audit Closure
 
 **Date:** 2026-05-03

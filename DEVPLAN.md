@@ -2,7 +2,7 @@
 module: 2
 phase: 2
 phase_title: Memory Store retrieval and embedding integration
-step: 1 of 4
+step: 2 of 4
 mode: Code
 blocked: false
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 2: Memory Store retrieval and embedding integration.
-- **Focus** — Step 1: embedding bridge and empty-batch/density snapshot behavior for Attention Filter.
+- **Focus** — Step 2: similar-note retrieval context for Attention Filter.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -58,16 +58,9 @@ Regime: Build. Four steps. Each step ends with focused `tests/attention_filter` 
 
 Scope boundary: this phase wires embeddings, Memory Store density reads, and similar-note retrieval into the Attention Filter. It does not add live LLM prompt scoring, assertion extraction, or final annotation generation; those remain later Module 2 phases.
 
-**Step 1 — Embedding bridge and empty-batch result**
+**Step 1 (complete) — Embedding bridge and empty-batch result**
 
-- Add a private embedding boundary in `phosphene.attention_filter` that embeds `ContentItem.content` via toolkit embedding using `config.embedding_config`.
-- Keep toolkit imports isolated so tests can use fakes and the current checkout can still import without the sibling toolkit present.
-- Implement `filter_content([], config)` to read `memory_store.get_density_metrics()`, compute prompt/structure weights, and return an empty `FilterResult`.
-- Preserve toolkit embedding errors from the embedding boundary; do not wrap them in Attention Filter-specific errors.
-- Tests:
-  - empty item list returns `accepted=[]`, `rejected_count=0`, `total_count=0`, and the current density snapshot/blend weights.
-  - embedding bridge passes content and `embedding_config` through to the configured/toolkit embedding callable.
-  - embedding failures propagate unchanged.
+Added the private embedding boundary, import-isolated toolkit embedding call, empty-batch `FilterResult` path with density snapshot/blend weights, and focused tests. See DEVLOG "Step 2.2.1".
 
 **Step 2 — Similar-note retrieval context**
 

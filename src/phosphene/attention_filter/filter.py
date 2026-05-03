@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from itertools import combinations
+from typing import Any, Protocol
 
 from phosphene.memory_store import DensityMetrics
 
@@ -23,6 +24,28 @@ PHASE2_SCORE_WEIGHTS: tuple[tuple[str, str], ...] = (
     ("cluster_novelty", "cluster_novelty_weight"),
     ("unresolvedness_affinity", "unresolvedness_affinity_weight"),
 )
+
+
+class _EmbeddingCallable(Protocol):
+    def __call__(self, texts: list[str], config: object) -> Any: ...
+
+
+def _toolkit_embed(texts: list[str], config: object) -> Any:
+    from toolkit.embedding import embed
+
+    return embed(texts, config)
+
+
+def _embed_content(
+    content: str,
+    config: AttentionFilterConfig,
+    *,
+    embedding_callable: _EmbeddingCallable = _toolkit_embed,
+) -> object:
+    """Embed one content item through the toolkit boundary."""
+
+    result = embedding_callable([content], config.embedding_config)
+    return result.vectors[0]
 
 
 def _clamp_probability(value: float) -> float:
@@ -212,4 +235,19 @@ class AttentionFilter:
     def filter_content(
         self, items: list[ContentItem], config: AttentionFilterConfig
     ) -> FilterResult:
-        raise NotImplementedError("AttentionFilter.filter_content is implemented in a later phase")
+        density_snapshot = self.memory_store.get_density_metrics()
+        prompt_weight, structure_weight = compute_blend_weights(density_snapshot, config)
+
+        if not items:
+            return FilterResult(
+                accepted=[],
+                rejected_count=0,
+                total_count=0,
+                prompt_weight=prompt_weight,
+                structure_weight=structure_weight,
+                density_snapshot=density_snapshot,
+            )
+
+        raise NotImplementedError(
+            "AttentionFilter.filter_content for non-empty batches is implemented in a later phase"
+        )
