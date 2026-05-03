@@ -127,11 +127,33 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
     embeddings = [np.array([1.0, 0.0]), np.array([0.0, 1.0])]
     embedding_calls: list[tuple[list[str], object]] = []
     embedding_config = object()
+    llm_config = object()
+    llm_tier = object()
+    assertion_tier = object()
+    llm_calls: list[dict[str, object]] = []
     store = FakeMemoryStore(
         density,
         [
-            [(FakeNote("note-a", unresolvedness=0.5), 0.9)],
-            [(FakeNote("note-b", unresolvedness=0.25), 0.8)],
+            [
+                (
+                    FakeNote(
+                        "note-a",
+                        unresolvedness=0.5,
+                        cluster_group="cluster-a",
+                    ),
+                    0.9,
+                )
+            ],
+            [
+                (
+                    FakeNote(
+                        "note-b",
+                        unresolvedness=0.25,
+                        cluster_group="cluster-b",
+                    ),
+                    0.8,
+                )
+            ],
         ],
     )
 
@@ -140,17 +162,26 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
         return EmbeddingResult(vectors=[embeddings[len(embedding_calls) - 1]])
 
     def fake_complete(**kwargs: object) -> str:
+        llm_calls.append(dict(kwargs))
         task = json.loads(kwargs["messages"][0]["content"])["task"]
         if task == "score_attention_filter_prompt_criteria":
             return '{"scores": {"precision_surplus": 0.9}}'
-        return '{"assertions": []}'
+        return '{"assertions": [{"text": "incoming claim", "confidence": 0.8}]}'
 
     monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
     monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
 
     result = AttentionFilter(store).filter_content(
         [make_item("first"), make_item("second")],
-        make_config(embedding_config=embedding_config, similarity_candidates=5),
+        make_config(
+            embedding_config=embedding_config,
+            llm_config=llm_config,
+            llm_tier=llm_tier,
+            assertion_extraction_tier=assertion_tier,
+            similarity_candidates=5,
+            acceptance_threshold=0.0,
+            auto_accept_sources=["rss"],
+        ),
     )
 
     assert store.density_calls == 1
@@ -158,6 +189,35 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
     assert [limit for _, limit in store.search_calls] == [5, 5]
     assert np.array_equal(store.search_calls[0][0], embeddings[0])
     assert np.array_equal(store.search_calls[1][0], embeddings[1])
+    assert len(llm_calls) == 4
+    assert [call["config"] for call in llm_calls] == [llm_config] * 4
+    assert [call["tier"] for call in llm_calls] == [
+        llm_tier,
+        assertion_tier,
+        llm_tier,
+        assertion_tier,
+    ]
+    payloads = [
+        json.loads(call["messages"][0]["content"]) for call in llm_calls
+    ]
+    assert [payload["task"] for payload in payloads] == [
+        "score_attention_filter_prompt_criteria",
+        "extract_attention_filter_incoming_assertions",
+        "score_attention_filter_prompt_criteria",
+        "extract_attention_filter_incoming_assertions",
+    ]
+    assert [payload["content_item"]["content"] for payload in payloads] == [
+        "first",
+        "first",
+        "second",
+        "second",
+    ]
+    assert payloads[0]["similar_notes"][0]["note_id"] == "note-a"
+    assert payloads[0]["similar_notes"][0]["metadata"]["cluster_group"] == "cluster-a"
+    assert payloads[2]["similar_notes"][0]["note_id"] == "note-b"
+    assert payloads[2]["similar_notes"][0]["metadata"]["cluster_group"] == "cluster-b"
+    assert payloads[1]["content_item"]["linked_urls"] == ["https://example.test/linked"]
+    assert payloads[3]["content_item"]["url"] == "https://example.test/item"
     assert store.write_calls == 0
     assert result.accepted == []
     assert result.rejected_count == 0

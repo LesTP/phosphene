@@ -66,6 +66,19 @@ The change remains read-only and preparatory: it does not read assertion-cache f
 
 Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter` (102 passed).
 
+### Step 2.3.5: Phase 3 public-path regression coverage
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added public `filter_content` regression coverage for the complete Phase 3 fake-backed path.
+**Contract changes:** None
+
+Expanded the non-empty public `filter_content` regression test so it now verifies embedding calls, Memory Store similarity retrieval, prompt-scoring LLM calls, assertion-extraction LLM calls, LLM config/tier propagation, prompt payload retrieval metadata, assertion payload content metadata, blend weights, read-only Memory Store behavior, and the deliberate absence of accepted fragments or rejection decisions before the orchestration/annotation phase.
+
+The regression uses an accepting configuration (`acceptance_threshold=0.0` and auto-accept source) to make the current phase boundary explicit: even high-scoring or auto-accepted items still do not emit annotations or accepted fragments until the next Attention Filter phase implements final public orchestration.
+
+Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter` (102 passed).
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03
