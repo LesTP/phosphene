@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Any, Protocol
 
+from phosphene.attention_filter.errors import InvalidScoreError
 from phosphene.memory_store import DensityMetrics
 
 from phosphene.attention_filter.types import (
     AttentionFilterConfig,
     ContentItem,
+    FilterCriterion,
     FilterResult,
     ScoringConfig,
 )
@@ -29,6 +32,16 @@ PHASE2_SCORE_WEIGHTS: tuple[tuple[str, str], ...] = (
 
 class _EmbeddingCallable(Protocol):
     def __call__(self, texts: list[str], config: object) -> Any: ...
+
+
+class _LLMCompleteCallable(Protocol):
+    def __call__(
+        self,
+        *,
+        messages: list[Mapping[str, str]],
+        config: object,
+        tier: object,
+    ) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -70,6 +83,7 @@ class _MemoryStructuralEvaluation:
 class _ItemEvaluation:
     retrieval: _ItemRetrievalContext
     structural: _MemoryStructuralEvaluation
+    prompt_scores: Mapping[str, float]
     prompt_weight: float
     structure_weight: float
 
@@ -95,21 +109,40 @@ def _embed_content(
     return result.vectors[0]
 
 
+def _toolkit_complete(
+    *,
+    messages: list[Mapping[str, str]],
+    config: object,
+    tier: object,
+) -> str:
+    from toolkit.llm_client import Message, complete
+
+    toolkit_messages = [
+        Message(role=message["role"], content=message["content"]) for message in messages
+    ]
+    response = complete(messages=toolkit_messages, config=config, tier=tier)
+    return str(response.content)
+
+
 def _normalize_similar_note(note: object, similarity: float) -> _SimilarNoteContext:
+    metadata = {
+        "tier": getattr(note, "tier"),
+        "title": getattr(note, "title"),
+        "importance": getattr(note, "importance"),
+        "link_count": getattr(note, "link_count"),
+        "tags": list(getattr(note, "tags")),
+        "source": getattr(note, "source"),
+        "friction_target": getattr(note, "friction_target"),
+        "cluster_group": getattr(note, "cluster_group"),
+    }
+    if hasattr(note, "content"):
+        metadata["content"] = getattr(note, "content")
+
     return _SimilarNoteContext(
         note_id=str(getattr(note, "note_id")),
         similarity=float(similarity),
         unresolvedness=float(getattr(note, "unresolvedness")),
-        metadata={
-            "tier": getattr(note, "tier"),
-            "title": getattr(note, "title"),
-            "importance": getattr(note, "importance"),
-            "link_count": getattr(note, "link_count"),
-            "tags": list(getattr(note, "tags")),
-            "source": getattr(note, "source"),
-            "friction_target": getattr(note, "friction_target"),
-            "cluster_group": getattr(note, "cluster_group"),
-        },
+        metadata=metadata,
     )
 
 
@@ -157,6 +190,118 @@ def _clamp_probability(value: float) -> float:
 
 def _normalized_similarities(similarities: Sequence[float]) -> list[float]:
     return [_clamp_probability(similarity) for similarity in similarities]
+
+
+def _build_prompt_scoring_request(
+    context: _ItemRetrievalContext,
+    criteria: Sequence[FilterCriterion],
+) -> list[Mapping[str, str]]:
+    """Build the Phase 1 criterion-scoring request for toolkit/llm_client."""
+
+    payload = {
+        "task": "score_attention_filter_prompt_criteria",
+        "instructions": (
+            "Score each criterion for the incoming content. Return only JSON "
+            'with shape {"scores": {"criterion_name": 0.0}}. Scores must be '
+            "numbers between 0.0 and 1.0."
+        ),
+        "criteria": [
+            {
+                "name": criterion.name,
+                "description": criterion.description,
+                "weight": criterion.weight,
+            }
+            for criterion in criteria
+        ],
+        "content_item": {
+            "content": context.item.content,
+            "source": context.item.source,
+            "timestamp": context.item.timestamp.isoformat(),
+            "url": context.item.url,
+            "linked_urls": list(context.item.linked_urls),
+        },
+        "similar_notes": [
+            {
+                "note_id": note.note_id,
+                "similarity": note.similarity,
+                "unresolvedness": note.unresolvedness,
+                "metadata": dict(note.metadata),
+            }
+            for note in context.similar_notes
+        ],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _extract_json_object(response_text: str) -> Mapping[str, object]:
+    try:
+        payload = json.loads(response_text)
+    except json.JSONDecodeError as exc:
+        raise InvalidScoreError("LLM prompt scoring response must be valid JSON") from exc
+
+    if not isinstance(payload, Mapping):
+        raise InvalidScoreError("LLM prompt scoring response must be a JSON object")
+
+    return payload
+
+
+def _parse_prompt_score_payload(
+    response_text: str,
+    criteria: Sequence[FilterCriterion],
+) -> dict[str, float]:
+    payload = _extract_json_object(response_text)
+    raw_scores = payload.get("scores")
+    if not isinstance(raw_scores, Mapping):
+        raise InvalidScoreError("LLM prompt scoring response must contain scores object")
+
+    scores: dict[str, float] = {}
+    for criterion in criteria:
+        if criterion.name not in raw_scores:
+            raise InvalidScoreError(
+                f"LLM prompt scoring response missing {criterion.name!r}"
+            )
+
+        raw_score = raw_scores[criterion.name]
+        if isinstance(raw_score, bool) or not isinstance(raw_score, int | float):
+            raise InvalidScoreError(
+                f"LLM prompt score for {criterion.name!r} must be numeric"
+            )
+        if raw_score < 0.0 or raw_score > 1.0:
+            raise InvalidScoreError(
+                f"LLM prompt score for {criterion.name!r} must be in [0.0, 1.0]"
+            )
+
+        scores[criterion.name] = float(raw_score)
+
+    return scores
+
+
+def _score_prompt_criteria(
+    context: _ItemRetrievalContext,
+    config: AttentionFilterConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> Mapping[str, float]:
+    """Score configured Phase 1 prompt criteria through the toolkit LLM boundary."""
+
+    if not config.prompt_criteria:
+        return {}
+
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    messages = _build_prompt_scoring_request(context, config.prompt_criteria)
+    response_text = llm_complete_callable(
+        messages=messages,
+        config=config.llm_config,
+        tier=config.llm_tier,
+    )
+    return _parse_prompt_score_payload(response_text, config.prompt_criteria)
 
 
 def phase2_is_active(metrics: DensityMetrics, config: AttentionFilterConfig) -> bool:
@@ -390,6 +535,7 @@ def _evaluate_items_non_llm(
         _ItemEvaluation(
             retrieval=context,
             structural=_compute_memory_structural_evaluation(context, config),
+            prompt_scores={},
             prompt_weight=prompt_weight,
             structure_weight=structure_weight,
         )

@@ -16,6 +16,17 @@
 
 This phase is scoped to live LLM enrichment of the existing private Attention Filter evaluation path. It adds Phase 1 precision-surplus scoring and incoming-text assertion extraction while keeping accepted fragments, rejection decisions, generated annotations, final public batch orchestration, and Memory Store writes deferred to the next Attention Filter phase. See D-26.
 
+### Step 2.3.1: LLM prompt scoring boundary and score parsing
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added a private toolkit LLM boundary for Phase 1 prompt-criterion scoring and deterministic parser coverage.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md` and keeps the new scoring path private.
+
+Added `_toolkit_complete()` as the Attention Filter's private boundary to `toolkit.llm_client.complete`, with request construction that passes configured prompt criteria, incoming content metadata, and retrieved similar-note context to the LLM. Added `_score_prompt_criteria()` and JSON score parsing that requires one numeric `[0.0, 1.0]` score per configured criterion and raises `InvalidScoreError` for malformed or incomplete payloads while leaving LLM exceptions unwrapped.
+
+The existing non-LLM public `filter_content` behavior remains unchanged for this step; prompt composite wiring is deferred to Step 2.3.2. Focused fake-call tests cover request construction, `llm_config` and `llm_tier` propagation, multi-score parsing, invalid payload handling, unchanged LLM error propagation, and the no-criteria no-call case. The Attention Filter slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`.
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03
