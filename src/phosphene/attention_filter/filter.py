@@ -118,6 +118,14 @@ class _GeneratedAnnotation:
     annotation: str
 
 
+@dataclass(frozen=True)
+class _RetentionDecision:
+    evaluation: _ItemEvaluation
+    accepted: bool
+    auto_accepted: bool
+    retention_criteria: tuple[str, ...]
+
+
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
 
@@ -564,6 +572,70 @@ def _generate_annotations(
     )
 
 
+def _active_score_names(scores: Mapping[str, float]) -> tuple[str, ...]:
+    return tuple(
+        name
+        for name, score in sorted(scores.items())
+        if _clamp_probability(score) > 0.0
+    )
+
+
+def _retention_criteria_for_evaluation(
+    evaluation: _ItemEvaluation,
+) -> tuple[str, ...]:
+    """Return deterministic criteria with non-zero prompt or structural scores."""
+
+    criteria: list[str] = []
+    seen: set[str] = set()
+    for score_map in (evaluation.prompt_scores, evaluation.structural.scores):
+        for name in _active_score_names(score_map):
+            if name not in seen:
+                criteria.append(name)
+                seen.add(name)
+
+    return tuple(criteria)
+
+
+def _decide_retention(
+    evaluation: _ItemEvaluation, config: AttentionFilterConfig
+) -> _RetentionDecision:
+    """Apply threshold and source bypass rules to one evaluated item."""
+
+    auto_accepted = evaluation.retrieval.item.source in config.auto_accept_sources
+    accepted = (
+        auto_accepted
+        or evaluation.composite_score >= config.acceptance_threshold
+    )
+    retention_criteria = (
+        _retention_criteria_for_evaluation(evaluation) if accepted else ()
+    )
+    return _RetentionDecision(
+        evaluation=evaluation,
+        accepted=accepted,
+        auto_accepted=auto_accepted,
+        retention_criteria=retention_criteria,
+    )
+
+
+def _decide_batch_retention(
+    evaluations: Sequence[_ItemEvaluation],
+    config: AttentionFilterConfig,
+) -> tuple[_RetentionDecision, ...]:
+    """Apply deterministic acceptance decisions to a scored batch."""
+
+    return tuple(_decide_retention(evaluation, config) for evaluation in evaluations)
+
+
+def _accepted_evaluations(
+    decisions: Sequence[_RetentionDecision],
+) -> tuple[_ItemEvaluation, ...]:
+    return tuple(decision.evaluation for decision in decisions if decision.accepted)
+
+
+def _rejected_count(decisions: Sequence[_RetentionDecision]) -> int:
+    return sum(1 for decision in decisions if not decision.accepted)
+
+
 def _assertion_cache_path(cluster_group: str) -> str:
     return f"tier2/{cluster_group}.json"
 
@@ -933,16 +1005,17 @@ class AttentionFilter:
                 density_snapshot=density_snapshot,
             )
 
-        _evaluate_items(
+        evaluations = _evaluate_items(
             self.memory_store,
             items,
             config,
             prompt_weight=prompt_weight,
             structure_weight=structure_weight,
         )
+        decisions = _decide_batch_retention(evaluations, config)
         return FilterResult(
             accepted=[],
-            rejected_count=0,
+            rejected_count=_rejected_count(decisions),
             total_count=len(items),
             prompt_weight=prompt_weight,
             structure_weight=structure_weight,

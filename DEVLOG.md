@@ -427,3 +427,16 @@ Added the private accepted-candidate annotation LLM boundary for Attention Filte
 Added annotation parsing with JSON-object validation, non-empty string enforcement, whitespace normalization, and unchanged propagation of LLM provider errors. The new `_generate_annotations` helper wraps already-accepted private evaluations without deciding acceptance or assembling public `AnnotatedFragment` objects, preserving the step boundary for later Phase 4 work.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 113 tests pass.
+
+### Step 2.4.2: Acceptance decisions and retention criteria
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added deterministic private retention decisions for Attention Filter Phase 4. The implementation now applies the composite-score acceptance threshold with exact-edge inclusion, supports `auto_accept_sources` as a threshold bypass, derives stable retention criteria from non-zero prompt and structural score maps, and computes batch rejected counts from the resulting decisions.
+
+The public non-empty `filter_content` path now reports `rejected_count` from those decisions while still returning no accepted fragments until Step 2.4.3 assembles `AnnotatedFragment` objects. The Attention Filter remains read-only against Memory Store; the new regression coverage verifies no write APIs are called.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 119 tests pass.
