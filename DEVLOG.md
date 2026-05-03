@@ -42,6 +42,17 @@ The retrieval path is read-only: it calls Memory Store search only, does not tou
 
 Focused tests cover per-item embedding/search calls with configured limits, ordered preservation of note ids/similarities/unresolvedness values and metadata, and empty retrieval candidates. The Memory Store and Attention Filter test slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`.
 
+### Step 2.2.3: Memory-backed structural scores
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added private Memory Store-backed structural evaluation over retrieval contexts.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md` and keeps the evaluation context private.
+
+Added `_MemoryStructuralEvaluation` and `_compute_memory_structural_evaluation()` for the structural signals available before Distillation centroid/assertion caches exist. The helper computes `link_density` from retrieved candidate similarities, computes `unresolvedness_affinity` from retrieved similarities paired with candidate unresolvedness metadata, emits connection ids only for candidates above `scoring.link_density_sim_threshold`, and keeps `friction_target` unset because ARCH friction requires assertion extraction and cached cluster assertions.
+
+Cluster-dependent criteria remain outside this private Memory Store-backed helper until the planned cache integration. Focused tests cover candidate-derived structural inputs, threshold-filtered connections, and empty candidates producing zero structural score with no connections. The Attention Filter slice passes with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; the required Memory Store plus Attention Filter slices pass with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store tests/attention_filter`.
+
 ## Phase 2.1 Audit Closure
 
 **Date:** 2026-05-03

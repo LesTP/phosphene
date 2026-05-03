@@ -2,7 +2,7 @@
 module: 2
 phase: 2
 phase_title: Memory Store retrieval and embedding integration
-step: 3 of 4
+step: 4 of 4
 mode: Code
 blocked: false
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 2 (Attention Filter), Phase 2: Memory Store retrieval and embedding integration.
-- **Focus** — Step 3: Memory-backed structural scores.
+- **Focus** — Step 4: Partial non-LLM pipeline wiring.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -66,15 +66,9 @@ Added the private embedding boundary, import-isolated toolkit embedding call, em
 
 Added private per-item retrieval contexts that embed each item once, call `memory_store.search_by_embedding` with the configured candidate limit, preserve ordered note ids/similarities/unresolvedness values, and normalize candidate metadata without Memory Store writes. See DEVLOG "Step 2.2.2".
 
-**Step 3 — Memory-backed structural scores**
+**Step 3 (complete) — Memory-backed structural scores**
 
-- Use the retrieval context to compute Memory Store-backed structural signals available before Distillation caches exist: `link_density`, `unresolvedness_affinity`, and connection ids above `scoring.link_density_sim_threshold`.
-- Keep cluster-dependent geometric criteria (`liminality`, `unexpected_connection`, `structural_insight`, `cluster_novelty`) at their degenerate helper behavior until Tier 2 centroid/cache integration is planned.
-- Keep `friction_target` unset in this phase because ARCH friction requires assertion extraction and cached cluster assertions, both deferred.
-- Tests:
-  - link-density and unresolvedness-affinity inputs are derived from retrieved candidates, not recomputed from raw files.
-  - connection ids include only candidates above the similarity threshold.
-  - no candidates produce zero structural score and no connections.
+Added private Memory Store-backed structural evaluation over retrieval contexts, including `link_density`, `unresolvedness_affinity`, connection ids above threshold, and unset `friction_target`. See DEVLOG "Step 2.2.3".
 
 **Step 4 — Partial non-LLM pipeline wiring**
 

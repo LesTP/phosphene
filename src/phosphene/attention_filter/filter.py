@@ -58,6 +58,14 @@ class _ItemRetrievalContext:
         return [note.unresolvedness for note in self.similar_notes]
 
 
+@dataclass(frozen=True)
+class _MemoryStructuralEvaluation:
+    scores: Mapping[str, float]
+    structure_score: float
+    connections: tuple[str, ...]
+    friction_target: str | None
+
+
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
 
@@ -304,6 +312,50 @@ def compute_phase2_composite(
         return 0.0
 
     return _clamp_probability(weighted_sum / total_weight)
+
+
+def _compute_memory_structural_evaluation(
+    context: _ItemRetrievalContext, config: AttentionFilterConfig
+) -> _MemoryStructuralEvaluation:
+    """Compute pre-cache structural signals from Memory Store retrieval context."""
+
+    threshold = config.scoring.link_density_sim_threshold
+    connections = tuple(
+        note.note_id for note in context.similar_notes if note.similarity > threshold
+    )
+    scores = {
+        "link_density": score_link_density(
+            context.similarities,
+            threshold=threshold,
+            similarity_candidates=config.similarity_candidates,
+        ),
+        "unresolvedness_affinity": score_unresolvedness_affinity(
+            context.similarities,
+            context.unresolvedness_scores,
+        ),
+    }
+
+    weighted_sum = (
+        scores["link_density"] * config.scoring.link_density_weight
+        + scores["unresolvedness_affinity"]
+        * config.scoring.unresolvedness_affinity_weight
+    )
+    total_weight = (
+        config.scoring.link_density_weight
+        + config.scoring.unresolvedness_affinity_weight
+    )
+    structure_score = (
+        _clamp_probability(weighted_sum / total_weight)
+        if total_weight > 0.0
+        else 0.0
+    )
+
+    return _MemoryStructuralEvaluation(
+        scores=scores,
+        structure_score=structure_score,
+        connections=connections,
+        friction_target=None,
+    )
 
 
 class AttentionFilter:
