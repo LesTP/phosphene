@@ -40,6 +40,19 @@ Precision surplus uses both the per-criterion weight and `ScoringConfig.precisio
 
 Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (241 passed).
 
+### Step 2.3.3: Incoming assertion extraction boundary
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Added a private incoming assertion-extraction LLM boundary and threaded structured assertions into private item evaluations.
+**Contract changes:** None — implementation follows `ARCH_attention_filter.md` and keeps assertion extraction private until friction preparation is wired.
+
+Added `_IncomingAssertion`, assertion-extraction request construction, JSON parsing, and `_extract_incoming_assertions()` as the private toolkit LLM boundary for future friction scoring. The boundary uses `config.assertion_extraction_tier`, passes `config.llm_config` unchanged, returns normalized assertion records with text and confidence, ignores empty extracted text, accepts a `claim` alias for noisy-but-usable payloads, and raises `InvalidScoreError` for malformed JSON, non-list assertions, invalid assertion objects, and out-of-range confidence values. LLM exceptions remain unwrapped.
+
+The private `_evaluate_items()` path now carries extracted incoming assertions alongside retrieval, structural, and prompt scoring context. Public non-empty `FilterResult` behavior remains intentionally unchanged: no accepted fragments, annotation generation, rejection counts, or Memory Store writes are produced in this phase step.
+
+Focused verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter` (100 passed).
+
 ## Phase 2.2 Plan: Memory Store retrieval and embedding integration
 
 **Date:** 2026-05-03

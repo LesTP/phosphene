@@ -80,11 +80,18 @@ class _MemoryStructuralEvaluation:
 
 
 @dataclass(frozen=True)
+class _IncomingAssertion:
+    text: str
+    confidence: float
+
+
+@dataclass(frozen=True)
 class _ItemEvaluation:
     retrieval: _ItemRetrievalContext
     structural: _MemoryStructuralEvaluation
     prompt_scores: Mapping[str, float]
     prompt_score: float
+    incoming_assertions: tuple[_IncomingAssertion, ...]
     composite_score: float
     prompt_weight: float
     structure_weight: float
@@ -240,14 +247,18 @@ def _build_prompt_scoring_request(
     ]
 
 
-def _extract_json_object(response_text: str) -> Mapping[str, object]:
+def _extract_json_object(
+    response_text: str,
+    *,
+    response_name: str = "LLM prompt scoring response",
+) -> Mapping[str, object]:
     try:
         payload = json.loads(response_text)
     except json.JSONDecodeError as exc:
-        raise InvalidScoreError("LLM prompt scoring response must be valid JSON") from exc
+        raise InvalidScoreError(f"{response_name} must be valid JSON") from exc
 
     if not isinstance(payload, Mapping):
-        raise InvalidScoreError("LLM prompt scoring response must be a JSON object")
+        raise InvalidScoreError(f"{response_name} must be a JSON object")
 
     return payload
 
@@ -304,6 +315,101 @@ def _score_prompt_criteria(
         tier=config.llm_tier,
     )
     return _parse_prompt_score_payload(response_text, config.prompt_criteria)
+
+
+def _build_assertion_extraction_request(
+    context: _ItemRetrievalContext,
+) -> list[Mapping[str, str]]:
+    """Build the incoming assertion-extraction request for toolkit/llm_client."""
+
+    payload = {
+        "task": "extract_attention_filter_incoming_assertions",
+        "instructions": (
+            "Extract explicit factual, causal, evaluative, or interpretive "
+            "claims made by the incoming content. Return only JSON with shape "
+            '{"assertions": [{"text": "...", "confidence": 0.0}]}. '
+            "Use an empty assertions list when no clear claims are present. "
+            "Confidence must be a number between 0.0 and 1.0."
+        ),
+        "content_item": {
+            "content": context.item.content,
+            "source": context.item.source,
+            "timestamp": context.item.timestamp.isoformat(),
+            "url": context.item.url,
+            "linked_urls": list(context.item.linked_urls),
+        },
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _parse_assertion_extraction_payload(
+    response_text: str,
+) -> tuple[_IncomingAssertion, ...]:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM assertion extraction response",
+    )
+    raw_assertions = payload.get("assertions")
+    if not isinstance(raw_assertions, Sequence) or isinstance(
+        raw_assertions, str | bytes
+    ):
+        raise InvalidScoreError(
+            "LLM assertion extraction response must contain assertions list"
+        )
+
+    assertions: list[_IncomingAssertion] = []
+    for raw_assertion in raw_assertions:
+        if not isinstance(raw_assertion, Mapping):
+            raise InvalidScoreError("LLM assertion entries must be objects")
+
+        raw_text = raw_assertion.get("text", raw_assertion.get("claim"))
+        if not isinstance(raw_text, str):
+            raise InvalidScoreError("LLM assertion text must be a string")
+
+        text = raw_text.strip()
+        if not text:
+            continue
+
+        raw_confidence = raw_assertion.get("confidence", 1.0)
+        if isinstance(raw_confidence, bool) or not isinstance(
+            raw_confidence, int | float
+        ):
+            raise InvalidScoreError("LLM assertion confidence must be numeric")
+        if raw_confidence < 0.0 or raw_confidence > 1.0:
+            raise InvalidScoreError(
+                "LLM assertion confidence must be in [0.0, 1.0]"
+            )
+
+        assertions.append(
+            _IncomingAssertion(text=text, confidence=float(raw_confidence))
+        )
+
+    return tuple(assertions)
+
+
+def _extract_incoming_assertions(
+    context: _ItemRetrievalContext,
+    config: AttentionFilterConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> tuple[_IncomingAssertion, ...]:
+    """Extract incoming claims through the toolkit LLM boundary for friction."""
+
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    messages = _build_assertion_extraction_request(context)
+    response_text = llm_complete_callable(
+        messages=messages,
+        config=config.llm_config,
+        tier=config.assertion_extraction_tier,
+    )
+    return _parse_assertion_extraction_payload(response_text)
 
 
 def _prompt_criterion_weight(
@@ -582,6 +688,11 @@ def _evaluate_items(
             config.prompt_criteria,
             config.scoring,
         )
+        incoming_assertions = _extract_incoming_assertions(
+            context,
+            config,
+            llm_complete_callable=llm_complete_callable,
+        )
         composite_score = _clamp_probability(
             prompt_score * prompt_weight
             + structural.structure_score * structure_weight
@@ -592,6 +703,7 @@ def _evaluate_items(
                 structural=structural,
                 prompt_scores=prompt_scores,
                 prompt_score=prompt_score,
+                incoming_assertions=incoming_assertions,
                 composite_score=composite_score,
                 prompt_weight=prompt_weight,
                 structure_weight=structure_weight,

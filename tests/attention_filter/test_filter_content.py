@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -138,8 +139,11 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
         embedding_calls.append((texts, config))
         return EmbeddingResult(vectors=[embeddings[len(embedding_calls) - 1]])
 
-    def fake_complete(**_kwargs: object) -> str:
-        return '{"scores": {"precision_surplus": 0.9}}'
+    def fake_complete(**kwargs: object) -> str:
+        task = json.loads(kwargs["messages"][0]["content"])["task"]
+        if task == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.9}}'
+        return '{"assertions": []}'
 
     monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
     monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
@@ -182,7 +186,10 @@ def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() 
         nonlocal llm_calls
         llm_calls += 1
         assert kwargs["config"] is llm_config
-        return '{"scores": {"precision_surplus": 0.8, "custom": 0.2}}'
+        task = json.loads(kwargs["messages"][0]["content"])["task"]
+        if task == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.8, "custom": 0.2}}'
+        return '{"assertions": [{"text": "incoming claim", "confidence": 0.7}]}'
 
     config = make_config(
         embedding_config=embedding_config,
@@ -209,12 +216,16 @@ def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() 
         llm_complete_callable=fake_complete,
     )
 
-    assert llm_calls == 1
+    assert llm_calls == 2
     assert len(evaluations) == 1
     evaluation = evaluations[0]
     assert evaluation.retrieval.note_ids == ["note-a"]
     assert evaluation.structural.connections == ("note-a",)
     assert evaluation.prompt_scores == {"precision_surplus": 0.8, "custom": 0.2}
+    assert [assertion.text for assertion in evaluation.incoming_assertions] == [
+        "incoming claim"
+    ]
+    assert evaluation.incoming_assertions[0].confidence == pytest.approx(0.7)
     assert evaluation.prompt_score == pytest.approx((0.8 * 4.0 + 0.2) / 5.0)
     assert evaluation.structural.structure_score == pytest.approx((0.5 + 0.45) / 2.0)
     assert evaluation.composite_score == pytest.approx(
