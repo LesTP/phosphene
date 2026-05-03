@@ -6,7 +6,7 @@ step: 5
 mode: Review
 blocked: false
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -31,8 +31,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 2 (Attention Filter), Phase 3 ready for review: LLM Phase 1 scoring and assertion extraction.
-- **Focus** — Next action: Phase 2.3 review.
+- **Phase** — Module 2 (Attention Filter), Phase 3 reviewed: LLM Phase 1 scoring and assertion extraction.
+- **Focus** — Next action: Phase 2.3 complete.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
