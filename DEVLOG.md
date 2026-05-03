@@ -414,3 +414,16 @@ Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestra
 Updated `DEVPLAN.md` Current Status to move Module 2 from awaiting human audit to ready for Phase 4 planning. No implementation changes, test changes, or architecture changes were required.
 
 Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: true`.
+
+### Step 2.4.1: Annotation generation boundary and parsing
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the private accepted-candidate annotation LLM boundary for Attention Filter Phase 4. The implementation builds a structured `generate_attention_filter_annotation` payload from the private `_ItemEvaluation` record, including original content metadata, composite/prompt/structure scores, prompt and structural score maps, friction preparation, connections, and similar-note context. Annotation calls reuse `config.llm_config` and `config.llm_tier`, matching the existing prompt-scoring tier boundary.
+
+Added annotation parsing with JSON-object validation, non-empty string enforcement, whitespace normalization, and unchanged propagation of LLM provider errors. The new `_generate_annotations` helper wraps already-accepted private evaluations without deciding acceptance or assembling public `AnnotatedFragment` objects, preserving the step boundary for later Phase 4 work.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 113 tests pass.

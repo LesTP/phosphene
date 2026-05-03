@@ -112,6 +112,12 @@ class _ItemEvaluation:
     structure_weight: float
 
 
+@dataclass(frozen=True)
+class _GeneratedAnnotation:
+    evaluation: _ItemEvaluation
+    annotation: str
+
+
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
 
@@ -425,6 +431,137 @@ def _extract_incoming_assertions(
         tier=config.assertion_extraction_tier,
     )
     return _parse_assertion_extraction_payload(response_text)
+
+
+def _build_annotation_generation_request(
+    evaluation: _ItemEvaluation,
+) -> list[Mapping[str, str]]:
+    """Build the accepted-candidate annotation request for toolkit/llm_client."""
+
+    context = evaluation.retrieval
+    payload = {
+        "task": "generate_attention_filter_annotation",
+        "instructions": (
+            "Write a short annotation explaining why this accepted content was "
+            "retained. Mention the strongest criteria, relevant friction, and "
+            "connections when present. Return only JSON with shape "
+            '{"annotation": "..."}; the annotation must be a non-empty string.'
+        ),
+        "content_item": {
+            "content": context.item.content,
+            "source": context.item.source,
+            "timestamp": context.item.timestamp.isoformat(),
+            "url": context.item.url,
+            "linked_urls": list(context.item.linked_urls),
+        },
+        "scores": {
+            "composite": evaluation.composite_score,
+            "prompt": evaluation.prompt_score,
+            "structure": evaluation.structural.structure_score,
+            "prompt_weight": evaluation.prompt_weight,
+            "structure_weight": evaluation.structure_weight,
+            "prompt_criteria": dict(evaluation.prompt_scores),
+            "structure_criteria": dict(evaluation.structural.scores),
+        },
+        "friction": {
+            "target": evaluation.structural.friction_target,
+            "incoming_assertions": [
+                {
+                    "text": assertion.text,
+                    "confidence": assertion.confidence,
+                }
+                for assertion in evaluation.incoming_assertions
+            ],
+            "cached_clusters": [
+                {
+                    "cluster_group": cluster.cluster_group,
+                    "note_ids": list(cluster.note_ids),
+                    "max_similarity": cluster.max_similarity,
+                    "assertion_cache_path": cluster.assertion_cache_path,
+                }
+                for cluster in evaluation.friction_preparation.cached_clusters
+            ],
+        },
+        "connections": list(evaluation.structural.connections),
+        "similar_notes": [
+            {
+                "note_id": note.note_id,
+                "similarity": note.similarity,
+                "unresolvedness": note.unresolvedness,
+                "metadata": dict(note.metadata),
+            }
+            for note in context.similar_notes
+        ],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _normalize_annotation_text(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _parse_annotation_generation_payload(response_text: str) -> str:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM annotation generation response",
+    )
+    raw_annotation = payload.get("annotation")
+    if not isinstance(raw_annotation, str):
+        raise InvalidScoreError(
+            "LLM annotation generation response must contain annotation string"
+        )
+
+    annotation = _normalize_annotation_text(raw_annotation)
+    if not annotation:
+        raise InvalidScoreError("LLM annotation must be non-empty")
+
+    return annotation
+
+
+def _generate_annotation(
+    evaluation: _ItemEvaluation,
+    config: AttentionFilterConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> str:
+    """Generate one accepted candidate annotation through the toolkit LLM boundary."""
+
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    messages = _build_annotation_generation_request(evaluation)
+    response_text = llm_complete_callable(
+        messages=messages,
+        config=config.llm_config,
+        tier=config.llm_tier,
+    )
+    return _parse_annotation_generation_payload(response_text)
+
+
+def _generate_annotations(
+    evaluations: Sequence[_ItemEvaluation],
+    config: AttentionFilterConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> tuple[_GeneratedAnnotation, ...]:
+    """Generate annotations for already-accepted private evaluations."""
+
+    return tuple(
+        _GeneratedAnnotation(
+            evaluation=evaluation,
+            annotation=_generate_annotation(
+                evaluation,
+                config,
+                llm_complete_callable=llm_complete_callable,
+            ),
+        )
+        for evaluation in evaluations
+    )
 
 
 def _assertion_cache_path(cluster_group: str) -> str:
