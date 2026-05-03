@@ -453,3 +453,16 @@ Added public `AnnotatedFragment` assembly for accepted Attention Filter evaluati
 The non-empty public `filter_content` path now generates annotations for accepted evaluations and returns assembled fragments while preserving accurate rejected counts and read-only Memory Store behavior. Regression coverage verifies exact field mapping, accepted-decision retention criteria propagation, annotation call ordering, embedding passthrough, connection mapping, and no Memory Store write API calls.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 275 tests pass.
+
+### Step 2.4.4: Public batch orchestration regression
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added public end-to-end regression coverage for the full non-empty `AttentionFilter.filter_content` orchestration path. The new test drives a mixed batch through fake embedding and LLM boundaries with one threshold-accepted RSS item, one rejected RSS item, and one low-score `human_share` item accepted through `auto_accept_sources`.
+
+The regression verifies deterministic LLM call ordering across prompt scoring, assertion extraction, and annotation generation; config and tier propagation for each LLM boundary; per-item embedding search limits and embedding passthrough; prompt/structure blend metadata; rejected counts; retention criteria attribution; read-only Memory Store behavior; and the existing empty-batch stability alongside the Attention Filter plus Memory Store slices.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 276 tests pass.

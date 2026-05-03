@@ -256,6 +256,141 @@ def test_filter_content_non_empty_scores_prompt_and_generates_accepted_fragments
     assert result.density_snapshot is density
 
 
+def test_filter_content_regression_mixed_batch_with_auto_accept_and_rejects(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics()
+    embeddings = [
+        np.array([1.0, 0.0]),
+        np.array([0.0, 1.0]),
+        np.array([1.0, 1.0]),
+    ]
+    embedding_config = object()
+    llm_config = object()
+    llm_tier = object()
+    assertion_tier = object()
+    llm_calls: list[dict[str, object]] = []
+    store = FakeMemoryStore(
+        density,
+        [
+            [(FakeNote("accepted-note", unresolvedness=0.2), 0.9)],
+            [(FakeNote("rejected-note", unresolvedness=0.0), 0.1)],
+            [(FakeNote("human-note", unresolvedness=0.4), 0.2)],
+        ],
+    )
+
+    def fake_embed(texts: list[str], config: object) -> EmbeddingResult:
+        assert config is embedding_config
+        return EmbeddingResult(vectors=[embeddings[len(store.search_calls)]])
+
+    def fake_complete(**kwargs: object) -> str:
+        llm_calls.append(dict(kwargs))
+        payload = json.loads(kwargs["messages"][0]["content"])
+        content = payload["content_item"]["content"]
+        task = payload["task"]
+        if task == "score_attention_filter_prompt_criteria":
+            scores = {
+                "accepted": 0.9,
+                "rejected": 0.1,
+                "human": 0.0,
+            }
+            return json.dumps({"scores": {"precision_surplus": scores[content]}})
+        if task == "extract_attention_filter_incoming_assertions":
+            return json.dumps(
+                {"assertions": [{"text": f"{content} claim", "confidence": 0.6}]}
+            )
+        return json.dumps({"annotation": f"Annotation for {content}."})
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [
+            make_item("accepted"),
+            make_item("rejected"),
+            ContentItem(
+                content="human",
+                source="human_share",
+                timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+        ],
+        make_config(
+            embedding_config=embedding_config,
+            llm_config=llm_config,
+            llm_tier=llm_tier,
+            assertion_extraction_tier=assertion_tier,
+            similarity_candidates=5,
+            acceptance_threshold=0.5,
+            auto_accept_sources=["human_share"],
+        ),
+    )
+
+    payloads = [
+        json.loads(call["messages"][0]["content"]) for call in llm_calls
+    ]
+    assert [payload["task"] for payload in payloads] == [
+        "score_attention_filter_prompt_criteria",
+        "extract_attention_filter_incoming_assertions",
+        "score_attention_filter_prompt_criteria",
+        "extract_attention_filter_incoming_assertions",
+        "score_attention_filter_prompt_criteria",
+        "extract_attention_filter_incoming_assertions",
+        "generate_attention_filter_annotation",
+        "generate_attention_filter_annotation",
+    ]
+    assert [payload["content_item"]["content"] for payload in payloads] == [
+        "accepted",
+        "accepted",
+        "rejected",
+        "rejected",
+        "human",
+        "human",
+        "accepted",
+        "human",
+    ]
+    assert [call["config"] for call in llm_calls] == [llm_config] * 8
+    assert [call["tier"] for call in llm_calls] == [
+        llm_tier,
+        assertion_tier,
+        llm_tier,
+        assertion_tier,
+        llm_tier,
+        assertion_tier,
+        llm_tier,
+        llm_tier,
+    ]
+    assert [limit for _, limit in store.search_calls] == [5, 5, 5]
+    assert np.array_equal(store.search_calls[0][0], embeddings[0])
+    assert np.array_equal(store.search_calls[1][0], embeddings[1])
+    assert np.array_equal(store.search_calls[2][0], embeddings[2])
+    assert store.write_calls == 0
+
+    assert result.total_count == 3
+    assert result.rejected_count == 1
+    assert [fragment.content for fragment in result.accepted] == ["accepted", "human"]
+    assert [fragment.annotation for fragment in result.accepted] == [
+        "Annotation for accepted.",
+        "Annotation for human.",
+    ]
+    assert result.accepted[0].importance_score == pytest.approx(0.6515)
+    assert result.accepted[0].prompt_score == pytest.approx(0.9)
+    assert result.accepted[0].structure_score == pytest.approx(0.19)
+    assert result.accepted[0].retention_criteria == [
+        "precision_surplus",
+        "link_density",
+        "unresolvedness_affinity",
+    ]
+    assert result.accepted[0].connections == ["accepted-note"]
+    assert result.accepted[1].source == "human_share"
+    assert result.accepted[1].importance_score == pytest.approx(0.014)
+    assert result.accepted[1].retention_criteria == ["unresolvedness_affinity"]
+    assert result.prompt_weight == 0.65
+    assert result.structure_weight == 0.35
+    assert result.density_snapshot is density
+
+
 def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() -> None:
     embedding = np.array([1.0, 0.0])
     embedding_config = object()
