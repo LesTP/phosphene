@@ -2,8 +2,8 @@
 module: 2
 phase: 4
 phase_title: Full batch orchestration and annotation output
-step: null
-mode: Discuss
+step: 1
+mode: Build
 blocked: false
 regime: Build
 review_done: false
@@ -31,8 +31,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 2 (Attention Filter), Phase 3 complete: LLM Phase 1 scoring and assertion extraction.
-- **Focus** — Awaiting human audit before Phase 4 planning.
+- **Phase** — Module 2 (Attention Filter), Phase 4 in progress: Full batch orchestration and annotation output.
+- **Focus** — Next step: 2.4.1 Annotation generation boundary and parsing.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -59,5 +59,14 @@ Delivered embedding boundary integration, Memory Store density reads, similar-no
 ### Phase 3 (complete): LLM Phase 1 scoring and assertion extraction
 
 Delivered private LLM prompt scoring, precision-surplus composite integration, incoming assertion extraction, friction-preparation records, and public-path regression coverage while preserving the no-accepted-fragments boundary before orchestration. Reviewed and completed. See DEVLOG "Phase 2.3 Review" and "Phase 2.3 Completion" entries.
+
+### Phase 4 (planned): Full batch orchestration and annotation output
+
+Scope: turn the private per-item evaluation records from Phases 2-3 into the public `FilterResult` contract: threshold/auto-accept decisions, generated annotations, accepted `AnnotatedFragment` objects, rejected counts, and batch metadata. The Attention Filter remains read-only against Memory Store; consumers store accepted fragments later. Cluster-cache scoring beyond retrieved-note structural signals stays behind the existing preparation boundary until Distillation owns the assertion/centroid cache format.
+
+- [ ] **Step 2.4.1 — Annotation generation boundary and parsing.** Add the private LLM annotation request/parser over accepted evaluation candidates. Tests should cover prompt payload shape, config/tier propagation, annotation text normalization, malformed payload handling, and unchanged LLM error propagation.
+- [ ] **Step 2.4.2 — Acceptance decisions and retention criteria.** Add deterministic decision helpers for composite thresholding, `auto_accept_sources` bypass, rejected counts, and retention criteria attribution from prompt and structure score maps. Tests should cover threshold edges, auto-accepted low-score items, zero-score rejects, and no Memory Store writes.
+- [ ] **Step 2.4.3 — AnnotatedFragment assembly.** Build public fragments from accepted evaluations with original content metadata, annotation, importance score, unresolvedness, prompt/structure scores, friction target, connections, linked URLs, and embedding. Tests should verify exact field mapping and that accepted fragments carry consumer-ready data without calling Memory Store write APIs.
+- [ ] **Step 2.4.4 — Public batch orchestration regression.** Wire the full non-empty `filter_content` path end to end with fake embedding and LLM boundaries. Tests should cover mixed accepted/rejected batches, auto-accept behavior, prompt/structure blend metadata, LLM call ordering, empty batch stability, and the Attention Filter plus Memory Store slices.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

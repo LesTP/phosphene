@@ -9,6 +9,13 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+## Phase 2.4 Plan: Full batch orchestration and annotation output
+
+**Date:** 2026-05-03
+**Decision:** Planned Module 2 Phase 4 as four Build steps: annotation generation boundary, acceptance and retention decision helpers, `AnnotatedFragment` assembly, and public `filter_content` batch regression coverage.
+
+This phase is scoped to completing the public Attention Filter output path over the private evaluation records delivered by Phases 2-3. It will produce accepted fragments, rejected counts, generated annotations, and batch metadata while preserving the read-only Memory Store boundary. Cluster-cache scoring that depends on Distillation-owned centroid/assertion files remains deferred behind the existing friction-preparation records until that cache contract has an implementation owner. See D-28.
+
 ## Phase 2.3 Plan: LLM Phase 1 scoring and assertion extraction
 
 **Date:** 2026-05-03
@@ -394,4 +401,16 @@ DEVPLAN cleanup: reduced the Phase 3 step plan to a one-line completion summary 
 
 ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 2 complete" to "Phase 3 complete".
 
-Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: false`.
+Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: true`.
+
+## Phase 2.3 Audit Closure — Attention Filter LLM Phase 1 Scoring and Assertion Extraction
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Accepted
+
+**Decision:** Human review recorded; Module 2 Phase 3 (Attention Filter LLM Phase 1 scoring and assertion extraction) is accepted as reviewed complete.
+
+Updated `DEVPLAN.md` Current Status to move Module 2 from awaiting human audit to ready for Phase 4 planning. No implementation changes, test changes, or architecture changes were required.
+
+Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: true`.
