@@ -391,6 +391,52 @@ def test_filter_content_regression_mixed_batch_with_auto_accept_and_rejects(
     assert result.density_snapshot is density
 
 
+def test_filter_content_prompt_only_mode_skips_assertion_extraction(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics(note_count=2, cluster_count=0, mean_link_degree=0.0)
+    embedding = np.array([1.0, 0.0])
+    store = FakeMemoryStore(
+        density,
+        [[(FakeNote("note-a", unresolvedness=0.5), 0.9)]],
+    )
+    llm_calls: list[dict[str, object]] = []
+
+    def fake_embed(_texts: list[str], _config: object) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[embedding])
+
+    def fake_complete(**kwargs: object) -> str:
+        llm_calls.append(dict(kwargs))
+        payload = json.loads(kwargs["messages"][0]["content"])
+        if payload["task"] == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.9}}'
+        if payload["task"] == "extract_attention_filter_incoming_assertions":
+            raise AssertionError("Phase 2 assertion extraction should be gated")
+        return '{"annotation": "Prompt-only annotation."}'
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [make_item("prompt-only")],
+        make_config(acceptance_threshold=0.0),
+    )
+
+    payloads = [
+        json.loads(call["messages"][0]["content"]) for call in llm_calls
+    ]
+    assert [payload["task"] for payload in payloads] == [
+        "score_attention_filter_prompt_criteria",
+        "generate_attention_filter_annotation",
+    ]
+    assert result.prompt_weight == 1.0
+    assert result.structure_weight == 0.0
+    assert len(result.accepted) == 1
+    assert result.accepted[0].annotation == "Prompt-only annotation."
+
+
 def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() -> None:
     embedding = np.array([1.0, 0.0])
     embedding_config = object()

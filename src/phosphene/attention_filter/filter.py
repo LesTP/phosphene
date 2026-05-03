@@ -980,10 +980,14 @@ def _evaluate_items(
     *,
     prompt_weight: float,
     structure_weight: float,
+    phase2_active: bool | None = None,
     embedding_callable: _EmbeddingCallable | None = None,
     llm_complete_callable: _LLMCompleteCallable | None = None,
 ) -> list[_ItemEvaluation]:
     """Prepare private per-item scoring context for later annotation phases."""
+
+    if phase2_active is None:
+        phase2_active = structure_weight > 0.0
 
     retrieval_contexts = _prepare_retrieval_contexts(
         memory_store,
@@ -1004,15 +1008,22 @@ def _evaluate_items(
             config.prompt_criteria,
             config.scoring,
         )
-        incoming_assertions = _extract_incoming_assertions(
-            context,
-            config,
-            llm_complete_callable=llm_complete_callable,
-        )
-        friction_preparation = _prepare_friction_from_assertions(
-            context,
-            incoming_assertions,
-        )
+        if phase2_active:
+            incoming_assertions = _extract_incoming_assertions(
+                context,
+                config,
+                llm_complete_callable=llm_complete_callable,
+            )
+            friction_preparation = _prepare_friction_from_assertions(
+                context,
+                incoming_assertions,
+            )
+        else:
+            incoming_assertions = ()
+            friction_preparation = _FrictionPreparation(
+                incoming_assertions=(),
+                cached_clusters=(),
+            )
         composite_score = _clamp_probability(
             prompt_score * prompt_weight
             + structural.structure_score * structure_weight
@@ -1035,11 +1046,7 @@ def _evaluate_items(
 
 
 class AttentionFilter:
-    """Personality-driven content selector.
-
-    Full scoring and annotation behavior is implemented in later Attention
-    Filter phases; this scaffold establishes the ARCH-defined constructor.
-    """
+    """Personality-driven content selector and annotator."""
 
     def __init__(self, memory_store: object) -> None:
         self.memory_store = memory_store
@@ -1048,6 +1055,7 @@ class AttentionFilter:
         self, items: list[ContentItem], config: AttentionFilterConfig
     ) -> FilterResult:
         density_snapshot = self.memory_store.get_density_metrics()
+        phase2_active = phase2_is_active(density_snapshot, config)
         prompt_weight, structure_weight = compute_blend_weights(density_snapshot, config)
 
         if not items:
@@ -1066,6 +1074,7 @@ class AttentionFilter:
             config,
             prompt_weight=prompt_weight,
             structure_weight=structure_weight,
+            phase2_active=phase2_active,
         )
         decisions = _decide_batch_retention(evaluations, config)
         accepted_evaluations = _accepted_evaluations(decisions)

@@ -466,3 +466,19 @@ Added public end-to-end regression coverage for the full non-empty `AttentionFil
 The regression verifies deterministic LLM call ordering across prompt scoring, assertion extraction, and annotation generation; config and tier propagation for each LLM boundary; per-item embedding search limits and embedding passthrough; prompt/structure blend metadata; rejected counts; retention criteria attribution; read-only Memory Store behavior; and the existing empty-batch stability alongside the Attention Filter plus Memory Store slices.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 276 tests pass.
+
+## Phase 2.4 Review - Attention Filter Full Batch Orchestration
+
+**Date:** 2026-05-03
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 2 Phase 4 against `ARCH_attention_filter.md`; one architecture/cost issue was fixed.
+
+Validated the public `filter_content` path for annotation generation, acceptance and auto-accept decisions, accepted `AnnotatedFragment` assembly, rejected counts, batch metadata, and read-only Memory Store behavior. Fixed the Phase 2 boundary so incoming assertion extraction and friction preparation run only after the triple gate activates Phase 2; prompt-only bootstrap mode now avoids the friction LLM call while still scoring prompt criteria and generating annotations for accepted content.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (277 passed).
+
+### Findings
+- Must fix: Gate assertion extraction behind Phase 2 activation; fixed in `src/phosphene/attention_filter/filter.py` with regression coverage.
+- Should fix: Remove stale scaffold wording from `AttentionFilter` class docstring; fixed.
+- Optional: none recorded.
