@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime, timezone
 
+from phosphene.source_ingestion.adapters import (
+    AdapterFactory,
+    AdapterItemError,
+    LastSeenMarker,
+    SourceAdapter,
+    pending_adapter_factory,
+)
 from phosphene.source_ingestion.errors import AdapterConfigError, AdapterNotFoundError
-from phosphene.source_ingestion.types import AdapterConfig, IngestionConfig, IngestionResult
+from phosphene.source_ingestion.types import (
+    AdapterConfig,
+    IngestionConfig,
+    IngestionError,
+    IngestionResult,
+)
 
 
 _SUPPORTED_ADAPTER_TYPES = {
@@ -43,28 +56,31 @@ _REDDIT_SORT_VALUES = {"new", "hot", "top"}
 _CORPUS_BLOG_FORMAT_VALUES = {"markdown", "html"}
 _CORPUS_CONVERSATION_FORMAT_VALUES = {"json", "text"}
 
+_ADAPTER_REGISTRY: dict[str, AdapterFactory] = {
+    adapter_type: pending_adapter_factory(adapter_type)
+    for adapter_type in _SUPPORTED_ADAPTER_TYPES
+}
+
 
 class SourceIngestion:
-    """Constructor-compatible Source Ingestion manager stub."""
+    """Source Ingestion manager."""
 
     def __init__(self, config: IngestionConfig) -> None:
         self.config = config
         self._adapters_by_label = _validate_and_index_adapters(config.adapters)
+        self._adapter_instances = {
+            adapter.source_label: _create_adapter(adapter) for adapter in config.adapters
+        }
+        self._last_seen_markers: dict[str, LastSeenMarker] = {}
 
     def poll(self, adapter_label: str | None = None) -> list[IngestionResult]:
         if adapter_label is not None:
-            self._get_adapter_config(adapter_label)
-            raise NotImplementedError(
-                "SourceIngestion.poll is implemented in a later phase step"
-            )
+            return [self.poll_once(adapter_label)]
 
-        if not self._enabled_adapter_configs():
-            return []
-        raise NotImplementedError("SourceIngestion.poll is implemented in a later phase step")
+        return [self._poll_adapter(adapter) for adapter in self._enabled_adapter_configs()]
 
     def poll_once(self, adapter_label: str) -> IngestionResult:
-        self._get_adapter_config(adapter_label)
-        raise NotImplementedError("SourceIngestion.poll_once is implemented in a later phase step")
+        return self._poll_adapter(self._get_adapter_config(adapter_label))
 
     def _enabled_adapter_configs(self) -> list[AdapterConfig]:
         return [adapter for adapter in self.config.adapters if adapter.enabled]
@@ -74,6 +90,37 @@ class SourceIngestion:
             return self._adapters_by_label[adapter_label]
         except KeyError as exc:
             raise AdapterNotFoundError(f"adapter label not found: {adapter_label}") from exc
+
+    def _poll_adapter(self, adapter_config: AdapterConfig) -> IngestionResult:
+        adapter = self._adapter_instances[adapter_config.source_label]
+        poll_timestamp = datetime.now(timezone.utc)
+
+        try:
+            poll_result = adapter.poll(self._last_seen_markers.get(adapter_config.source_label))
+        except Exception as exc:  # noqa: BLE001 - adapter failures are reported per ARCH.
+            return IngestionResult(
+                items=[],
+                adapter_label=adapter_config.source_label,
+                errors=[
+                    IngestionError(
+                        url=None,
+                        error=str(exc),
+                        adapter_label=adapter_config.source_label,
+                    )
+                ],
+                poll_timestamp=poll_timestamp,
+            )
+
+        self._last_seen_markers[adapter_config.source_label] = poll_result.next_marker
+        return IngestionResult(
+            items=poll_result.items,
+            adapter_label=adapter_config.source_label,
+            errors=[
+                _to_ingestion_error(error, adapter_config.source_label)
+                for error in poll_result.errors
+            ],
+            poll_timestamp=poll_timestamp,
+        )
 
 
 def _validate_and_index_adapters(adapters: Iterable[AdapterConfig]) -> dict[str, AdapterConfig]:
@@ -87,7 +134,7 @@ def _validate_and_index_adapters(adapters: Iterable[AdapterConfig]) -> dict[str,
 
 
 def _validate_adapter_config(adapter: AdapterConfig) -> None:
-    if adapter.adapter_type not in _SUPPORTED_ADAPTER_TYPES:
+    if adapter.adapter_type not in _ADAPTER_REGISTRY:
         raise AdapterConfigError(f"unknown adapter_type: {adapter.adapter_type}")
     if not adapter.source_label:
         raise AdapterConfigError("adapter source_label is required")
@@ -147,3 +194,15 @@ def _validate_enum_values(adapter: AdapterConfig) -> None:
             raise AdapterConfigError(
                 "corpus_conversations adapter params.format must be json or text"
             )
+
+
+def _create_adapter(adapter: AdapterConfig) -> SourceAdapter:
+    try:
+        factory = _ADAPTER_REGISTRY[adapter.adapter_type]
+    except KeyError as exc:
+        raise AdapterConfigError(f"unknown adapter_type: {adapter.adapter_type}") from exc
+    return factory(adapter)
+
+
+def _to_ingestion_error(error: AdapterItemError, adapter_label: str) -> IngestionError:
+    return IngestionError(url=error.url, error=error.error, adapter_label=adapter_label)

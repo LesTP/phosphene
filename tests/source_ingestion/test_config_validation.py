@@ -167,7 +167,7 @@ def test_source_ingestion_rejects_invalid_enum_params(adapter: AdapterConfig) ->
         SourceIngestion(_config(adapter))
 
 
-def test_poll_all_filters_disabled_adapters_before_polling_is_implemented() -> None:
+def test_poll_all_filters_disabled_adapters() -> None:
     manager = SourceIngestion(
         _config(
             AdapterConfig(

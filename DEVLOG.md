@@ -44,6 +44,19 @@ Kept live adapter fetching out of scope for this step: `poll()` and `poll_once()
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion tests/attention_filter tests/memory_store`; 295 tests pass.
 
+### Step 3.1.3: Internal adapter protocol and manager polling orchestration
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the internal Source Ingestion adapter boundary with `SourceAdapter`, `AdapterPollResult`, `AdapterItemError`, and an adapter factory registry. ARCH-listed live adapter types now resolve to explicit pending placeholders, while tests can register deterministic fake adapters without changing the public `SourceIngestion(config)` constructor.
+
+Replaced the manager polling stubs with ordered enabled-adapter polling, specific-adapter polling, per-adapter `IngestionResult` assembly, in-memory last-seen marker handoff, adapter-level exception wrapping, and adapter item-error conversion into public `IngestionError` records. Live network/API fetching remains intentionally out of scope for this foundation phase.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 21 tests pass.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
