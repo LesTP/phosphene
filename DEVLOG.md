@@ -440,3 +440,16 @@ Added deterministic private retention decisions for Attention Filter Phase 4. Th
 The public non-empty `filter_content` path now reports `rejected_count` from those decisions while still returning no accepted fragments until Step 2.4.3 assembles `AnnotatedFragment` objects. The Attention Filter remains read-only against Memory Store; the new regression coverage verifies no write APIs are called.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 119 tests pass.
+
+### Step 2.4.3: AnnotatedFragment assembly
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added public `AnnotatedFragment` assembly for accepted Attention Filter evaluations. The new helpers map generated annotations and retention decisions into consumer-ready fragments with original content metadata, composite importance score, unresolvedness affinity, prompt and structural scores, friction target, connections, linked URLs, and the precomputed embedding.
+
+The non-empty public `filter_content` path now generates annotations for accepted evaluations and returns assembled fragments while preserving accurate rejected counts and read-only Memory Store behavior. Regression coverage verifies exact field mapping, accepted-decision retention criteria propagation, annotation call ordering, embedding passthrough, connection mapping, and no Memory Store write API calls.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store`; 275 tests pass.

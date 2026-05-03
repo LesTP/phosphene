@@ -118,7 +118,7 @@ def make_item(content: str) -> ContentItem:
     )
 
 
-def test_filter_content_non_empty_scores_prompt_without_annotations(
+def test_filter_content_non_empty_scores_prompt_and_generates_accepted_fragments(
     monkeypatch,
 ) -> None:
     import phosphene.attention_filter.filter as filter_module
@@ -163,10 +163,19 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
 
     def fake_complete(**kwargs: object) -> str:
         llm_calls.append(dict(kwargs))
-        task = json.loads(kwargs["messages"][0]["content"])["task"]
+        payload = json.loads(kwargs["messages"][0]["content"])
+        task = payload["task"]
         if task == "score_attention_filter_prompt_criteria":
             return '{"scores": {"precision_surplus": 0.9}}'
-        return '{"assertions": [{"text": "incoming claim", "confidence": 0.8}]}'
+        if task == "extract_attention_filter_incoming_assertions":
+            return '{"assertions": [{"text": "incoming claim", "confidence": 0.8}]}'
+        return json.dumps(
+            {
+                "annotation": (
+                    f"Annotation for {payload['content_item']['content']}."
+                )
+            }
+        )
 
     monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
     monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
@@ -189,13 +198,15 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
     assert [limit for _, limit in store.search_calls] == [5, 5]
     assert np.array_equal(store.search_calls[0][0], embeddings[0])
     assert np.array_equal(store.search_calls[1][0], embeddings[1])
-    assert len(llm_calls) == 4
-    assert [call["config"] for call in llm_calls] == [llm_config] * 4
+    assert len(llm_calls) == 6
+    assert [call["config"] for call in llm_calls] == [llm_config] * 6
     assert [call["tier"] for call in llm_calls] == [
         llm_tier,
         assertion_tier,
         llm_tier,
         assertion_tier,
+        llm_tier,
+        llm_tier,
     ]
     payloads = [
         json.loads(call["messages"][0]["content"]) for call in llm_calls
@@ -205,11 +216,15 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
         "extract_attention_filter_incoming_assertions",
         "score_attention_filter_prompt_criteria",
         "extract_attention_filter_incoming_assertions",
+        "generate_attention_filter_annotation",
+        "generate_attention_filter_annotation",
     ]
     assert [payload["content_item"]["content"] for payload in payloads] == [
         "first",
         "first",
         "second",
+        "second",
+        "first",
         "second",
     ]
     assert payloads[0]["similar_notes"][0]["note_id"] == "note-a"
@@ -219,7 +234,21 @@ def test_filter_content_non_empty_scores_prompt_without_annotations(
     assert payloads[1]["content_item"]["linked_urls"] == ["https://example.test/linked"]
     assert payloads[3]["content_item"]["url"] == "https://example.test/item"
     assert store.write_calls == 0
-    assert result.accepted == []
+    assert len(result.accepted) == 2
+    assert [fragment.content for fragment in result.accepted] == ["first", "second"]
+    assert [fragment.annotation for fragment in result.accepted] == [
+        "Annotation for first.",
+        "Annotation for second.",
+    ]
+    assert [fragment.source for fragment in result.accepted] == ["rss", "rss"]
+    assert [fragment.linked_urls for fragment in result.accepted] == [
+        ["https://example.test/linked"],
+        ["https://example.test/linked"],
+    ]
+    assert result.accepted[0].connections == ["note-a"]
+    assert result.accepted[1].connections == ["note-b"]
+    assert np.array_equal(result.accepted[0].embedding, embeddings[0])
+    assert np.array_equal(result.accepted[1].embedding, embeddings[1])
     assert result.rejected_count == 0
     assert result.total_count == 2
     assert result.prompt_weight == 0.65

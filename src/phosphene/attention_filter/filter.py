@@ -12,6 +12,7 @@ from phosphene.attention_filter.errors import InvalidScoreError
 from phosphene.memory_store import DensityMetrics
 
 from phosphene.attention_filter.types import (
+    AnnotatedFragment,
     AttentionFilterConfig,
     ContentItem,
     FilterCriterion,
@@ -636,6 +637,60 @@ def _rejected_count(decisions: Sequence[_RetentionDecision]) -> int:
     return sum(1 for decision in decisions if not decision.accepted)
 
 
+def _retention_criteria_for_generated_annotation(
+    generated: _GeneratedAnnotation,
+    decisions: Sequence[_RetentionDecision],
+) -> tuple[str, ...]:
+    for decision in decisions:
+        if decision.evaluation is generated.evaluation:
+            return decision.retention_criteria
+
+    raise InvalidScoreError("Generated annotation has no retention decision")
+
+
+def _assemble_annotated_fragment(
+    generated: _GeneratedAnnotation,
+    retention_criteria: Sequence[str],
+) -> AnnotatedFragment:
+    """Map one accepted private evaluation into the public fragment contract."""
+
+    evaluation = generated.evaluation
+    item = evaluation.retrieval.item
+    return AnnotatedFragment(
+        content=item.content,
+        annotation=generated.annotation,
+        importance_score=evaluation.composite_score,
+        unresolvedness=_clamp_probability(
+            evaluation.structural.scores.get("unresolvedness_affinity", 0.0)
+        ),
+        retention_criteria=list(retention_criteria),
+        prompt_score=evaluation.prompt_score,
+        structure_score=evaluation.structural.structure_score,
+        friction_target=evaluation.structural.friction_target,
+        connections=list(evaluation.structural.connections),
+        source=item.source,
+        timestamp=item.timestamp,
+        url=item.url,
+        linked_urls=list(item.linked_urls),
+        embedding=evaluation.retrieval.embedding,
+    )
+
+
+def _assemble_annotated_fragments(
+    generated_annotations: Sequence[_GeneratedAnnotation],
+    decisions: Sequence[_RetentionDecision],
+) -> list[AnnotatedFragment]:
+    """Assemble consumer-ready fragments for accepted decisions only."""
+
+    return [
+        _assemble_annotated_fragment(
+            generated,
+            _retention_criteria_for_generated_annotation(generated, decisions),
+        )
+        for generated in generated_annotations
+    ]
+
+
 def _assertion_cache_path(cluster_group: str) -> str:
     return f"tier2/{cluster_group}.json"
 
@@ -1013,8 +1068,14 @@ class AttentionFilter:
             structure_weight=structure_weight,
         )
         decisions = _decide_batch_retention(evaluations, config)
+        accepted_evaluations = _accepted_evaluations(decisions)
+        generated_annotations = _generate_annotations(accepted_evaluations, config)
+        accepted_fragments = _assemble_annotated_fragments(
+            generated_annotations,
+            decisions,
+        )
         return FilterResult(
-            accepted=[],
+            accepted=accepted_fragments,
             rejected_count=_rejected_count(decisions),
             total_count=len(items),
             prompt_weight=prompt_weight,
