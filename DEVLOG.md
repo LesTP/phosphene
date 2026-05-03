@@ -237,3 +237,19 @@ Bootstrap behavior documented in Orchestrator: when Tier 3 is empty, run ingesti
 **Files changed:** DECISIONS.md, ARCHITECTURE.md, ARCH_distillation.md, ARCH_attention_filter.md, ARCH_generator.md, ARCH_source_ingestion.md, ARCH_memory_store.md, ARCH_orchestrator.md, PROJECT.md, DEVPLAN.md, CLAUDE.md, CODEX.md, .llms/rules/phosphene.md.
 **File deleted:** ARCH_seeding.md.
 **Implementation sequence renumbered:** 10 modules → 9. Module 2 is now Attention Filter.
+
+## Phase 2.2 Review — Attention Filter Memory Retrieval Integration
+
+**Date:** 2026-05-03
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 2 Phase 2 against `ARCH_attention_filter.md`; no must-fix or should-fix code changes were required.
+
+Validated that Phase 2 remains limited to embedding, Memory Store density reads, similar-note retrieval, and Memory Store-backed structural preparation. The public non-empty `filter_content` path still avoids accepted fragment production, rejected-count manufacture, LLM scoring, assertion extraction, annotation generation, and Memory Store writes, matching the phase boundary recorded in D-24.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter tests/memory_store` (225 passed).
+
+### Findings
+- Must fix: none.
+- Should fix: none.
+- Optional: none recorded.

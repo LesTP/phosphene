@@ -175,3 +175,10 @@ Priority: Important
 Decision: Module 2 Phase 2 will wire the embedding boundary, Memory Store density metrics, similar-note retrieval, and Memory Store-backed structural signals before implementing live LLM prompt scoring, assertion extraction, or annotation generation. Non-empty item evaluation may build private context for later phases, but accepted `AnnotatedFragment` production remains deferred until the LLM scoring and annotation phase.
 Rationale: The Attention Filter ARCH behavior combines embedding, Memory Store retrieval, LLM prompt scoring, assertion extraction, geometric scoring, acceptance, and annotation in one public method. Building all of that in one phase would hide failures across too many dependencies. Splitting retrieval plumbing first gives deterministic tests around the Memory Store boundary and keeps the current no-toolkit checkout workable through fakes, while preserving the ARCH contract for the later LLM phase.
 Revisit if: The toolkit embedding API requires a public configuration or constructor change, or if downstream phases need `filter_content` to produce provisional non-LLM fragments before annotation exists.
+
+D-25: Module 2 Phase 2 review accepts retrieval-only output
+Date: 2026-05-03 | Status: Closed
+Priority: Important
+Decision: Accept Module 2 Phase 2 as architecturally aligned with no required code fixes. The reviewed output intentionally prepares retrieval and Memory Store-backed structural context while leaving accepted fragments, rejected counts, LLM annotations, final scoring, assertion extraction, and Memory Store writes for later Attention Filter phases.
+Rationale: This preserves the D-24 phase boundary and avoids manufacturing partial public results before live LLM scoring and annotation exist. Focused Attention Filter and Memory Store tests pass, and the current implementation remains read-only against Memory Store.
+Revisit if: Phase 3 LLM scoring needs additional public state from the retrieval contexts, or if integration requires provisional non-LLM fragments before annotation is implemented.
