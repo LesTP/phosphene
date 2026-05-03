@@ -31,6 +31,19 @@ The manager stores its `IngestionConfig` but leaves polling behavior intentional
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion tests/attention_filter tests/memory_store`; 280 tests pass.
 
+### Step 3.1.2: Config validation and adapter lookup semantics
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Source Ingestion manager config validation for the ARCH-listed adapter types, duplicate source labels, required params, required credentials, and constrained enum params for Reddit sort and corpus formats. The manager now indexes configs by source label, provides internal label lookup, filters disabled adapters when polling all adapters, returns an empty result list when no enabled adapters exist, and raises `AdapterNotFoundError` for unknown specific labels before the later polling implementation runs.
+
+Kept live adapter fetching out of scope for this step: `poll()` and `poll_once()` still defer real adapter execution to the upcoming registry/orchestration step after completing lookup validation. Added focused tests for valid adapter configs, unknown adapter types, duplicate labels, missing params/credentials, invalid enum params, disabled filtering, and unknown-label errors.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion tests/attention_filter tests/memory_store`; 295 tests pass.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03

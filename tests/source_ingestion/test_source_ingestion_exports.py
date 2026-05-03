@@ -97,6 +97,15 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     assert config.max_content_length == 50_000
     assert config.extract_links is True
     assert result.errors == [error]
-    assert isinstance(SourceIngestion(config), SourceIngestion)
+    manager_config = IngestionConfig(
+        adapters=[
+            AdapterConfig(
+                adapter_type="rss",
+                source_label="feed",
+                params={"feed_url": "https://example.com/feed.xml"},
+            )
+        ]
+    )
+    assert isinstance(SourceIngestion(manager_config), SourceIngestion)
     assert issubclass(AdapterConfigError, SourceIngestionError)
     assert issubclass(AdapterNotFoundError, SourceIngestionError)
