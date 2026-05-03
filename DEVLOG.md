@@ -372,3 +372,26 @@ Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention
 - Must fix: none.
 - Should fix: none.
 - Optional: none recorded.
+
+### Phase 2.3 Completion: LLM Phase 1 scoring and assertion extraction
+
+**Date:** 2026-05-03
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 3 of Module 2 (Attention Filter). Final verification ran the Attention Filter test slice with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter`; 102 tests pass.
+
+Phase 3 delivered the private toolkit LLM boundary for prompt-criterion scoring, weighted precision-surplus prompt composite integration in the private per-item evaluation path, incoming assertion extraction through `config.assertion_extraction_tier`, friction-preparation records pairing incoming assertions with retrieved cluster identifiers and the Distillation assertion-cache contract, and public-path regression coverage for the fake-backed non-empty `filter_content` path. The phase intentionally preserves the pre-orchestration boundary: no accepted fragments, no annotation generation, and no Memory Store writes from the public non-empty path.
+
+DEVLOG learning review: Phase 3 landed linearly across one plan, five implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+
+Contract Changes scan: Phase 3 step entries recorded "Contract changes: None"; the review also recorded no contract changes. D-26 documents the LLM-enrichment-only phase boundary, but no upstream contract propagation is required.
+
+Log review: `logs/loop/summary.log` shows Module 2 Phase 3 iterations 44-50 completed cleanly with no escalations, no repeated tool failures, and no wasted-turn patterns. No new operational Gotchas to promote.
+
+DEVPLAN cleanup: reduced the Phase 3 step plan to a one-line completion summary referencing this entry. Module 2 remains in progress, with Phase 4 ready for its own Phase Plan after human audit.
+
+ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 2 complete" to "Phase 3 complete".
+
+Frontmatter reset for next phase: `phase: 4`, `phase_title: Full batch orchestration and annotation output`, `step: null`, `mode: Discuss`, `review_done: false`.

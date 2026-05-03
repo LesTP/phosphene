@@ -1,12 +1,12 @@
 ---
 module: 2
-phase: 3
-phase_title: LLM Phase 1 scoring and assertion extraction
-step: 5
-mode: Review
+phase: 4
+phase_title: Full batch orchestration and annotation output
+step: null
+mode: Discuss
 blocked: false
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -31,8 +31,8 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 2 (Attention Filter), Phase 3 reviewed: LLM Phase 1 scoring and assertion extraction.
-- **Focus** — Next action: Phase 2.3 complete.
+- **Phase** — Module 2 (Attention Filter), Phase 3 complete: LLM Phase 1 scoring and assertion extraction.
+- **Focus** — Awaiting human audit before Phase 4 planning.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -56,14 +56,8 @@ Delivered ARCH-aligned public dataclasses/exports, default precision-surplus cri
 
 Delivered embedding boundary integration, Memory Store density reads, similar-note retrieval contexts, Memory Store-backed structural preparation, and non-LLM public-path wiring without Memory Store writes or premature LLM/annotation behavior. Reviewed complete. See DEVLOG "Phase 2.2 Completion" and "Phase 2.2 Audit Closure".
 
-### Phase 3 (in progress): LLM Phase 1 scoring and assertion extraction
+### Phase 3 (complete): LLM Phase 1 scoring and assertion extraction
 
-Build phase scoped to live LLM calls that enrich the existing private per-item evaluation path. This phase adds precision-surplus prompt scoring and incoming-text assertion extraction for future friction scoring, while leaving final acceptance, annotation generation, and full batch orchestration for the next Attention Filter phase. See D-26.
-
-- [x] **Step 2.3.1 — LLM prompt scoring boundary and score parsing.** Add a private toolkit LLM boundary for Phase 1 prompt criteria, with deterministic fake-call tests covering request construction, tier/config propagation, score parsing, invalid payload handling, and unchanged LLM error propagation.
-- [x] **Step 2.3.2 — Precision-surplus prompt composite integration.** Compute weighted prompt scores from configured criteria inside the private item evaluation path, preserve the existing Memory Store retrieval/structural context, and keep public non-empty `FilterResult` output free of accepted fragments until annotation exists.
-- [x] **Step 2.3.3 — Incoming assertion extraction boundary.** Add a private assertion-extraction LLM boundary using `config.assertion_extraction_tier`, returning structured incoming assertions for friction scoring with tests for empty/noisy extraction, parser failures, tier propagation, and unchanged LLM error propagation.
-- [x] **Step 2.3.4 — Friction preparation from assertions and cached-cluster contract.** Add private friction-preparation records that pair incoming assertions with retrieved cluster identifiers and the existing Distillation assertion-cache contract, without inventing Memory Store writes or changing public dataclasses.
-- [x] **Step 2.3.5 — Phase 3 public-path regression coverage.** Cover the non-empty `filter_content` path end-to-end with fakes to verify embedding, retrieval, prompt scoring, assertion extraction, blend metadata, read-only Memory Store behavior, and the intentional absence of acceptance/annotation behavior before the orchestration phase.
+Delivered private LLM prompt scoring, precision-surplus composite integration, incoming assertion extraction, friction-preparation records, and public-path regression coverage while preserving the no-accepted-fragments boundary before orchestration. Reviewed and completed. See DEVLOG "Phase 2.3 Review" and "Phase 2.3 Completion" entries.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
