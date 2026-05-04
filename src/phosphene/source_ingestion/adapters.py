@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from inspect import Parameter, signature
 from typing import Protocol
 
-from phosphene.source_ingestion.types import AdapterConfig, ContentItem
+from phosphene.source_ingestion.types import AdapterConfig, ContentItem, IngestionConfig
 
 LastSeenMarker = str | int | float | datetime | None
 
@@ -36,7 +37,7 @@ class SourceAdapter(Protocol):
         """Fetch content newer than last_seen_marker."""
 
 
-AdapterFactory = Callable[[AdapterConfig], SourceAdapter]
+AdapterFactory = Callable[..., SourceAdapter]
 
 
 class AdapterRegistry:
@@ -71,8 +72,13 @@ class AdapterRegistry:
     def supports(self, adapter_type: str) -> bool:
         return adapter_type in self._factories
 
-    def create(self, config: AdapterConfig) -> SourceAdapter:
-        return self._factories[config.adapter_type](config)
+    def create(
+        self, config: AdapterConfig, ingestion_config: IngestionConfig | None = None
+    ) -> SourceAdapter:
+        factory = self._factories[config.adapter_type]
+        if ingestion_config is None or not _accepts_ingestion_config(factory):
+            return factory(config)
+        return factory(config, ingestion_config)
 
 
 class PendingAdapter:
@@ -96,3 +102,17 @@ def adapter_error_from_exception(
     exc: Exception, *, url: str | None = None
 ) -> AdapterItemError:
     return AdapterItemError(error=str(exc), url=url)
+
+
+def _accepts_ingestion_config(factory: AdapterFactory) -> bool:
+    parameters = signature(factory).parameters.values()
+    positional = [
+        parameter
+        for parameter in parameters
+        if parameter.kind
+        in {Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD}
+    ]
+    has_varargs = any(
+        parameter.kind == Parameter.VAR_POSITIONAL for parameter in parameters
+    )
+    return has_varargs or len(positional) >= 2

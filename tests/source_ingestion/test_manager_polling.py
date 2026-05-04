@@ -148,7 +148,13 @@ def test_poll_specific_adapter_wraps_adapter_exception(
     assert result.errors[0].error == "adapter broke"
 
 
-def test_pending_arch_adapter_error_is_reported_in_result() -> None:
+def test_rss_adapter_fetch_error_is_reported_in_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_urlopen(request: object, timeout: float) -> object:
+        raise OSError("network down")
+
+    monkeypatch.setattr("phosphene.source_ingestion.rss.urlopen", failing_urlopen)
     manager = SourceIngestion(
         IngestionConfig(
             adapters=[
@@ -166,8 +172,8 @@ def test_pending_arch_adapter_error_is_reported_in_result() -> None:
     assert result.items == []
     assert result.adapter_label == "feed"
     assert result.errors[0].adapter_label == "feed"
-    assert result.errors[0].url is None
-    assert result.errors[0].error == "rss adapter is not implemented"
+    assert result.errors[0].url == "https://example.com/feed.xml"
+    assert result.errors[0].error == "network down"
 
 
 def test_private_registry_builds_with_concrete_factory_override() -> None:

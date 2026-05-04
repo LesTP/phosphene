@@ -14,6 +14,7 @@ from phosphene.source_ingestion.adapters import (
     pending_adapter_factory,
 )
 from phosphene.source_ingestion.errors import AdapterConfigError, AdapterNotFoundError
+from phosphene.source_ingestion.rss import rss_adapter_factory
 from phosphene.source_ingestion.types import (
     AdapterConfig,
     IngestionConfig,
@@ -61,6 +62,7 @@ _ADAPTER_REGISTRY: dict[str, AdapterFactory] = {
     adapter_type: pending_adapter_factory(adapter_type)
     for adapter_type in _SUPPORTED_ADAPTER_TYPES
 }
+_ADAPTER_REGISTRY["rss"] = rss_adapter_factory
 _DEFAULT_ADAPTER_REGISTRY = AdapterRegistry(_ADAPTER_REGISTRY)
 
 
@@ -74,7 +76,9 @@ class SourceIngestion:
             config.adapters, self._adapter_registry
         )
         self._adapter_instances = {
-            adapter.source_label: _create_adapter(adapter, self._adapter_registry)
+            adapter.source_label: _create_adapter(
+                adapter, self._adapter_registry, self.config
+            )
             for adapter in config.adapters
         }
         self._last_seen_markers: dict[str, LastSeenMarker] = {}
@@ -215,11 +219,13 @@ def _validate_enum_values(adapter: AdapterConfig) -> None:
 
 
 def _create_adapter(
-    adapter: AdapterConfig, registry: AdapterRegistry | None = None
+    adapter: AdapterConfig,
+    registry: AdapterRegistry | None = None,
+    ingestion_config: IngestionConfig | None = None,
 ) -> SourceAdapter:
     registry = registry or _build_adapter_registry(_ADAPTER_REGISTRY)
     try:
-        return registry.create(adapter)
+        return registry.create(adapter, ingestion_config)
     except KeyError as exc:
         raise AdapterConfigError(f"unknown adapter_type: {adapter.adapter_type}") from exc
 

@@ -83,6 +83,17 @@ Added shared Source Ingestion adapter utilities for URL fetching, HTML-to-text e
 
 Focused tests cover concrete factory overrides, invalid factory rejection, adapter error conversion, HTML extraction, URL fetch success/failure behavior, truncation/link preservation, and marker ordering edge cases. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (318 passed).
 
+### Step 3.2.2: RSS/Atom adapter
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the concrete `rss` adapter behind the existing Source Ingestion manager and registry contract. The adapter fetches feed XML with stdlib HTTP, parses RSS and Atom fixtures with stdlib XML, normalizes entry content through the shared HTML-to-text/link utilities, preserves title/author/url/timestamp metadata, advances deterministic last-seen markers, and reports fetch or parse failures inside `IngestionResult.errors`.
+
+Kept the public `SourceIngestion(config)` API stable while allowing internal concrete factories to receive the global `IngestionConfig`; existing one-argument fake factory seams continue to work. Focused tests cover RSS fixtures, Atom fixtures, duplicate suppression by marker, malformed feed/error reporting, network failure conversion, and disabled adapter behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (45 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (322 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

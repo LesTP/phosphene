@@ -2,7 +2,7 @@
 module: SOURCE_INGESTION
 phase: 2
 phase_title: Concrete adapters, human-share, and corpus import
-step: 3.2.2
+step: 3.2.3
 mode: Build
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 2 in progress
-- **Focus** — Step 3.2.2: RSS/Atom adapter
+- **Focus** — Step 3.2.3: Local corpus text and blog adapters
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -84,7 +84,7 @@ Build concrete Source Ingestion adapters behind the Phase 1 manager/registry con
   - Add test-covered internal registration seams for concrete adapter factories without exposing a new public API.
   - Add shared utilities needed by multiple adapters: URL/page text fetch abstraction, HTML-to-text extraction, deterministic timestamp/marker comparison helpers, and adapter-local error conversion.
   - Tests: registry construction with concrete/fake factories, URL extraction/fetch fallback behavior, content truncation/link extraction preservation, marker ordering edge cases.
-- [ ] **Step 3.2.2 — RSS/Atom adapter**
+- [x] **Step 3.2.2 — RSS/Atom adapter**
   - Implement `rss` adapter for feed URL polling, entry normalization, publication timestamp handling, title/author/url population, and last-seen marker advancement.
   - Keep network failures inside `IngestionResult.errors`.
   - Tests: RSS and Atom fixtures, duplicate suppression by marker, malformed feed/error reporting, disabled adapter unchanged.
