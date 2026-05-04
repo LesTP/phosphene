@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
@@ -39,6 +39,42 @@ class SourceAdapter(Protocol):
 AdapterFactory = Callable[[AdapterConfig], SourceAdapter]
 
 
+class AdapterRegistry:
+    """Immutable internal adapter factory registry."""
+
+    def __init__(self, factories: Mapping[str, AdapterFactory]) -> None:
+        self._factories = dict(factories)
+        for adapter_type, factory in self._factories.items():
+            if not adapter_type:
+                raise ValueError("adapter_type is required")
+            if not callable(factory):
+                raise TypeError(f"adapter factory for {adapter_type} must be callable")
+
+    @classmethod
+    def pending(cls, adapter_types: set[str]) -> "AdapterRegistry":
+        return cls(
+            {
+                adapter_type: pending_adapter_factory(adapter_type)
+                for adapter_type in adapter_types
+            }
+        )
+
+    def with_factories(
+        self, factories: Mapping[str, AdapterFactory] | None
+    ) -> "AdapterRegistry":
+        if not factories:
+            return self
+        merged = dict(self._factories)
+        merged.update(factories)
+        return AdapterRegistry(merged)
+
+    def supports(self, adapter_type: str) -> bool:
+        return adapter_type in self._factories
+
+    def create(self, config: AdapterConfig) -> SourceAdapter:
+        return self._factories[config.adapter_type](config)
+
+
 class PendingAdapter:
     """Placeholder for ARCH adapter types whose fetching is implemented later."""
 
@@ -54,3 +90,9 @@ def pending_adapter_factory(adapter_type: str) -> AdapterFactory:
         return PendingAdapter(config.adapter_type)
 
     return _factory
+
+
+def adapter_error_from_exception(
+    exc: Exception, *, url: str | None = None
+) -> AdapterItemError:
+    return AdapterItemError(error=str(exc), url=url)

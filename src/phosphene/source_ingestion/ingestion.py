@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from phosphene.source_ingestion.adapters import (
     AdapterFactory,
     AdapterItemError,
+    AdapterRegistry,
     LastSeenMarker,
     SourceAdapter,
     pending_adapter_factory,
@@ -60,6 +61,7 @@ _ADAPTER_REGISTRY: dict[str, AdapterFactory] = {
     adapter_type: pending_adapter_factory(adapter_type)
     for adapter_type in _SUPPORTED_ADAPTER_TYPES
 }
+_DEFAULT_ADAPTER_REGISTRY = AdapterRegistry(_ADAPTER_REGISTRY)
 
 
 class SourceIngestion:
@@ -67,9 +69,13 @@ class SourceIngestion:
 
     def __init__(self, config: IngestionConfig) -> None:
         self.config = config
-        self._adapters_by_label = _validate_and_index_adapters(config.adapters)
+        self._adapter_registry = _build_adapter_registry(_ADAPTER_REGISTRY)
+        self._adapters_by_label = _validate_and_index_adapters(
+            config.adapters, self._adapter_registry
+        )
         self._adapter_instances = {
-            adapter.source_label: _create_adapter(adapter) for adapter in config.adapters
+            adapter.source_label: _create_adapter(adapter, self._adapter_registry)
+            for adapter in config.adapters
         }
         self._last_seen_markers: dict[str, LastSeenMarker] = {}
 
@@ -123,18 +129,30 @@ class SourceIngestion:
         )
 
 
-def _validate_and_index_adapters(adapters: Iterable[AdapterConfig]) -> dict[str, AdapterConfig]:
+def _build_adapter_registry(
+    factories: dict[str, AdapterFactory] | None = None,
+) -> AdapterRegistry:
+    return _DEFAULT_ADAPTER_REGISTRY.with_factories(factories)
+
+
+def _validate_and_index_adapters(
+    adapters: Iterable[AdapterConfig], registry: AdapterRegistry | None = None
+) -> dict[str, AdapterConfig]:
+    registry = registry or _build_adapter_registry(_ADAPTER_REGISTRY)
     adapters_by_label: dict[str, AdapterConfig] = {}
     for adapter in adapters:
-        _validate_adapter_config(adapter)
+        _validate_adapter_config(adapter, registry)
         if adapter.source_label in adapters_by_label:
             raise AdapterConfigError(f"duplicate adapter source_label: {adapter.source_label}")
         adapters_by_label[adapter.source_label] = adapter
     return adapters_by_label
 
 
-def _validate_adapter_config(adapter: AdapterConfig) -> None:
-    if adapter.adapter_type not in _ADAPTER_REGISTRY:
+def _validate_adapter_config(
+    adapter: AdapterConfig, registry: AdapterRegistry | None = None
+) -> None:
+    registry = registry or _build_adapter_registry(_ADAPTER_REGISTRY)
+    if not registry.supports(adapter.adapter_type):
         raise AdapterConfigError(f"unknown adapter_type: {adapter.adapter_type}")
     if not adapter.source_label:
         raise AdapterConfigError("adapter source_label is required")
@@ -196,12 +214,14 @@ def _validate_enum_values(adapter: AdapterConfig) -> None:
             )
 
 
-def _create_adapter(adapter: AdapterConfig) -> SourceAdapter:
+def _create_adapter(
+    adapter: AdapterConfig, registry: AdapterRegistry | None = None
+) -> SourceAdapter:
+    registry = registry or _build_adapter_registry(_ADAPTER_REGISTRY)
     try:
-        factory = _ADAPTER_REGISTRY[adapter.adapter_type]
+        return registry.create(adapter)
     except KeyError as exc:
         raise AdapterConfigError(f"unknown adapter_type: {adapter.adapter_type}") from exc
-    return factory(adapter)
 
 
 def _to_ingestion_error(error: AdapterItemError, adapter_label: str) -> IngestionError:

@@ -70,6 +70,19 @@ Planned Module 3 Phase 2 as a Build phase over concrete Source Ingestion adapter
 
 Scope decision recorded in D-33: durable marker persistence remains Source Ingestion-owned during this phase. If implementing durable markers would require a Memory Store dependency or public cross-module contract change, the worker should record the issue during review rather than expanding dependencies inside the phase.
 
+### Step 3.2.1: Shared adapter utilities and registry hardening
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added an internal `AdapterRegistry` seam for concrete/fake factory construction without changing the public `SourceIngestion(config)` API. The manager now validates and creates adapters through an immutable internal registry snapshot while preserving the existing private `_ADAPTER_REGISTRY` test override path.
+
+Added shared Source Ingestion adapter utilities for URL fetching, HTML-to-text extraction, page title/link extraction, deterministic marker ordering, and adapter-local exception-to-error conversion. Link extraction continues to run before content truncation so linked URLs survive max-content clipping.
+
+Focused tests cover concrete factory overrides, invalid factory rejection, adapter error conversion, HTML extraction, URL fetch success/failure behavior, truncation/link preservation, and marker ordering edge cases. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (318 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

@@ -2,7 +2,7 @@
 module: SOURCE_INGESTION
 phase: 2
 phase_title: Concrete adapters, human-share, and corpus import
-step: 3.2.1
+step: 3.2.2
 mode: Build
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 2 in progress
-- **Focus** — Step 3.2.1: shared adapter utilities and registry hardening
+- **Focus** — Step 3.2.2: RSS/Atom adapter
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -80,7 +80,7 @@ Added `pytest-cov` dev tooling and captured the full-suite baseline: 310 tests p
 
 Build concrete Source Ingestion adapters behind the Phase 1 manager/registry contract, keeping the public `ContentItem` / `IngestionResult` shape stable. Scope includes shared fetch/extraction utilities, autonomous adapters, human-share handling, corpus import adapters, and persistence/integration hardening where it does not introduce a Memory Store dependency.
 
-- [ ] **Step 3.2.1 — Shared adapter utilities and registry hardening**
+- [x] **Step 3.2.1 — Shared adapter utilities and registry hardening**
   - Add test-covered internal registration seams for concrete adapter factories without exposing a new public API.
   - Add shared utilities needed by multiple adapters: URL/page text fetch abstraction, HTML-to-text extraction, deterministic timestamp/marker comparison helpers, and adapter-local error conversion.
   - Tests: registry construction with concrete/fake factories, URL extraction/fetch fallback behavior, content truncation/link extraction preservation, marker ordering edge cases.

@@ -10,10 +10,12 @@ from phosphene.source_ingestion import (
 )
 from phosphene.source_ingestion.adapters import (
     AdapterItemError,
+    AdapterRegistry,
     AdapterPollResult,
     LastSeenMarker,
+    adapter_error_from_exception,
 )
-from phosphene.source_ingestion.ingestion import _ADAPTER_REGISTRY
+from phosphene.source_ingestion.ingestion import _ADAPTER_REGISTRY, _build_adapter_registry
 
 
 class FakeAdapter:
@@ -166,3 +168,44 @@ def test_pending_arch_adapter_error_is_reported_in_result() -> None:
     assert result.errors[0].adapter_label == "feed"
     assert result.errors[0].url is None
     assert result.errors[0].error == "rss adapter is not implemented"
+
+
+def test_private_registry_builds_with_concrete_factory_override() -> None:
+    def factory(config: AdapterConfig) -> FakeAdapter:
+        return FakeAdapter(
+            AdapterPollResult(
+                items=[
+                    ContentItem(
+                        content=config.source_label,
+                        source=config.adapter_type,
+                        timestamp=datetime(2026, 1, 1),
+                    )
+                ],
+                next_marker=1,
+            )
+        )
+
+    registry = _build_adapter_registry({"rss": factory})
+    adapter = registry.create(
+        AdapterConfig(
+            adapter_type="rss",
+            source_label="feed",
+            params={"feed_url": "https://example.com/feed.xml"},
+        )
+    )
+
+    assert adapter.poll(None).items[0].content == "feed"
+
+
+def test_private_registry_rejects_invalid_factory() -> None:
+    with pytest.raises(TypeError, match="must be callable"):
+        AdapterRegistry({"rss": None})  # type: ignore[arg-type]
+
+
+def test_adapter_error_from_exception_preserves_url_context() -> None:
+    error = adapter_error_from_exception(
+        RuntimeError("bad fetch"), url="https://example.com/bad"
+    )
+
+    assert error.error == "bad fetch"
+    assert error.url == "https://example.com/bad"

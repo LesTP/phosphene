@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.error import URLError
 
 import pytest
 
 from phosphene.source_ingestion.normalization import (
     build_content_item,
     extract_urls,
+    fetch_url_text,
+    html_to_text,
+    is_marker_newer,
+    marker_sort_key,
     truncate_content,
 )
 from phosphene.source_ingestion.types import IngestionConfig
@@ -93,3 +98,94 @@ def test_build_content_item_deduplicates_explicit_and_extracted_links() -> None:
         "https://example.com/b",
         "https://example.com/a",
     ]
+
+
+def test_build_content_item_preserves_links_from_truncated_content() -> None:
+    item = build_content_item(
+        content="prefix https://example.com/kept-after-truncation",
+        source="rss",
+        timestamp=datetime(2026, 1, 1),
+        config=IngestionConfig(adapters=[], max_content_length=6),
+    )
+
+    assert item.content == "prefix"
+    assert item.linked_urls == ["https://example.com/kept-after-truncation"]
+
+
+def test_html_to_text_extracts_readable_text_title_and_links() -> None:
+    result = html_to_text(
+        """
+        <html>
+          <head><title>Example &amp; Title</title><style>.x {}</style></head>
+          <body>
+            <h1>Hello</h1>
+            <script>ignored()</script>
+            <p>Read <a href="https://example.com/a">A</a></p>
+            <a href="/relative">relative</a>
+          </body>
+        </html>
+        """
+    )
+
+    assert result.text == "Hello Read A relative"
+    assert result.title == "Example & Title"
+    assert result.linked_urls == ["https://example.com/a"]
+
+
+def test_fetch_url_text_uses_fetch_abstraction_and_extracts_links(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeHeaders:
+        def get_content_charset(self) -> str:
+            return "utf-8"
+
+    class FakeResponse:
+        headers = FakeHeaders()
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"<title>T</title><p>Body https://example.com/body</p>"
+
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(request: object, timeout: float) -> FakeResponse:
+        seen["request"] = request
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("phosphene.source_ingestion.normalization.urlopen", fake_urlopen)
+
+    result = fetch_url_text("https://example.com/page", timeout_seconds=2.5)
+
+    assert seen["timeout"] == 2.5
+    assert result.url == "https://example.com/page"
+    assert result.text == "Body https://example.com/body"
+    assert result.title == "T"
+    assert result.linked_urls == ["https://example.com/body"]
+
+
+def test_fetch_url_text_propagates_url_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: object, timeout: float) -> object:
+        raise URLError("network down")
+
+    monkeypatch.setattr("phosphene.source_ingestion.normalization.urlopen", fake_urlopen)
+
+    with pytest.raises(URLError, match="network down"):
+        fetch_url_text("https://example.com/page", timeout_seconds=2.5)
+
+
+def test_marker_ordering_handles_none_numbers_datetimes_and_strings() -> None:
+    early = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    late = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    assert is_marker_newer(1, None) is True
+    assert is_marker_newer(2, 1) is True
+    assert is_marker_newer(1, 2) is False
+    assert is_marker_newer(late, early) is True
+    assert is_marker_newer("b", "a") is True
+    assert marker_sort_key(None) < marker_sort_key(0)
