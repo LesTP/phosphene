@@ -57,6 +57,19 @@ Replaced the manager polling stubs with ordered enabled-adapter polling, specifi
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 21 tests pass.
 
+### Step 3.1.4: Shared content normalization helpers
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added shared Source Ingestion normalization helpers for deterministic HTTP(S) URL extraction, configured content truncation, duplicate link removal, and `ContentItem` assembly that preserves timestamps and metadata without performing any network fetching. The helper keeps explicit adapter-provided links, optionally extracts links from content and human annotations according to `IngestionConfig.extract_links`, and applies `IngestionConfig.max_content_length` before emitting the public dataclass.
+
+Added focused normalization tests covering ordered URL extraction, empty text handling, truncation behavior, negative length rejection, metadata/timestamp preservation, human annotation link extraction, and disabled automatic link extraction.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 27 tests pass.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
