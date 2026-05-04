@@ -99,6 +99,24 @@ Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_in
 - Should fix: none.
 - Optional: none recorded.
 
+### Phase 3.1 Completion: Source Ingestion contract and adapter foundation
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Phase 1 of Module 3 (Source Ingestion). Final verification ran the Source Ingestion slice with the documented dependency path: `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 33 tests pass.
+
+Phase 1 delivered the Source Ingestion public package foundation: ARCH-aligned dataclasses and exports, config validation, adapter protocol and registry boundary, manager polling orchestration, per-adapter error reporting, in-memory last-seen marker handoff, deterministic content/link normalization helpers, and focused unit tests. Live Telegram/RSS/Reddit/API fetching, human-share URL fetching, corpus archive parsing, and persisted marker storage remain deferred to later Source Ingestion phases.
+DEVLOG learning review: Phase 3.1 landed linearly across one plan, five implementation steps, and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 3.1 step entries and review recorded no contract changes. D-30 and D-31 document the accepted adapter-foundation scope; no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 3 Phase 1 iterations 62-68 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary, kept Module 3 active, and cleared active frontmatter pending human audit before Module 3 Phase 2 planning.
+ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
+
+<!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
@@ -190,8 +208,6 @@ Contract Changes scan: Phase 4 step entries and review recorded no contract chan
 Log review: `logs/loop/summary.log` shows Module 2 Phase 4 iterations 52-57 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
 DEVPLAN cleanup: reduced Phase 4 to a one-line completion summary, marked Module 2 complete, and cleared active frontmatter pending human audit before Module 3 planning.
 ARCHITECTURE.md: Attention Filter row in the Implementation Sequence table updated from "Phase 3 complete" to "Complete".
-
-<!-- HISTORY — do not read past this line. Completed entries kept for audit. -->
 
 ## Phase 2.3 Plan: LLM Phase 1 scoring and assertion extraction
 
