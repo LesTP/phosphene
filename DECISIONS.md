@@ -224,3 +224,10 @@ Priority: Important
 Decision: Accept Module 3 Phase 1 as architecturally aligned with no required code fixes. The reviewed output intentionally provides the Source Ingestion public contract, validation, registry/protocol boundary, manager polling orchestration, in-memory last-seen marker handoff, per-adapter error reporting, and deterministic normalization helpers while leaving live fetchers, corpus parsers, and persisted marker storage for later phases.
 Rationale: This preserves the D-30 foundation boundary and avoids implementing network, API, archive, or persistence behavior before concrete adapters define their source-specific needs. Focused Source Ingestion tests pass, and the current implementation remains a leaf module with no toolkit or Memory Store dependency.
 Revisit if: A concrete adapter needs durable marker state earlier than the planned persistence/integration hardening phase, or if source-specific fetching reveals that the internal adapter protocol needs a public result-shape change.
+
+D-32: Module 3 Phase 1.5 review accepts instrumentation-only coverage baseline
+Date: 2026-05-04 | Status: Closed
+Priority: Normal
+Decision: Accept Module 3 Phase 1.5 as complete from a review standpoint with no required fixes. The reviewed output intentionally limits the phase to coverage tooling metadata and baseline reporting: `pytest-cov` is listed as a dev dependency, installed in the existing `.python_deps` workflow, and the reproducible full-suite coverage command records 310 passing tests with 98% total coverage.
+Rationale: The phase was inserted only to retire the deferred coverage-tooling investment at a clean boundary between Source Ingestion Phase 1 and Phase 2 planning. It does not change Source Ingestion behavior, source code, or tests, and all tracked module baselines remain above the 80% follow-up threshold.
+Revisit if: Future modules add enough untested behavior to push a tracked module below the 80% threshold or if the test environment changes away from the `.python_deps` target workflow.

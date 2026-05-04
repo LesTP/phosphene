@@ -133,6 +133,22 @@ Module coverage baseline:
 
 No module is below the 80% follow-up threshold.
 
+## Phase 3.1.5 Review — Coverage Tooling Infra
+
+**Date:** 2026-05-04
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 3 Phase 1.5 against its instrumentation-only scope; no must-fix or should-fix changes were required.
+
+Validated that the phase added `pytest-cov` to project dev dependencies, captured a reproducible baseline coverage report, and avoided `src/` or `tests/` modifications. The baseline remains above the 80% follow-up threshold for `memory_store`, `attention_filter`, and `source_ingestion`.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing` (310 passed, 98% total coverage).
+
+### Findings
+- Must fix: none.
+- Should fix: none.
+- Optional: none recorded.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
