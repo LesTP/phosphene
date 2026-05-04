@@ -63,10 +63,38 @@ def test_source_ingestion_accepts_valid_arch_adapter_configs() -> None:
     assert manager._get_adapter_config("feed").adapter_type == "rss"
 
 
+def test_source_ingestion_accepts_telegram_channel_id_alternative() -> None:
+    manager = SourceIngestion(
+        _config(
+            AdapterConfig(
+                adapter_type="telegram_channel",
+                source_label="telegram",
+                credentials={"bot_token": "token"},
+                params={"channel_id": "12345"},
+            )
+        )
+    )
+
+    assert manager._get_adapter_config("telegram").params == {"channel_id": "12345"}
+
+
 def test_source_ingestion_rejects_unknown_adapter_type() -> None:
     with pytest.raises(AdapterConfigError, match="unknown adapter_type"):
         SourceIngestion(
             _config(AdapterConfig(adapter_type="webhook", source_label="unknown"))
+        )
+
+
+def test_source_ingestion_rejects_empty_source_label() -> None:
+    with pytest.raises(AdapterConfigError, match="source_label is required"):
+        SourceIngestion(
+            _config(
+                AdapterConfig(
+                    adapter_type="rss",
+                    source_label="",
+                    params={"feed_url": "https://example.com/feed.xml"},
+                )
+            )
         )
 
 
@@ -178,6 +206,12 @@ def test_poll_all_filters_disabled_adapters() -> None:
             )
         )
     )
+
+    assert manager.poll() == []
+
+
+def test_poll_all_with_no_adapters_returns_empty_results() -> None:
+    manager = SourceIngestion(_config())
 
     assert manager.poll() == []
 

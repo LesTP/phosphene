@@ -3,7 +3,7 @@ module: SOURCE_INGESTION
 phase: 1
 phase_title: Source Ingestion contract and adapter foundation
 step: 3.1.5
-mode: Discuss
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 1: Source Ingestion contract and adapter foundation
-- **Focus** — Step 3.1.5: focused Source Ingestion unit tests
+- **Focus** — Module 3 Phase 1 implementation complete; ready for phase review
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -76,6 +76,6 @@ Build the `phosphene.source_ingestion` package foundation as a leaf module with 
 - [x] **Step 3.1.2** — Add config validation and adapter lookup semantics, including unknown adapter types, duplicate labels, missing required params/credentials, enabled filtering, and `AdapterNotFoundError`.
 - [x] **Step 3.1.3** — Implement the internal adapter protocol/registry and manager polling orchestration with deterministic fake adapters for tests, per-adapter `IngestionResult` assembly, and per-item error capture.
 - [x] **Step 3.1.4** — Add shared normalization helpers for URL extraction, content truncation, timestamp preservation, and `ContentItem` assembly without network fetching.
-- [ ] **Step 3.1.5** — Add focused Source Ingestion unit tests covering public exports, config defaults, manager behavior, adapter errors, normalization helpers, and empty/no-enabled-adapter polling.
+- [x] **Step 3.1.5** — Add focused Source Ingestion unit tests covering public exports, config defaults, manager behavior, adapter errors, normalization helpers, and empty/no-enabled-adapter polling.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

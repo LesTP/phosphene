@@ -70,6 +70,19 @@ Added focused normalization tests covering ordered URL extraction, empty text ha
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 27 tests pass.
 
+### Step 3.1.5: Focused Source Ingestion unit tests
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Expanded focused Source Ingestion coverage across the Phase 1 foundation without changing implementation. Added tests for the alternate Telegram channel-id config path, empty source-label rejection, empty adapter polling, explicit polling of disabled adapters, pending ARCH adapter error wrapping, zero-length truncation, and link deduplication across explicit and extracted sources.
+
+The existing public export/default, config validation, manager orchestration, adapter error, normalization, and empty/no-enabled polling coverage now anchors the Phase 1 contract before review. Live network/API fetching and corpus parsing remain out of scope for this phase.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 33 tests pass.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03

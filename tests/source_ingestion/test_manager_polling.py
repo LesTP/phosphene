@@ -103,6 +103,28 @@ def test_poll_all_uses_enabled_adapters_in_config_order(
     assert fake_registry["disabled"].seen_markers == []
 
 
+def test_poll_once_can_poll_disabled_adapter_by_explicit_label(
+    fake_registry: dict[str, FakeAdapter],
+) -> None:
+    manager = SourceIngestion(
+        IngestionConfig(
+            adapters=[
+                AdapterConfig(
+                    adapter_type="fake_source",
+                    source_label="disabled",
+                    enabled=False,
+                ),
+            ]
+        )
+    )
+
+    result = manager.poll_once("disabled")
+
+    assert result.adapter_label == "disabled"
+    assert [item.content for item in result.items] == ["disabled item"]
+    assert fake_registry["disabled"].seen_markers == [None]
+
+
 def test_poll_specific_adapter_wraps_adapter_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -122,3 +144,25 @@ def test_poll_specific_adapter_wraps_adapter_exception(
     assert result.errors[0].adapter_label == "failing"
     assert result.errors[0].url is None
     assert result.errors[0].error == "adapter broke"
+
+
+def test_pending_arch_adapter_error_is_reported_in_result() -> None:
+    manager = SourceIngestion(
+        IngestionConfig(
+            adapters=[
+                AdapterConfig(
+                    adapter_type="rss",
+                    source_label="feed",
+                    params={"feed_url": "https://example.com/feed.xml"},
+                )
+            ]
+        )
+    )
+
+    result = manager.poll_once("feed")
+
+    assert result.items == []
+    assert result.adapter_label == "feed"
+    assert result.errors[0].adapter_label == "feed"
+    assert result.errors[0].url is None
+    assert result.errors[0].error == "rss adapter is not implemented"

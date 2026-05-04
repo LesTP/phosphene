@@ -30,6 +30,7 @@ def test_extract_urls_ignores_empty_text() -> None:
 def test_truncate_content_applies_configured_character_limit() -> None:
     assert truncate_content("abcdef", 4) == "abcd"
     assert truncate_content("abcdef", 6) == "abcdef"
+    assert truncate_content("abcdef", 0) == ""
 
 
 def test_truncate_content_rejects_negative_limit() -> None:
@@ -76,3 +77,19 @@ def test_build_content_item_can_disable_link_extraction() -> None:
     )
 
     assert item.linked_urls == ["https://example.com/explicit"]
+
+
+def test_build_content_item_deduplicates_explicit_and_extracted_links() -> None:
+    item = build_content_item(
+        content="Read https://example.com/a and https://example.com/b",
+        source="rss",
+        timestamp=datetime(2026, 1, 1),
+        config=IngestionConfig(adapters=[]),
+        linked_urls=["https://example.com/b", "https://example.com/a"],
+        human_annotation="same https://example.com/a",
+    )
+
+    assert item.linked_urls == [
+        "https://example.com/b",
+        "https://example.com/a",
+    ]
