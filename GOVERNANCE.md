@@ -163,8 +163,15 @@ Organize findings as:
 4. **Log review** — review iteration logs (summary.log, transcripts) for this phase. Identify patterns: repeated tool failures, wasted turns, behavioral issues. Promote findings to DEVPLAN Gotchas.
 5. **Contract scan** — scan DEVLOG for Contract Changes markers. List affected upstream documents and propagate (see Contract Changes under Rules).
 6. **DEVPLAN cleanup** — reduce completed phase to a one-line summary with DEVLOG reference. If DEVLOG exceeds ~500 lines, archive completed module entries to `DEVLOG_archive.md`.
-7. Update module Status in ARCHITECTURE.md's Implementation Sequence table. Format: "Phase N complete" after each phase, or "Complete" if this was the module's final phase. Reset DEVPLAN frontmatter for the next phase (or clear it if module is done).
-8. Present summary of everything done and everything needing confirmation.
+7. Update module Status in ARCHITECTURE.md's Implementation Sequence table. Format: "Phase N complete" after each phase, or "Complete" if this was the module's final phase.
+8. Update DEVPLAN frontmatter to reflect completed state:
+   - `phase: null`, `step: null`, `mode: Complete`, `review_done: false`
+   - `phase_title`: describe what was completed and what's next (e.g. "Module 2 complete — Module 3 (Source Ingestion) next")
+   - `blocked: "awaiting-human-audit"`
+   - If this was the project's final module: `module: null`, `phase_title: "All modules complete"`, `blocked: "awaiting-human-audit"`
+   - Update the Current Status prose section to match: Phase = "Module N complete", Focus = "Awaiting human audit before Module N+1 planning".
+   The `/close` bot command clears the audit gate by setting `blocked: null`.
+9. Present summary of everything done and everything needing confirmation.
 
 **Supervised:** Do not commit. Wait for explicit human confirmation.
 **Autonomous:** Commit. Exit with ESCALATE — human audits before next phase begins.
@@ -208,6 +215,13 @@ Under autonomous execution, three consecutive failures on the same problem is a 
 
 Under autonomous execution, contract changes that would affect other modules are a hard stop — the agent flags them in DECISIONS.md, exits with ESCALATE, and the human decides propagation.
 
+**Test propagation:** When a contract change crosses a module boundary that is already built (i.e., a downstream consumer module has been implemented and tested against a Fake/double of the changed contract), propagation includes test work, not just doc work:
+1. Update the consumer's test double (Fake, stub, monkeypatched object) to match the new contract signature.
+2. Run or add a boundary test that exercises the real producer implementation through the consumer's call path (no fakes between them). One test per crossed boundary is enough — the goal is to catch Fake-vs-real drift, not to re-test either side's internals.
+3. Both updates land in the same commit as the contract change so the test trail mirrors the doc trail.
+
+This is mechanism-driven: cost is paid only when a contract actually moves, not as a per-phase chore.
+
 **Cross-cutting tracks** should declare their upstream document scope in the DEVPLAN Cold Start Summary.
 
 **Upstream revision protocol:**
@@ -248,12 +262,14 @@ module: RENDERING_UI
 phase: 3b
 phase_title: Hit-test math
 step: 2 of 5
-mode: Discuss | Code | Debug | Review
-blocked: null
+mode: Discuss | Code | Debug | Review | Complete
+blocked: null | "awaiting-human-audit" | "<description>"
 regime: Build | Refine | Explore
 review_done: false
 ---
 ```
+
+`blocked: "awaiting-human-audit"` is the phase-boundary gate set by the worker during Phase Complete. The `/close` bot command clears it by setting `blocked: null`, unblocking the next iteration.
 
 This block mirrors the Cold Start Summary and Current Status below it. Update both together. The frontmatter is the parse target for tooling; the prose sections remain the authoritative reference for cold-start sessions.
 
@@ -310,6 +326,8 @@ Before integrating modules A and B:
 3. **Bridge logic** — document any adapter/conversion needed
 
 No module imports from the integration/orchestration layer. Subsystems do not import from each other except for shared types from upstream dependencies.
+
+**When to apply:** When a phase first introduces use of an already-built upstream module (i.e., the consumer module has been depending on Fakes/test doubles up to this point), the boundary test step belongs in that phase's plan — typically as the first step or alongside the first step that exercises the real upstream API. Pair this with the **Test propagation** rule under Contract Changes: boundary tests written here are the same ones that get re-run when the upstream contract later changes.
 
 **Shortcut:** `/integration-check`
 

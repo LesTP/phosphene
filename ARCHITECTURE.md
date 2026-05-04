@@ -79,6 +79,17 @@ The following are in PROJECT.md's flexible-scope `[in]` set but have no numbered
 
 Both are flagged as load-bearing for downstream concerns (Reviewer Panel for `Reviewer Panel Calibration` in PROJECT.md Risks; Model Router for the `Subscription rotation strategy` cost model in Constraints), so the deferral is about timing, not importance. See D-10.
 
+### Deferred Test Investments
+
+Test-debt items recognised but not scheduled. Each has an explicit promote-when trigger so it stops being invisible when the trigger fires. Same shape as the components table above.
+
+| Investment | Promote when | Status |
+|------------|--------------|--------|
+| Real-adapter integration tests for Source Ingestion (Telegram / RSS / Reddit / corpus) | Concrete adapters land in Module 3 Phase 2+. Each adapter's PR includes at least one test that hits the real API surface (recorded fixture or live, depending on adapter), not just the FakeAdapter path. | Deferred — Phase 1 (foundation) intentionally uses fakes only. |
+| LLM prompt/parse round-trip tests for Attention Filter | A model upgrade is planned, OR a production parsing failure is observed, OR before Generator (Module 5) ships (since Generator inherits the same prompt/parse risk surface). | Deferred — current FakeLLM tests verify control flow but not the actual prompt strings or JSON-parse-on-real-output. |
+| Property-based tests (decay, scoring blends, normalization helpers) | A bug is found in one of these areas that example-based tests missed, OR before any of these algorithms is changed in a non-trivial way (the property tests then act as regression armour for the change). | Deferred — example-based coverage is currently sufficient and property tests have a non-trivial setup cost (hypothesis dependency, strategy design). |
+| Coverage tooling (pytest-cov + baseline report) | Next phase boundary (between Module 3 Phase 1 and Phase 2 plan). Folded in as a one-step infra iter or as step 0 of the next phase plan, not mid-phase. | Deferred until phase boundary — adding mid-phase would mix infra with feature work. |
+
 ## Coupling Notes
 
 - Memory Store ↔ most modules: **tight by necessity** — it is the shared state. All reads go through the index layer; writes go through typed APIs. No module reads raw files directly.
