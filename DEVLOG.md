@@ -105,6 +105,17 @@ Implemented local-file `corpus_text` and `corpus_blog` adapters behind the exist
 
 Adapter failures remain inside `IngestionResult.errors`, including invalid archive paths and per-file parse/read errors. Last-seen marker advancement is deterministic for local archive items, and content truncation continues to happen through the shared normalization path so links survive max-content clipping. Focused tests cover plain text, markdown frontmatter, HTML metadata/link extraction, recursive directory import, invalid path reporting, marker suppression, and max-content truncation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (51 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (328 passed).
 
+### Step 3.2.4: Structured corpus adapters
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `corpus_livejournal`, `corpus_twitter`, and `corpus_conversations` behind the existing Source Ingestion manager/registry contract. LiveJournal imports reuse the local HTML archive parser with the `corpus_livejournal` source. Twitter/X imports support representative JSON and JavaScript archive files, normalize tweet timestamps/authors, fetch linked article content when available, preserve tweet text as `human_annotation`, keep expanded URLs in linked context, and report inaccessible linked URLs as per-item errors with an annotation fallback item. Conversation imports support JSON and text archives while preserving conversation title and message author metadata where available.
+
+No public dataclasses or manager signatures changed. Last-seen markers remain adapter-local and deterministic for archive items. Focused tests cover minimal LiveJournal export parsing, linked-tweet fetch behavior, retweet/no-comment handling, inaccessible linked URL fallback, conversation metadata preservation, and marker advancement. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (57 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (334 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
