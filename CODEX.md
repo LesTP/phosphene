@@ -24,6 +24,14 @@ fence) in a **single command**:
 cat CODEX.md && echo '---SPLIT---' && cat WORKER_SPEC.md && echo '---SPLIT---' && awk '/<!-- HISTORY -->/{exit} {print}' DEVPLAN.md
 ```
 
+**DEVLOG.md fence:** When reading or writing to DEVLOG.md, stop at the
+`<!-- HISTORY` fence. Insert new entries **above** the fence line. Do not read
+or patch content below it.
+
+```bash
+awk '/<!-- HISTORY -->/{exit} {print}' DEVLOG.md
+```
+
 ### Tier 2 — Current module (mandatory for step/review/complete actions)
 
 After determining the active module from DEVPLAN's Current Status, read the

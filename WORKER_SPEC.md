@@ -45,7 +45,7 @@ Execute **exactly one** of the following actions per iteration:
 | **Phase Plan** | No active phase for the current module | Break the phase into steps. Update DEVPLAN with the step breakdown. Commit. Exit. |
 | **Step Execution** | A phase is in progress with remaining steps | Pick the next step from DEVPLAN. Do all file read/write work. Run builds, tests, git operations. Mark the step done in DEVPLAN. Commit. Exit. |
 | **Phase Review** | All steps in the current phase are complete | Review the phase output against the architecture contract. Log decisions to DECISIONS.md. Update DEVPLAN "Next" pointer to Phase Complete. Commit review artifacts. Exit. |
-| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Commit. Exit. |
+| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Update DEVPLAN frontmatter to completed state with `blocked: "awaiting-human-audit"` and `phase_title` indicating what was completed and what comes next. The `/close` bot command (or human) clears the gate. Commit. Exit. |
 
 ---
 
@@ -70,7 +70,11 @@ to do one thing correctly, not to do everything.
 Every iteration that modifies project state must leave an auditable trail:
 
 - **DEVPLAN.md** — update step status, mark completions, record blockers.
-- **DEVLOG.md** — append a dated entry describing what was done and why.
+- **DEVLOG.md** — add a dated entry describing what was done and why.
+  DEVLOG.md uses a `<!-- HISTORY` fence. New entries go **above** the fence,
+  below existing current-phase entries. Do not read or edit content below the
+  fence. During Phase Complete, move the **previous** phase's entries below
+  the fence into history — only the just-completed phase should remain above it.
 - **DECISIONS.md** — log any non-trivial design or implementation decision
   with rationale.
 - **ARCHITECTURE.md** — update the implementation sequence table when a phase
