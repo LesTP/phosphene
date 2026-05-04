@@ -94,6 +94,17 @@ Implemented the concrete `rss` adapter behind the existing Source Ingestion mana
 
 Kept the public `SourceIngestion(config)` API stable while allowing internal concrete factories to receive the global `IngestionConfig`; existing one-argument fake factory seams continue to work. Focused tests cover RSS fixtures, Atom fixtures, duplicate suppression by marker, malformed feed/error reporting, network failure conversion, and disabled adapter behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (45 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (322 passed).
 
+### Step 3.2.3: Local corpus text and blog adapters
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented local-file `corpus_text` and `corpus_blog` adapters behind the existing Source Ingestion manager/registry contract. The text adapter imports UTF-8 `.txt`/`.text` files from a file or recursive directory and splits content on paragraph boundaries. The blog adapter imports markdown or HTML archives according to the existing `params.format` value, preserving titles, author metadata where available, ISO publication timestamps where discoverable, local source paths, stable source fields, and extracted links.
+
+Adapter failures remain inside `IngestionResult.errors`, including invalid archive paths and per-file parse/read errors. Last-seen marker advancement is deterministic for local archive items, and content truncation continues to happen through the shared normalization path so links survive max-content clipping. Focused tests cover plain text, markdown frontmatter, HTML metadata/link extraction, recursive directory import, invalid path reporting, marker suppression, and max-content truncation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (51 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (328 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
