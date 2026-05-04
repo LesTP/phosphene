@@ -217,3 +217,10 @@ Priority: Important
 Decision: Module 3 Phase 1 will implement the Source Ingestion public dataclasses, errors, package exports, config validation, manager polling orchestration, adapter registry boundary, and deterministic normalization helpers before adding concrete Telegram, RSS, Reddit, human-share, or corpus archive fetchers.
 Rationale: `ARCH_source_ingestion.md` defines many external adapters and archive formats behind one uniform contract. Building the manager and adapter boundary first gives later network and corpus adapters a small tested surface, keeps the module leaf-like, and avoids hiding API, parsing, and state-marker failures inside the initial package scaffold.
 Revisit if: A concrete adapter needs public configuration or result-shape changes that cannot fit the registry/protocol boundary.
+
+D-31: Module 3 Phase 1 review accepts adapter-foundation scope
+Date: 2026-05-04 | Status: Closed
+Priority: Important
+Decision: Accept Module 3 Phase 1 as architecturally aligned with no required code fixes. The reviewed output intentionally provides the Source Ingestion public contract, validation, registry/protocol boundary, manager polling orchestration, in-memory last-seen marker handoff, per-adapter error reporting, and deterministic normalization helpers while leaving live fetchers, corpus parsers, and persisted marker storage for later phases.
+Rationale: This preserves the D-30 foundation boundary and avoids implementing network, API, archive, or persistence behavior before concrete adapters define their source-specific needs. Focused Source Ingestion tests pass, and the current implementation remains a leaf module with no toolkit or Memory Store dependency.
+Revisit if: A concrete adapter needs durable marker state earlier than the planned persistence/integration hardening phase, or if source-specific fetching reveals that the internal adapter protocol needs a public result-shape change.

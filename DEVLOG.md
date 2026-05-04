@@ -83,6 +83,22 @@ The existing public export/default, config validation, manager orchestration, ad
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion`; 33 tests pass.
 
+## Phase 3.1 Review — Source Ingestion Contract and Adapter Foundation
+
+**Date:** 2026-05-04
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 3 Phase 1 against `ARCH_source_ingestion.md`; no must-fix or should-fix code changes were required.
+
+Validated that Phase 1 remains limited to the public Source Ingestion dataclasses and exports, config validation, adapter registry boundary, manager polling orchestration, per-adapter error reporting, in-memory last-seen marker handoff, and shared normalization helpers. Live Telegram/RSS/Reddit/API fetching, human-share URL fetching, corpus archive parsing, and persisted marker storage remain out of scope for this foundation phase.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (33 passed).
+
+### Findings
+- Must fix: none.
+- Should fix: none.
+- Optional: none recorded.
+
 ## Phase 2.4 Plan: Full batch orchestration and annotation output
 
 **Date:** 2026-05-03
