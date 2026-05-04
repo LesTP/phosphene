@@ -59,6 +59,17 @@ Log review: `logs/loop/summary.log` shows Module 3 Phase 1.5 iterations 70-71 co
 DEVPLAN cleanup: reduced Phase 1.5 to a one-line completion summary, kept Module 3 active, and cleared active frontmatter pending human audit before Module 3 Phase 2 planning.
 ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 1.5 complete"; Deferred Test Investments coverage-tooling row marked complete with baseline numbers.
 
+### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 3 Phase 2 as a Build phase over concrete Source Ingestion adapters while preserving the Phase 1 public manager/result contract. The plan starts with shared adapter utilities and registry hardening, then builds RSS/Atom, local corpus text/blog, structured corpus exports, human-share, Telegram channel, Reddit, and persistence/integration hardening.
+
+Scope decision recorded in D-33: durable marker persistence remains Source Ingestion-owned during this phase. If implementing durable markers would require a Memory Store dependency or public cross-module contract change, the worker should record the issue during review rather than expanding dependencies inside the phase.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

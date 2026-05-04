@@ -1,10 +1,10 @@
 ---
 module: SOURCE_INGESTION
-phase: null
-phase_title: Coverage tooling infra complete — Module 3 Phase 2 next
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+phase: 2
+phase_title: Concrete adapters, human-share, and corpus import
+step: 3.2.1
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -31,9 +31,9 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 3 Phase 1.5 (infra) complete
-- **Focus** — Awaiting human audit before Module 3 Phase 2 planning
-- **Blocked/Broken** — awaiting-human-audit
+- **Phase** — Module 3 Phase 2 in progress
+- **Focus** — Step 3.2.1: shared adapter utilities and registry hardening
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
@@ -75,5 +75,38 @@ Delivered ARCH-aligned public dataclasses/exports, config validation, adapter pr
 ### Phase 1.5 (complete): Coverage tooling infra
 
 Added `pytest-cov` dev tooling and captured the full-suite baseline: 310 tests pass, 98% total coverage, no tracked module below 80%. Reviewed and completed. See DEVLOG "Phase 3.1.5 Review" and "Phase 3.1.5 Completion" entries.
+
+### Phase 2 (in progress): Concrete adapters, human-share, and corpus import
+
+Build concrete Source Ingestion adapters behind the Phase 1 manager/registry contract, keeping the public `ContentItem` / `IngestionResult` shape stable. Scope includes shared fetch/extraction utilities, autonomous adapters, human-share handling, corpus import adapters, and persistence/integration hardening where it does not introduce a Memory Store dependency.
+
+- [ ] **Step 3.2.1 — Shared adapter utilities and registry hardening**
+  - Add test-covered internal registration seams for concrete adapter factories without exposing a new public API.
+  - Add shared utilities needed by multiple adapters: URL/page text fetch abstraction, HTML-to-text extraction, deterministic timestamp/marker comparison helpers, and adapter-local error conversion.
+  - Tests: registry construction with concrete/fake factories, URL extraction/fetch fallback behavior, content truncation/link extraction preservation, marker ordering edge cases.
+- [ ] **Step 3.2.2 — RSS/Atom adapter**
+  - Implement `rss` adapter for feed URL polling, entry normalization, publication timestamp handling, title/author/url population, and last-seen marker advancement.
+  - Keep network failures inside `IngestionResult.errors`.
+  - Tests: RSS and Atom fixtures, duplicate suppression by marker, malformed feed/error reporting, disabled adapter unchanged.
+- [ ] **Step 3.2.3 — Local corpus text and blog adapters**
+  - Implement `corpus_text` plus `corpus_blog` markdown/html archive readers using local files/directories only.
+  - Preserve titles, timestamps when discoverable, section/paragraph splitting where appropriate, and stable source fields.
+  - Tests: plain text, markdown, HTML fixtures, recursive directory import, invalid path/error handling, max-content truncation.
+- [ ] **Step 3.2.4 — Structured corpus adapters**
+  - Implement `corpus_livejournal`, `corpus_twitter`, and `corpus_conversations` for representative exported archive formats.
+  - Treat tweets-with-links as human annotation plus linked content when fetchable; preserve conversation metadata as title/author/source context when available.
+  - Tests: minimal export fixtures per adapter, retweet/no-comment handling, inaccessible linked URL fallback, timestamp ordering.
+- [ ] **Step 3.2.5 — Human-share adapter**
+  - Implement `human_share` polling through the Telegram toolkit boundary, with URL-only, URL-plus-text, and text-only normalization.
+  - Preserve `human_annotation`, populate `linked_urls`, and produce a fallback item when URL fetch fails but the share itself has signal.
+  - Tests: fake Telegram client messages for all three message shapes, page fetch success/failure, marker advancement, per-item errors.
+- [ ] **Step 3.2.6 — Telegram channel and Reddit adapters**
+  - Implement `telegram_channel` via `toolkit/telegram_client` and `reddit` via a small HTTP/API boundary.
+  - Normalize message text/captions/forwarded content and Reddit self/link posts without ingesting comments.
+  - Tests: fake toolkit/API clients, credential/param validation integration, sort handling, API failure conversion.
+- [ ] **Step 3.2.7 — Persistence and integration hardening**
+  - Add durable last-seen marker handling only if it can remain Source Ingestion-owned and avoid a Memory Store import; otherwise record the contract issue for review instead of expanding dependencies.
+  - Add cross-adapter manager tests that poll mixed adapter sets, preserve per-adapter markers, and verify full-suite coverage remains above the established threshold.
+  - Tests: focused `tests/source_ingestion`, then full suite with coverage command from Cold Start Summary.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
