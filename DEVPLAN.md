@@ -1,10 +1,10 @@
 ---
 module: SOURCE_INGESTION
-phase: null
-phase_title: Source Ingestion Phase 1 complete — Module 3 Phase 2 next
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+phase: 1.5
+phase_title: Coverage tooling infra (Module 3 Phase 1 → Phase 2 boundary)
+step: 3.1.5.infra
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -31,9 +31,9 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 3 Phase 1 complete; awaiting human audit before Module 3 Phase 2 planning
-- **Focus** — Source Ingestion foundation is complete: public contract, validation, adapter registry, polling orchestration, normalization helpers, and focused tests
-- **Blocked/Broken** — Awaiting human audit
+- **Phase** — Module 3 Phase 1.5 (infra): coverage tooling baseline before Phase 2 planning
+- **Focus** — Step 3.1.5.infra: add `pytest-cov`, capture baseline coverage report
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
@@ -71,5 +71,17 @@ Planned phases follow `ARCH_source_ingestion.md`: first stabilize the public con
 ### Phase 1 (complete): Source Ingestion contract and adapter foundation
 
 Delivered ARCH-aligned public dataclasses/exports, config validation, adapter protocol/registry, manager polling orchestration, per-adapter error reporting, in-memory last-seen marker handoff, deterministic normalization helpers, and focused unit tests. Reviewed and completed. See DEVLOG "Phase 3.1 Review" and "Phase 3.1 Completion" entries.
+
+### Phase 1.5 (active): Coverage tooling infra
+
+Project-level infra step inserted at the Module 3 Phase 1 → Phase 2 boundary, per the "Coverage tooling" entry in ARCHITECTURE.md "Deferred Test Investments". Single isolated step. Not a Source Ingestion logic change — instrumentation only, no source or test code modifications.
+
+- [ ] **Step 3.1.5.infra** — Add `pytest-cov` to `pyproject.toml` dev dependencies, install it into the existing `.python_deps/` target (`pip install --target .python_deps pytest-cov`), then run a baseline coverage report:
+
+  ```bash
+  PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing
+  ```
+
+  Capture the baseline numbers in a DEVLOG entry — overall coverage % plus per-module breakdown (memory_store, attention_filter, source_ingestion). Note any module below 80% as a follow-up worth flagging (do not fix in this step). Commit the `pyproject.toml` change and the DEVLOG entry. Do NOT modify any `src/` or `tests/` files — purpose is purely instrumentation and baseline capture.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
