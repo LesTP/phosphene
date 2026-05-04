@@ -115,6 +115,24 @@ Log review: `logs/loop/summary.log` shows Module 3 Phase 1 iterations 62-68 comp
 DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary, kept Module 3 active, and cleared active frontmatter pending human audit before Module 3 Phase 2 planning.
 ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
 
+### Step 3.1.5.infra: Coverage tooling baseline
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added `pytest-cov` to the project dev dependency set and installed it into the existing `.python_deps/` target for the documented non-venv test workflow. No `src/` or `tests/` files were modified.
+
+Captured the baseline coverage report with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing`; 310 tests pass. Overall coverage is 98%.
+
+Module coverage baseline:
+- `memory_store`: 507 statements, 8 missed, 98% coverage.
+- `attention_filter`: 485 statements, 14 missed, 97% coverage.
+- `source_ingestion`: 197 statements, 2 missed, 99% coverage.
+
+No module is below the 80% follow-up threshold.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Phase 2.4 Plan: Full batch orchestration and annotation output

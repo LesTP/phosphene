@@ -1,8 +1,8 @@
 ---
 module: SOURCE_INGESTION
 phase: 1.5
-phase_title: Coverage tooling infra (Module 3 Phase 1 → Phase 2 boundary)
-step: 3.1.5.infra
+phase_title: Coverage tooling infra ready for review
+step: 3.1.5.review
 mode: Build
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 1.5 (infra): coverage tooling baseline before Phase 2 planning
-- **Focus** — Step 3.1.5.infra: add `pytest-cov`, capture baseline coverage report
+- **Focus** — Phase 1.5 review: coverage tooling baseline captured
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -76,7 +76,7 @@ Delivered ARCH-aligned public dataclasses/exports, config validation, adapter pr
 
 Project-level infra step inserted at the Module 3 Phase 1 → Phase 2 boundary, per the "Coverage tooling" entry in ARCHITECTURE.md "Deferred Test Investments". Single isolated step. Not a Source Ingestion logic change — instrumentation only, no source or test code modifications.
 
-- [ ] **Step 3.1.5.infra** — Add `pytest-cov` to `pyproject.toml` dev dependencies, install it into the existing `.python_deps/` target (`pip install --target .python_deps pytest-cov`), then run a baseline coverage report:
+- [x] **Step 3.1.5.infra** — Add `pytest-cov` to `pyproject.toml` dev dependencies, install it into the existing `.python_deps/` target (`pip install --target .python_deps pytest-cov`), then run a baseline coverage report:
 
   ```bash
   PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing
