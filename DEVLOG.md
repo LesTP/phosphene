@@ -103,6 +103,17 @@ Log review: `logs/loop/summary.log` shows Module 4 Phase 2 iterations 91-97 comp
 DEVPLAN cleanup: reduced Phase 2 to a one-line completion summary and set frontmatter to await human audit before Module 5 planning.
 ARCHITECTURE.md: Gateway row in the Implementation Sequence table updated from "Phase 2 in progress" to "Complete".
 
+### Phase 5.1 Plan: Contract and routing foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 5 Phase 1 as a Build phase over the Generator + Output Router foundation. The plan starts with ARCH-aligned public dataclasses, errors, exports, and validation, then implements stateless Memory Store personality-context loading and empty-personality behavior, deterministic Output Router delivery decisions through fake Gateway instances, and integration coverage proving the foundation stays read-only against Memory Store and credential-free.
+
+Scope decision recorded in D-39: Phase 1 deliberately excludes live LLM generation, skeptical memory verification, and real prompt/parse behavior while preserving interface room for Tier 2 relevance and embedding boundaries. Those behaviors remain for later Generator phases once the public contract and Gateway routing surface are stable.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
