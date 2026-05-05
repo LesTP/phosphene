@@ -116,6 +116,17 @@ Implemented `corpus_livejournal`, `corpus_twitter`, and `corpus_conversations` b
 
 No public dataclasses or manager signatures changed. Last-seen markers remain adapter-local and deterministic for archive items. Focused tests cover minimal LiveJournal export parsing, linked-tweet fetch behavior, retweet/no-comment handling, inaccessible linked URL fallback, conversation metadata preservation, and marker advancement. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (57 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (334 passed).
 
+### Step 3.2.5: Human-share adapter
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the concrete `human_share` adapter behind the existing Source Ingestion manager/registry contract. The adapter polls a dedicated Telegram toolkit boundary lazily, normalizes URL-only, URL-plus-text, and text-only share messages, preserves human annotations and sender metadata where available, fetches primary shared URLs through the shared page-fetch utility, and reports page-fetch failures as per-item errors while still producing a fallback `ContentItem` when the share itself has signal.
+
+No public dataclasses or manager signatures changed. Last-seen markers remain manager-owned and adapter-local, and the toolkit dependency stays behind an internal boundary so tests use fake Telegram clients without importing external services. Focused tests cover fake Telegram messages for all three message shapes, page fetch success/failure, annotation/link preservation, marker advancement, and ignored non-target chats. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (62 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (339 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

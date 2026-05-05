@@ -21,6 +21,7 @@ from phosphene.source_ingestion.corpus import (
     corpus_twitter_adapter_factory,
 )
 from phosphene.source_ingestion.errors import AdapterConfigError, AdapterNotFoundError
+from phosphene.source_ingestion.human_share import human_share_adapter_factory
 from phosphene.source_ingestion.rss import rss_adapter_factory
 from phosphene.source_ingestion.types import (
     AdapterConfig,
@@ -75,6 +76,7 @@ _ADAPTER_REGISTRY["corpus_blog"] = corpus_blog_adapter_factory
 _ADAPTER_REGISTRY["corpus_livejournal"] = corpus_livejournal_adapter_factory
 _ADAPTER_REGISTRY["corpus_twitter"] = corpus_twitter_adapter_factory
 _ADAPTER_REGISTRY["corpus_conversations"] = corpus_conversations_adapter_factory
+_ADAPTER_REGISTRY["human_share"] = human_share_adapter_factory
 _DEFAULT_ADAPTER_REGISTRY = AdapterRegistry(_ADAPTER_REGISTRY)
 
 

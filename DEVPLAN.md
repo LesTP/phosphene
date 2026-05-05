@@ -2,7 +2,7 @@
 module: SOURCE_INGESTION
 phase: 2
 phase_title: Concrete adapters, human-share, and corpus import
-step: 3.2.5
+step: 3.2.6
 mode: Build
 blocked: null
 regime: Build
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 2 in progress
-- **Focus** — Step 3.2.5: Human-share adapter
+- **Focus** — Step 3.2.6: Telegram channel and Reddit adapters
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -96,7 +96,7 @@ Build concrete Source Ingestion adapters behind the Phase 1 manager/registry con
   - Implement `corpus_livejournal`, `corpus_twitter`, and `corpus_conversations` for representative exported archive formats.
   - Treat tweets-with-links as human annotation plus linked content when fetchable; preserve conversation metadata as title/author/source context when available.
   - Tests: minimal export fixtures per adapter, retweet/no-comment handling, inaccessible linked URL fallback, timestamp ordering.
-- [ ] **Step 3.2.5 — Human-share adapter**
+- [x] **Step 3.2.5 — Human-share adapter**
   - Implement `human_share` polling through the Telegram toolkit boundary, with URL-only, URL-plus-text, and text-only normalization.
   - Preserve `human_annotation`, populate `linked_urls`, and produce a fallback item when URL fetch fails but the share itself has signal.
   - Tests: fake Telegram client messages for all three message shapes, page fetch success/failure, marker advancement, per-item errors.
