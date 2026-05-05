@@ -209,6 +209,10 @@ def test_generate_builds_prompted_context_calls_llm_and_preserves_output(
     payload = json.loads(messages[1]["content"])
     assert payload["task"] == "prompted_generation"
     assert payload["topic"] == "density"
+    assert payload["topic_selection"] == {
+        "source": "explicit_prompt",
+        "source_note_ids": [],
+    }
     assert payload["ambient_context"] == {"hour": 12}
     assert payload["personality_files"][0]["note_id"] == "personality-1"
     assert payload["relevant_patterns"][0]["note_id"] == "pattern-1"
@@ -225,4 +229,140 @@ def test_generate_builds_prompted_context_calls_llm_and_preserves_output(
             "log_surfacing",
             "subscription_proposal",
         ],
+    }
+
+
+def test_generate_selects_absent_topic_from_unresolved_thread_before_llm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = FakeMemoryStore([make_note("personality-1", tier=3)])
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        messages = kwargs["messages"]
+        captured_payloads.append(json.loads(messages[1]["content"]))
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated from unresolved",
+                    "intent_tag": "synthesis",
+                    "output_mode": "prompted",
+                    "importance_score": 0.5,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(),
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).generate(
+        GenerationPrompt(unresolved_thread_ids=["thread-1"]),
+        {},
+        GeneratorConfig(llm_config=object()),
+    )
+
+    assert output.source_note_ids == ["personality-1", "thread-1"]
+    assert store.context_calls == 1
+    assert store.get_note_calls == ["thread-1"]
+    assert store.write_calls == 0
+    assert captured_payloads[0]["topic"] == "thread-1: thread-1 body"
+    assert captured_payloads[0]["topic_selection"] == {
+        "source": "unresolved_thread",
+        "source_note_ids": ["thread-1"],
+    }
+
+
+def test_generate_selects_absent_topic_from_high_importance_tier_two_pattern(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    low_pattern = make_note("low-pattern", tier=2, importance=0.2)
+    high_pattern = make_note("high-pattern", tier=2, importance=0.9)
+    store = FakeMemoryStore(
+        [make_note("personality-1", tier=3)],
+        query_results=[low_pattern, high_pattern],
+    )
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        messages = kwargs["messages"]
+        captured_payloads.append(json.loads(messages[1]["content"]))
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated from pattern",
+                    "intent_tag": "synthesis",
+                    "output_mode": "prompted",
+                    "importance_score": 0.5,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(),
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).generate(
+        GenerationPrompt(),
+        {},
+        GeneratorConfig(llm_config=object()),
+    )
+
+    assert output.source_note_ids == ["personality-1", "low-pattern", "high-pattern"]
+    assert store.context_calls == 1
+    assert len(store.query_calls) == 1
+    assert store.get_note_calls == []
+    assert store.write_calls == 0
+    assert captured_payloads[0]["topic"] == "high-pattern: high-pattern body"
+    assert captured_payloads[0]["topic_selection"] == {
+        "source": "tier2_pattern",
+        "source_note_ids": ["high-pattern"],
+    }
+
+
+def test_generate_absent_topic_without_bootstrap_material_still_requires_personality(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = FakeMemoryStore([make_note("personality-1", tier=3)])
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        messages = kwargs["messages"]
+        captured_payloads.append(json.loads(messages[1]["content"]))
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated from personality only",
+                    "intent_tag": "synthesis",
+                    "output_mode": "prompted",
+                    "importance_score": 0.5,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(),
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).generate(
+        GenerationPrompt(),
+        {},
+        GeneratorConfig(llm_config=object(), include_tier2_patterns=False),
+    )
+
+    assert output.source_note_ids == ["personality-1"]
+    assert store.context_calls == 1
+    assert store.query_calls == []
+    assert store.get_note_calls == []
+    assert store.write_calls == 0
+    assert captured_payloads[0]["topic"] is None
+    assert captured_payloads[0]["topic_selection"] == {
+        "source": "no_bootstrap_material",
+        "source_note_ids": [],
     }

@@ -125,6 +125,17 @@ Implemented live prompted `Generator.generate()` orchestration behind the existi
 
 Kept the Generator stateless and read-only against Memory Store: the prompted path uses only `get_personality_context()`, Tier 2 query/search reads, and optional `get_note()` reads. Added fake-LLM and fake-store coverage for prompt contents, generation tier/config propagation, unresolved-note loading, source-note fallback, token usage preservation, and no Memory Store writes. Updated the foundation integration test now that `generate()` is implemented for prompted generation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (36 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (432 passed).
 
+### Step 5.2.3: Topic selection when prompt topic is absent
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added deterministic prompted-generation topic selection for absent or blank prompt topics. The Generator now selects the first loaded unresolved-thread note when unresolved IDs are present, otherwise selects the highest-importance Tier 2 pattern from the fresh snapshot, and includes explicit `topic_selection` metadata in the LLM prompt before generation. If no prompt topic, unresolved thread, or Tier 2 pattern is available, the prompt carries `topic: null` with `source: no_bootstrap_material` after the required Tier 3 personality context check.
+
+Kept the behavior stateless and read-only against Memory Store: selection reuses existing `get_personality_context()`, Tier 2 query/search reads, and optional `get_note()` reads without adding writes or public API changes. Added fake-LLM coverage for explicit prompt metadata, unresolved-thread bootstrap, high-importance Tier 2 fallback, and empty-material behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (39 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (435 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

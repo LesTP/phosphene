@@ -39,6 +39,13 @@ class _LLMCompletion:
     token_usage: TokenUsage
 
 
+@dataclass(frozen=True)
+class _TopicSelection:
+    topic: str | None
+    source: str
+    source_note_ids: list[str]
+
+
 def _zero_token_usage() -> TokenUsage:
     return TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
 
@@ -248,6 +255,20 @@ def _note_payload(note: MemoryNote) -> dict[str, object]:
     }
 
 
+def _bootstrap_topic_from_note(note: MemoryNote) -> str:
+    title = note.title.strip()
+    content = " ".join(note.content.split())
+    if len(content) > 180:
+        content = f"{content[:177]}..."
+    if title and content:
+        return f"{title}: {content}"
+    if title:
+        return title
+    if content:
+        return content
+    return str(note.note_id)
+
+
 def _system_message() -> str:
     return (
         "You are the Phosphene Generator. Produce original text grounded only in "
@@ -353,13 +374,18 @@ class Generator:
         self,
         *,
         prompt: GenerationPrompt,
+        topic_selection: _TopicSelection,
         snapshot: PersonalitySnapshot,
         unresolved_notes: Sequence[MemoryNote],
         config: GeneratorConfig,
     ) -> list[Mapping[str, str]]:
         payload = {
             "task": "prompted_generation",
-            "topic": prompt.topic,
+            "topic": topic_selection.topic,
+            "topic_selection": {
+                "source": topic_selection.source,
+                "source_note_ids": list(topic_selection.source_note_ids),
+            },
             "budget_tokens": prompt.budget_tokens,
             "max_output_tokens": config.max_output_tokens,
             "ambient_context": _json_ready(snapshot.ambient_context),
@@ -401,6 +427,49 @@ class Generator:
             },
         ]
 
+    def _select_prompt_topic(
+        self,
+        prompt: GenerationPrompt,
+        snapshot: PersonalitySnapshot,
+        unresolved_notes: Sequence[MemoryNote],
+    ) -> _TopicSelection:
+        if prompt.topic is not None and prompt.topic.strip():
+            return _TopicSelection(
+                topic=prompt.topic.strip(),
+                source="explicit_prompt",
+                source_note_ids=[],
+            )
+
+        if unresolved_notes:
+            note = unresolved_notes[0]
+            return _TopicSelection(
+                topic=_bootstrap_topic_from_note(note),
+                source="unresolved_thread",
+                source_note_ids=[str(note.note_id)],
+            )
+
+        if snapshot.relevant_patterns:
+            note = sorted(
+                snapshot.relevant_patterns,
+                key=lambda candidate: (
+                    candidate.importance,
+                    candidate.updated_at,
+                    str(candidate.note_id),
+                ),
+                reverse=True,
+            )[0]
+            return _TopicSelection(
+                topic=_bootstrap_topic_from_note(note),
+                source="tier2_pattern",
+                source_note_ids=[str(note.note_id)],
+            )
+
+        return _TopicSelection(
+            topic=None,
+            source="no_bootstrap_material",
+            source_note_ids=[],
+        )
+
     def generate(
         self,
         prompt: GenerationPrompt,
@@ -409,9 +478,11 @@ class Generator:
     ) -> GeneratorOutput:
         snapshot = self._load_personality_snapshot(ambient, config)
         unresolved_notes = self._load_notes_by_id(prompt.unresolved_thread_ids)
+        topic_selection = self._select_prompt_topic(prompt, snapshot, unresolved_notes)
         completion = _call_generation_llm(
             self._build_prompted_generation_messages(
                 prompt=prompt,
+                topic_selection=topic_selection,
                 snapshot=snapshot,
                 unresolved_notes=unresolved_notes,
                 config=config,
