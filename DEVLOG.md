@@ -129,6 +129,17 @@ Planned Module 4 Phase 1 as a Build phase over the Gateway public contract and i
 
 Scope decision recorded in D-36: live Telegram behavior is deferred to a later Gateway phase. Phase 1 should establish the reusable message-bus shape and local/fake testing surface without requiring credentials or external platform calls.
 
+### Step 4.1.1: Public contract, errors, exports, and config validation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the `phosphene.gateway` package scaffold with ARCH-aligned public dataclasses, package exports, and a Gateway exception hierarchy. Added Gateway construction-time config validation for duplicate platform names, default-platform presence and enabled state, supported adapter types, required Telegram/log fields, enabled-platform filtering, and supported output format lists.
+
+Kept this step to the public contract and validation boundary: adapter construction, listener lifecycle, outbound delivery, and callback dispatch remain deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover dataclass field order/defaults, package exports, valid Telegram/log configs, validation failures, and disabled non-default platform behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (16 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (362 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

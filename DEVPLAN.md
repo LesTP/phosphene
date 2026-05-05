@@ -2,7 +2,7 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.1
+step: 4.1.2
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Step 4.1.1: public contract, errors, exports, and config validation
+- **Focus** — Step 4.1.2: adapter protocol, registry, and Gateway lifecycle foundation
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -90,7 +90,7 @@ Planned phases follow `ARCH_gateway.md`: first stabilize the public Gateway cont
 
 Build the Gateway public contract and internal adapter foundation without live external-service behavior. Scope includes ARCH-aligned dataclasses/errors/exports, config validation, adapter protocol/registry seams, outbound send routing, local log delivery, listener lifecycle orchestration, and fake-adapter inbound/feedback callback dispatch.
 
-- [ ] **Step 4.1.1 — Public contract, errors, exports, and config validation**
+- [x] **Step 4.1.1 — Public contract, errors, exports, and config validation**
   - Add `src/phosphene/gateway/` package scaffold with ARCH-aligned public dataclasses, errors, and package exports.
   - Validate duplicate platform names, default-platform presence/enabled state, unknown adapter types, missing required credentials/params, enabled-platform selection, and supported output format lists.
   - Tests: dataclass defaults/field order where relevant, package exports, validation success/failure cases, disabled platform behavior.
