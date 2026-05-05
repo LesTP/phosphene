@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import inspect
 import json
 from pathlib import Path
+import threading
 from typing import Protocol
 
 from phosphene.gateway.errors import PlatformConfigError, PlatformConnectionError
@@ -172,6 +173,16 @@ class TelegramGatewayAdapter:
         if not callable(factory):
             raise PlatformConfigError("telegram client factory must be callable")
         self.client = factory(config)
+        self._poll_interval_seconds = float(
+            config.params.get("poll_interval_seconds", 0.1)
+        )
+        self._poll_timeout_seconds = int(config.params.get("poll_timeout_seconds", 0))
+        self._poll_offset: int | None = _coerce_optional_int(
+            config.params.get("initial_update_offset")
+        )
+        self._stop_polling = threading.Event()
+        self._listener_thread: threading.Thread | None = None
+        self._listener_error: Exception | None = None
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
         try:
@@ -199,10 +210,58 @@ class TelegramGatewayAdapter:
         on_message: InboundCallback,
         on_feedback: FeedbackCallback,
     ) -> None:
-        raise PlatformConnectionError("telegram polling is not implemented")
+        del on_feedback
+        if self._listener_thread is not None and self._listener_thread.is_alive():
+            return
+        if not _supports_telegram_polling(self.client):
+            raise PlatformConnectionError(
+                "telegram client does not expose a supported polling method"
+            )
+
+        self._listener_error = None
+        self._stop_polling.clear()
+        self._listener_thread = threading.Thread(
+            target=self._run_polling,
+            args=(on_message,),
+            name=f"phosphene-gateway-{self.config.name}-poller",
+            daemon=True,
+        )
+        self._listener_thread.start()
 
     def stop_listener(self) -> None:
-        return None
+        self._stop_polling.set()
+        stop_method = getattr(self.client, "stop_polling", None)
+        if stop_method is not None:
+            _resolve_awaitable(_invoke_flexible(stop_method, {}))
+        if self._listener_thread is not None:
+            self._listener_thread.join(timeout=1.0)
+            self._listener_thread = None
+
+    def _run_polling(self, on_message: InboundCallback) -> None:
+        while not self._stop_polling.is_set():
+            try:
+                for message in _poll_telegram_inbound(
+                    self.client,
+                    platform=self.config.name,
+                    offset=self._poll_offset,
+                    timeout=self._poll_timeout_seconds,
+                ):
+                    if self._stop_polling.is_set():
+                        break
+                    if (update_id := _raw_update_id(message.raw)) is not None:
+                        next_offset = update_id + 1
+                        self._poll_offset = (
+                            next_offset
+                            if self._poll_offset is None
+                            else max(self._poll_offset, next_offset)
+                        )
+                    on_message(message)
+            except Exception as exc:  # noqa: BLE001 - keep background listener alive.
+                self._listener_error = exc
+                if self._stop_polling.wait(self._poll_interval_seconds):
+                    break
+                continue
+            self._stop_polling.wait(self._poll_interval_seconds)
 
 
 def fake_adapter_factory(config: PlatformConfig) -> GatewayAdapter:
@@ -361,6 +420,208 @@ def _send_telegram_api_message(
             )
         )
     )
+
+
+def _supports_telegram_polling(client: object) -> bool:
+    return any(
+        getattr(client, method_name, None) is not None
+        for method_name in ("get_updates", "poll_updates", "get_next_update")
+    )
+
+
+def _poll_telegram_inbound(
+    client: object,
+    *,
+    platform: str,
+    offset: int | None,
+    timeout: int,
+) -> list[InboundMessage]:
+    raw_updates = _fetch_telegram_updates(client, offset=offset, timeout=timeout)
+    if raw_updates is None:
+        return []
+    if not isinstance(raw_updates, list):
+        raw_updates = [raw_updates]
+
+    normalizer = getattr(client, "normalize_updates", None)
+    if normalizer is not None:
+        normalized = _resolve_awaitable(
+            _invoke_flexible(normalizer, {"raw_updates": raw_updates})
+        )
+        if isinstance(normalized, list):
+            raw_updates = normalized
+
+    messages: list[InboundMessage] = []
+    for update in raw_updates:
+        message = _normalize_telegram_inbound(update, platform=platform)
+        if message is not None:
+            messages.append(message)
+    return messages
+
+
+def _fetch_telegram_updates(
+    client: object,
+    *,
+    offset: int | None,
+    timeout: int,
+) -> object:
+    for method_name, kwargs in (
+        (
+            "get_updates",
+            {"offset": offset, "timeout": timeout},
+        ),
+        (
+            "poll_updates",
+            {"offset": offset, "timeout": timeout},
+        ),
+        (
+            "get_next_update",
+            {},
+        ),
+    ):
+        method = getattr(client, method_name, None)
+        if method is None:
+            continue
+        return _resolve_awaitable(_invoke_flexible(method, kwargs))
+    raise RuntimeError("telegram client does not expose a supported polling method")
+
+
+def _normalize_telegram_inbound(
+    update: object,
+    *,
+    platform: str,
+) -> InboundMessage | None:
+    raw = _object_to_raw_dict(update)
+    if _has_attr(update, "message_text"):
+        return _inbound_from_normalized_update(update, platform=platform, raw=raw)
+    if not isinstance(update, Mapping):
+        return None
+    message = update.get("message") or update.get("edited_message")
+    if not isinstance(message, Mapping):
+        return None
+    content = message.get("text")
+    if not isinstance(content, str):
+        content = message.get("caption")
+    if not isinstance(content, str):
+        return None
+    message_id = _coerce_optional_int(message.get("message_id"))
+    if message_id is None:
+        return None
+
+    sender = _telegram_sender(message.get("from"))
+    timestamp = _telegram_timestamp(message.get("date"))
+    reply_to = None
+    reply_payload = message.get("reply_to_message")
+    if isinstance(reply_payload, Mapping):
+        reply_id = _coerce_optional_int(reply_payload.get("message_id"))
+        if reply_id is not None:
+            reply_to = str(reply_id)
+
+    return InboundMessage(
+        content=content,
+        platform=platform,
+        message_id=str(message_id),
+        sender=sender,
+        timestamp=timestamp,
+        reply_to=reply_to,
+        reactions=_telegram_reactions(message),
+        raw=dict(update),
+    )
+
+
+def _inbound_from_normalized_update(
+    update: object,
+    *,
+    platform: str,
+    raw: dict | None,
+) -> InboundMessage | None:
+    content = getattr(update, "message_text", None)
+    message_id = getattr(update, "message_id", None)
+    sender = getattr(update, "user_id", None)
+    if not isinstance(content, str) or message_id is None or sender is None:
+        return None
+    return InboundMessage(
+        content=content,
+        platform=platform,
+        message_id=str(message_id),
+        sender=str(sender),
+        timestamp=_telegram_timestamp(_field_from_raw(raw, "date")),
+        reply_to=None,
+        reactions=None,
+        raw=raw,
+    )
+
+
+def _object_to_raw_dict(value: object) -> dict | None:
+    if isinstance(value, Mapping):
+        return dict(value)
+    raw = getattr(value, "raw", None)
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    return None
+
+
+def _field_from_raw(raw: dict | None, key: str) -> object:
+    if not raw:
+        return None
+    message = raw.get("message")
+    if isinstance(message, Mapping):
+        return message.get(key)
+    return raw.get(key)
+
+
+def _telegram_sender(sender_payload: object) -> str:
+    if not isinstance(sender_payload, Mapping):
+        return "unknown"
+    for key in ("username", "id", "first_name"):
+        value = sender_payload.get(key)
+        if value is not None and value != "":
+            return str(value)
+    return "unknown"
+
+
+def _telegram_timestamp(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, UTC)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.now(UTC)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed
+    return datetime.now(UTC)
+
+
+def _telegram_reactions(message: Mapping) -> list[str] | None:
+    raw_reactions = message.get("reactions") or message.get("reaction")
+    if raw_reactions is None:
+        return None
+    if isinstance(raw_reactions, str):
+        return [raw_reactions]
+    if isinstance(raw_reactions, list):
+        reactions: list[str] = []
+        for reaction in raw_reactions:
+            if isinstance(reaction, str):
+                reactions.append(reaction)
+            elif isinstance(reaction, Mapping):
+                value = reaction.get("emoji") or reaction.get("type")
+                if value is not None:
+                    reactions.append(str(value))
+        return reactions or None
+    return None
+
+
+def _raw_update_id(raw: dict | None) -> int | None:
+    if not raw:
+        return None
+    return _coerce_optional_int(raw.get("update_id"))
+
+
+def _has_attr(value: object, name: str) -> bool:
+    return getattr(value, name, None) is not None
 
 
 def _invoke_flexible(method: object, kwargs: dict[str, object]) -> object:

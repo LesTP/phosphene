@@ -1,3 +1,7 @@
+import threading
+import time
+from datetime import datetime, timezone
+
 import pytest
 
 from phosphene.gateway import (
@@ -38,9 +42,55 @@ def _telegram_platform() -> PlatformConfig:
         name="telegram",
         adapter_type="telegram",
         credentials={"bot_token": "test-token"},
-        params={"chat_id": "12345"},
+        params={"chat_id": "12345", "poll_interval_seconds": 0.01},
         output_formats=["text", "markdown", "telegraph", "thread"],
     )
+
+
+class PollingTelegramClient(FakeTelegramClient):
+    def __init__(self, config: PlatformConfig) -> None:
+        super().__init__(config)
+        self.get_updates_calls: list[dict] = []
+        self.update_batches: list[list[dict]] = [
+            [
+                {
+                    "update_id": 10,
+                    "message": {
+                        "message_id": 77,
+                        "date": 1_777_777_780,
+                        "text": "hello gateway",
+                        "from": {"id": 42, "username": "human"},
+                        "reply_to_message": {"message_id": 55},
+                    },
+                }
+            ]
+        ]
+        self.block = threading.Event()
+        self.stopped = False
+
+    async def get_updates(
+        self,
+        offset: int | None = None,
+        timeout: int | None = None,
+    ) -> list[dict]:
+        self.get_updates_calls.append({"offset": offset, "timeout": timeout})
+        if self.update_batches:
+            return self.update_batches.pop(0)
+        self.block.wait(timeout=0.05)
+        return []
+
+    async def stop_polling(self) -> None:
+        self.stopped = True
+        self.block.set()
+
+
+def _wait_for(predicate, timeout: float = 1.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.01)
+    raise AssertionError("condition was not reached before timeout")
 
 
 def test_telegram_adapter_constructs_client_through_injected_factory() -> None:
@@ -220,6 +270,93 @@ def test_telegram_adapter_converts_client_send_failure_to_delivery_result() -> N
         message_id=None,
         error="telegram unavailable",
     )
+
+
+def test_telegram_listener_polls_and_normalizes_inbound_messages() -> None:
+    received = []
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        received.append,
+        lambda _: None,
+        _telegram_client_factory=PollingTelegramClient,
+    )
+    adapter = gateway._adapters_by_platform["telegram"]
+
+    gateway.start_listener()
+    _wait_for(lambda: len(received) == 1)
+    gateway.stop_listener()
+
+    assert received[0].content == "hello gateway"
+    assert received[0].platform == "telegram"
+    assert received[0].message_id == "77"
+    assert received[0].sender == "human"
+    assert received[0].timestamp == datetime.fromtimestamp(
+        1_777_777_780, timezone.utc
+    )
+    assert received[0].reply_to == "55"
+    assert received[0].raw["update_id"] == 10
+    assert adapter.client.get_updates_calls[0] == {"offset": None, "timeout": 0}
+    assert adapter.client.stopped is True
+
+
+def test_telegram_listener_start_is_nonblocking_and_lifecycle_is_idempotent() -> None:
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=PollingTelegramClient,
+    )
+    adapter = gateway._adapters_by_platform["telegram"]
+
+    gateway.start_listener()
+    gateway.start_listener()
+    _wait_for(lambda: len(adapter.client.get_updates_calls) >= 1)
+    gateway.stop_listener()
+    gateway.stop_listener()
+
+    assert gateway._listening_platforms == set()
+    assert adapter._listener_thread is None
+    assert adapter.client.stopped is True
+
+
+def test_telegram_listener_respects_listen_false() -> None:
+    gateway = Gateway(
+        GatewayConfig(
+            platforms=[_telegram_platform()],
+            default_platform="telegram",
+            listen=False,
+        ),
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=PollingTelegramClient,
+    )
+    adapter = gateway._adapters_by_platform["telegram"]
+
+    gateway.start_listener()
+
+    assert adapter._listener_thread is None
+    assert adapter.client.get_updates_calls == []
+
+
+def test_telegram_callback_exceptions_remain_gateway_owned() -> None:
+    received: list[str] = []
+
+    def on_message(message) -> None:
+        received.append(message.message_id)
+        raise RuntimeError("callback failed")
+
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        on_message,
+        lambda _: None,
+        _telegram_client_factory=PollingTelegramClient,
+    )
+
+    gateway.start_listener()
+    _wait_for(lambda: received == ["77"])
+    gateway.stop_listener()
+
+    assert [str(error) for error in gateway._callback_errors] == ["callback failed"]
 
 
 def test_telegram_adapter_rejects_noncallable_client_factory() -> None:

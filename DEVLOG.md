@@ -136,6 +136,17 @@ Implemented Telegram outbound delivery behind the existing internal adapter prot
 
 The delivery path maps platform message IDs into `DeliveryResult`, preserves reply metadata in Telegram payloads, keeps intent tags available through Gateway recent-delivery tracking, supports async toolkit methods, and converts client/API failures into failed delivery results. Focused fake-client tests cover text, thread, markdown, telegraph, metadata preservation, recent-delivery attribution, and failure conversion. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (387 passed).
 
+### Step 4.2.3: Polling listener lifecycle and inbound normalization
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented non-blocking Telegram listener polling behind the existing internal adapter protocol. The Telegram adapter now starts a daemon polling thread, supports idempotent start/stop through Gateway lifecycle state, honors `listen=False` at the Gateway boundary, and signals toolkit polling shutdown when the client exposes `stop_polling`.
+
+Added private normalization helpers for toolkit-normalized Telegram updates and raw Bot API update dictionaries, producing Gateway `InboundMessage` values with content, platform, message ID, sender, timestamp, reply target, reactions when present, and raw payload metadata. Callback exception isolation remains Gateway-owned through the existing dispatch wrappers. Focused fake-client tests cover polling delivery, inbound normalization, non-blocking/idempotent lifecycle behavior, `listen=False`, and callback exception recording. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (45 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (391 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import
