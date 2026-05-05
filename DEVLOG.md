@@ -9,6 +9,102 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 4.1 Plan: Gateway contract and adapter foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 4 Phase 1 as a Build phase over the Gateway public contract and internal adapter foundation. The plan starts with ARCH-aligned dataclasses, errors, package exports, and config validation, then builds the adapter protocol/registry lifecycle, outbound send routing, local log delivery, and inbound/feedback callback dispatch using fake/local adapters only.
+
+Scope decision recorded in D-36: live Telegram behavior is deferred to a later Gateway phase. Phase 1 should establish the reusable message-bus shape and local/fake testing surface without requiring credentials or external platform calls.
+
+### Step 4.1.1: Public contract, errors, exports, and config validation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the `phosphene.gateway` package scaffold with ARCH-aligned public dataclasses, package exports, and a Gateway exception hierarchy. Added Gateway construction-time config validation for duplicate platform names, default-platform presence and enabled state, supported adapter types, required Telegram/log fields, enabled-platform filtering, and supported output format lists.
+
+Kept this step to the public contract and validation boundary: adapter construction, listener lifecycle, outbound delivery, and callback dispatch remain deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover dataclass field order/defaults, package exports, valid Telegram/log configs, validation failures, and disabled non-default platform behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (16 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (362 passed).
+
+### Step 4.1.2: Adapter protocol, registry, and Gateway lifecycle foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the internal Gateway adapter protocol, immutable adapter factory registry, default fake/log/pending adapter factories, and Gateway-owned enabled-adapter construction without adding public API exports. Gateway construction now validates adapter support through the internal registry and normalizes private registry/factory failures to `PlatformConfigError`.
+
+Implemented listener state bookkeeping with idempotent `start_listener`/`stop_listener`, `listen=False` handling, callback storage handoff to adapters, and platform connection error propagation via `PlatformConnectionError`. Kept outbound delivery and fake callback dispatch deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover fake adapter construction, invalid private factory rejection, listener start/stop idempotence, disabled listening, and connection failure wrapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (21 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (367 passed).
+
+### Step 4.1.3: Outbound send routing and default delivery
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `Gateway.send` over the internal adapter protocol with enabled-platform lookup, output-format validation, outbound message handoff, and adapter delivery failure conversion into failed `DeliveryResult` values. `send_to_default` now uses the same route through the configured default platform while preserving format and intent tag fields on the outbound message.
+
+Extended the internal fake/output-only adapter surface with deterministic send behavior for local tests while leaving real log-file delivery to Step 4.1.4. Focused tests cover target-platform routing, reply metadata and intent-tag preservation, platform-not-found and disabled-platform failures, unsupported format rejection, adapter delivery error conversion, and default-platform delivery. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (26 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (372 passed).
+
+### Step 4.1.4: Local log adapter
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the concrete `log` Gateway adapter for local development output behind the existing internal adapter registry. The adapter uses `params["log_path"]`, creates parent directories as needed, appends one JSON record per outbound message, preserves content, format, reply target, intent tag, and metadata, and returns deterministic local message IDs for feedback attribution tests.
+
+Kept the adapter output-only: listener start/stop hooks are no-ops and do not create inbound activity or persistent listener state beyond the Gateway lifecycle bookkeeping already established in Step 4.1.2. Focused tests cover log file creation, append ordering, metadata serialization, missing log-path validation through existing config coverage, and listener no-op behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (375 passed).
+
+### Step 4.1.5: Inbound and feedback callback dispatch harness
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Gateway-owned inbound and feedback dispatch wrappers for listener adapters. The wrappers preserve adapter-provided `InboundMessage` and `FeedbackSignal` metadata, ignore dispatch after listener stop, and isolate callback exceptions by recording them on the Gateway so adapter listener loops can continue.
+
+Extended the fake Gateway adapter with deterministic in-process inbound and feedback dispatch helpers, and added bounded in-memory recent-delivery tracking keyed by platform/message ID for later feedback attribution work. No persistent state or public API surface was added. Focused tests cover inbound dispatch, feedback dispatch, callback exception isolation, stopped-listener suppression, and bounded recent message mapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (380 passed).
+
+### Phase 4.1 Review: Gateway contract and adapter foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Gateway Phase 1 against `ARCH_gateway.md`. Must fix: none. Should fix: removed one unused internal helper and import from `gateway.py`. Optional: no optional changes deferred.
+
+The phase remains scoped to the public Gateway contract, validation, internal adapter registry, fake/local adapters, outbound routing, listener lifecycle, callback dispatch, and bounded in-memory delivery tracking. Live Telegram delivery and polling remain deferred to the later Gateway phase as planned in D-36.
+
+### Phase 4.1 Completion: Gateway contract and adapter foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Module 4 Phase 1. Final verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (380 passed).
+
+Phase 1 delivered the Gateway public contract and local/fake adapter foundation: ARCH-aligned dataclasses/errors/exports, config validation, internal adapter protocol and registry, lifecycle bookkeeping, outbound send routing, local log delivery, fake inbound and feedback callback dispatch, callback exception isolation, and bounded in-memory delivery tracking. Live Telegram delivery and polling remain deferred to the later Gateway phase per D-36.
+
+DEVLOG learning review: Phase 4.1 landed linearly across plan, five implementation steps, and review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 4.1 plan, step, and review entries recorded "Contract changes: None"; D-36 and D-37 document the local/fake foundation boundary, and no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 4 Phase 1 iterations 83-89 completed without repeated tool failures or wasted-turn patterns. No new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary and set frontmatter to await human audit before Gateway Phase 2 planning.
+ARCHITECTURE.md: Gateway row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
+
+<!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
+
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import
 
 **Date:** 2026-05-04
@@ -117,86 +213,6 @@ Contract Changes scan: Phase 3.2 plan and step entries recorded "Contract change
 Log review: `logs/loop/summary.log` shows Module 3 Phase 2 iterations 73-81 completed without repeated tool failures. Review iteration 81 applied two code fixes and escalated for the normal human audit gate; no new operational Gotchas to promote.
 DEVPLAN cleanup: reduced Phase 2 to a one-line completion summary, marked Module 3 complete, and set frontmatter to await human audit before Module 4 Gateway planning.
 ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1.5 complete" to "Complete"; Source Ingestion real-adapter test investment marked partially complete with live external-service testing still deferred.
-
-### Phase 4.1 Plan: Gateway contract and adapter foundation
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Planned
-**Contract changes:** None
-
-Planned Module 4 Phase 1 as a Build phase over the Gateway public contract and internal adapter foundation. The plan starts with ARCH-aligned dataclasses, errors, package exports, and config validation, then builds the adapter protocol/registry lifecycle, outbound send routing, local log delivery, and inbound/feedback callback dispatch using fake/local adapters only.
-
-Scope decision recorded in D-36: live Telegram behavior is deferred to a later Gateway phase. Phase 1 should establish the reusable message-bus shape and local/fake testing surface without requiring credentials or external platform calls.
-
-### Step 4.1.1: Public contract, errors, exports, and config validation
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added the `phosphene.gateway` package scaffold with ARCH-aligned public dataclasses, package exports, and a Gateway exception hierarchy. Added Gateway construction-time config validation for duplicate platform names, default-platform presence and enabled state, supported adapter types, required Telegram/log fields, enabled-platform filtering, and supported output format lists.
-
-Kept this step to the public contract and validation boundary: adapter construction, listener lifecycle, outbound delivery, and callback dispatch remain deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover dataclass field order/defaults, package exports, valid Telegram/log configs, validation failures, and disabled non-default platform behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (16 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (362 passed).
-
-### Step 4.1.2: Adapter protocol, registry, and Gateway lifecycle foundation
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added the internal Gateway adapter protocol, immutable adapter factory registry, default fake/log/pending adapter factories, and Gateway-owned enabled-adapter construction without adding public API exports. Gateway construction now validates adapter support through the internal registry and normalizes private registry/factory failures to `PlatformConfigError`.
-
-Implemented listener state bookkeeping with idempotent `start_listener`/`stop_listener`, `listen=False` handling, callback storage handoff to adapters, and platform connection error propagation via `PlatformConnectionError`. Kept outbound delivery and fake callback dispatch deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover fake adapter construction, invalid private factory rejection, listener start/stop idempotence, disabled listening, and connection failure wrapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (21 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (367 passed).
-
-### Step 4.1.3: Outbound send routing and default delivery
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Implemented `Gateway.send` over the internal adapter protocol with enabled-platform lookup, output-format validation, outbound message handoff, and adapter delivery failure conversion into failed `DeliveryResult` values. `send_to_default` now uses the same route through the configured default platform while preserving format and intent tag fields on the outbound message.
-
-Extended the internal fake/output-only adapter surface with deterministic send behavior for local tests while leaving real log-file delivery to Step 4.1.4. Focused tests cover target-platform routing, reply metadata and intent-tag preservation, platform-not-found and disabled-platform failures, unsupported format rejection, adapter delivery error conversion, and default-platform delivery. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (26 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (372 passed).
-
-### Step 4.1.4: Local log adapter
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Implemented the concrete `log` Gateway adapter for local development output behind the existing internal adapter registry. The adapter uses `params["log_path"]`, creates parent directories as needed, appends one JSON record per outbound message, preserves content, format, reply target, intent tag, and metadata, and returns deterministic local message IDs for feedback attribution tests.
-
-Kept the adapter output-only: listener start/stop hooks are no-ops and do not create inbound activity or persistent listener state beyond the Gateway lifecycle bookkeeping already established in Step 4.1.2. Focused tests cover log file creation, append ordering, metadata serialization, missing log-path validation through existing config coverage, and listener no-op behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (375 passed).
-
-### Step 4.1.5: Inbound and feedback callback dispatch harness
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added Gateway-owned inbound and feedback dispatch wrappers for listener adapters. The wrappers preserve adapter-provided `InboundMessage` and `FeedbackSignal` metadata, ignore dispatch after listener stop, and isolate callback exceptions by recording them on the Gateway so adapter listener loops can continue.
-
-Extended the fake Gateway adapter with deterministic in-process inbound and feedback dispatch helpers, and added bounded in-memory recent-delivery tracking keyed by platform/message ID for later feedback attribution work. No persistent state or public API surface was added. Focused tests cover inbound dispatch, feedback dispatch, callback exception isolation, stopped-listener suppression, and bounded recent message mapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (380 passed).
-
-### Phase 4.1 Review: Gateway contract and adapter foundation
-
-**Date:** 2026-05-05
-**Mode:** autonomous
-**Outcome:** Reviewed
-**Contract changes:** None
-
-Reviewed Gateway Phase 1 against `ARCH_gateway.md`. Must fix: none. Should fix: removed one unused internal helper and import from `gateway.py`. Optional: no optional changes deferred.
-
-The phase remains scoped to the public Gateway contract, validation, internal adapter registry, fake/local adapters, outbound routing, listener lifecycle, callback dispatch, and bounded in-memory delivery tracking. Live Telegram delivery and polling remain deferred to the later Gateway phase as planned in D-36.
-
-<!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
-
 ## Module 3 Phase 1 Plan
 
 **Date:** 2026-05-03
