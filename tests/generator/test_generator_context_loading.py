@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 import phosphene.generator.generator as generator_module
+from phosphene.gateway import InboundMessage
 from phosphene.generator import EmptyPersonalityError, GenerationPrompt, Generator, GeneratorConfig
 from phosphene.generator.types import TokenUsage
 from phosphene.memory_store import MemoryNote, PersonalityContext
@@ -365,4 +366,99 @@ def test_generate_absent_topic_without_bootstrap_material_still_requires_persona
     assert captured_payloads[0]["topic_selection"] == {
         "source": "no_bootstrap_material",
         "source_note_ids": [],
+    }
+
+
+def test_respond_builds_response_context_calls_llm_and_preserves_threading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    personality = make_note("personality-1", tier=3)
+    pattern = make_note("pattern-1", tier=2, importance=0.8)
+    relevant = make_note("relevant-1", tier=1, importance=0.7)
+    store = FakeMemoryStore(
+        [personality],
+        query_results=[pattern],
+        search_results=[(relevant, 0.86)],
+    )
+    calls: list[dict[str, object]] = []
+    usage = TokenUsage(prompt_tokens=9, completion_tokens=13, total_tokens=22)
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated response",
+                    "intent_tag": "question",
+                    "output_mode": "response",
+                    "importance_score": 0.62,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=usage,
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+    inbound = InboundMessage(
+        content="What changed about density?",
+        platform="telegram",
+        message_id="inbound-42",
+        sender="human",
+        timestamp=datetime(2026, 5, 5, 12, 30),
+        reply_to="previous-1",
+        reactions=["curious"],
+        raw={"embedding": [0.1, 0.2, 0.3], "chat_id": "chat-1"},
+    )
+
+    output = Generator(store).respond(
+        inbound,
+        {"hour": 12},
+        GeneratorConfig(llm_config="llm-config", generation_tier="quality"),
+    )
+
+    assert output.content == "generated response"
+    assert output.output_mode == "response"
+    assert output.is_lateral is False
+    assert output.source_note_ids == ["personality-1", "pattern-1", "relevant-1"]
+    assert output.token_usage == usage
+    assert output.originating_message_id == "inbound-42"
+    assert store.context_calls == 1
+    assert len(store.query_calls) == 1
+    assert store.search_calls == [([0.1, 0.2, 0.3], None, 10)]
+    assert store.write_calls == 0
+    assert calls[0]["config"] == "llm-config"
+    assert calls[0]["tier"] == "quality"
+
+    messages = calls[0]["messages"]
+    assert messages[0]["role"] == "system"
+    payload = json.loads(messages[1]["content"])
+    assert payload["task"] == "response_generation"
+    assert payload["ambient_context"] == {"hour": 12}
+    assert payload["inbound_message"] == {
+        "content": "What changed about density?",
+        "platform": "telegram",
+        "message_id": "inbound-42",
+        "sender": "human",
+        "timestamp": "2026-05-05T12:30:00",
+        "reply_to": "previous-1",
+        "reactions": ["curious"],
+        "raw": {"embedding": [0.1, 0.2, 0.3], "chat_id": "chat-1"},
+    }
+    assert payload["personality_files"][0]["note_id"] == "personality-1"
+    assert payload["relevant_patterns"][0]["note_id"] == "pattern-1"
+    assert payload["relevant_notes"][0]["note_id"] == "relevant-1"
+    assert payload["required_output"] == {
+        "output_mode": "response",
+        "is_lateral": False,
+        "intent_tag_options": [
+            "synthesis",
+            "provocation",
+            "question",
+            "aesthetic",
+            "internal_note",
+            "log_surfacing",
+            "subscription_proposal",
+        ],
     }

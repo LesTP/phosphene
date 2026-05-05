@@ -136,6 +136,17 @@ Added deterministic prompted-generation topic selection for absent or blank prom
 
 Kept the behavior stateless and read-only against Memory Store: selection reuses existing `get_personality_context()`, Tier 2 query/search reads, and optional `get_note()` reads without adding writes or public API changes. Added fake-LLM coverage for explicit prompt metadata, unresolved-thread bootstrap, high-importance Tier 2 fallback, and empty-material behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (39 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (435 passed).
 
+### Step 5.2.4: Response generation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented live `Generator.respond()` orchestration behind the existing public contract. The response path loads a fresh personality snapshot, reads relevant Memory Store context from inbound-message embeddings when present or a bounded query fallback otherwise, builds a deterministic JSON prompt containing the inbound message, ambient context, personality files, Tier 2 patterns, relevant notes, and required response output metadata, then calls the generation LLM boundary and parses the generated response.
+
+Preserved router threading by setting `GeneratorOutput.originating_message_id` from `InboundMessage.message_id`, and kept the Generator stateless and read-only against Memory Store with no public API changes. Added fake-LLM/fake-store coverage for prompt contents, config and tier propagation, token usage preservation, source-note fallback across personality/pattern/relevant notes, no Memory Store writes, and response threading metadata. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (40 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

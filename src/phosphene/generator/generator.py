@@ -275,8 +275,8 @@ def _system_message() -> str:
         "the supplied personality files, relevant patterns, unresolved threads, "
         "and ambient context. Return a single JSON object with these fields: "
         "content, intent_tag, output_mode, importance_score, is_lateral, "
-        "source_note_ids, contradictions_noted. For prompted generation, "
-        'output_mode must be "prompted" and is_lateral must be false. '
+        "source_note_ids, contradictions_noted. Use the required output_mode "
+        "from the user payload and set is_lateral exactly as requested. "
         "contradictions_noted must be a list of objects with personality_note_id, "
         "claim_summary, counter_evidence_ids, and counter_summary."
     )
@@ -370,6 +370,31 @@ class Generator:
             notes.append(self.memory_store.get_note(note_id))
         return notes
 
+    def _load_response_context(
+        self,
+        message: InboundMessage,
+        config: GeneratorConfig,
+    ) -> list[MemoryNote]:
+        limit = config.tier2_pattern_limit or 10
+        raw = message.raw if isinstance(message.raw, Mapping) else {}
+        embedding = raw.get("embedding", raw.get("content_embedding"))
+
+        if embedding is not None and hasattr(self.memory_store, "search_by_embedding"):
+            results = self.memory_store.search_by_embedding(embedding, limit=limit)
+            return [note for note, _similarity in results]
+
+        if hasattr(self.memory_store, "query_notes"):
+            return list(
+                self.memory_store.query_notes(
+                    NoteQuery(
+                        limit=limit,
+                        order_by="importance",
+                    )
+                )
+            )
+
+        return []
+
     def _build_prompted_generation_messages(
         self,
         *,
@@ -407,6 +432,66 @@ class Generator:
             ],
             "required_output": {
                 "output_mode": "prompted",
+                "is_lateral": False,
+                "intent_tag_options": [
+                    "synthesis",
+                    "provocation",
+                    "question",
+                    "aesthetic",
+                    "internal_note",
+                    "log_surfacing",
+                    "subscription_proposal",
+                ],
+            },
+        }
+        return [
+            {"role": "system", "content": _system_message()},
+            {
+                "role": "user",
+                "content": json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            },
+        ]
+
+    def _build_response_generation_messages(
+        self,
+        *,
+        message: InboundMessage,
+        snapshot: PersonalitySnapshot,
+        relevant_notes: Sequence[MemoryNote],
+        config: GeneratorConfig,
+    ) -> list[Mapping[str, str]]:
+        payload = {
+            "task": "response_generation",
+            "inbound_message": {
+                "content": message.content,
+                "platform": message.platform,
+                "message_id": message.message_id,
+                "sender": message.sender,
+                "timestamp": message.timestamp.isoformat(),
+                "reply_to": message.reply_to,
+                "reactions": list(message.reactions or []),
+                "raw": _json_ready(message.raw or {}),
+            },
+            "max_output_tokens": config.max_output_tokens,
+            "ambient_context": _json_ready(snapshot.ambient_context),
+            "personality_files": [
+                _note_payload(note) for note in snapshot.personality_files
+            ],
+            "relevant_patterns": [
+                _note_payload(note) for note in snapshot.relevant_patterns
+            ],
+            "relevant_notes": [_note_payload(note) for note in relevant_notes],
+            "contradictions": [
+                {
+                    "personality_note_id": contradiction.personality_note_id,
+                    "claim_summary": contradiction.claim_summary,
+                    "counter_evidence_ids": list(contradiction.counter_evidence_ids),
+                    "counter_summary": contradiction.counter_summary,
+                }
+                for contradiction in snapshot.contradictions
+            ],
+            "required_output": {
+                "output_mode": "response",
                 "is_lateral": False,
                 "intent_tag_options": [
                     "synthesis",
@@ -512,5 +597,22 @@ class Generator:
         ambient: AmbientContext,
         config: GeneratorConfig,
     ) -> GeneratorOutput:
-        self._load_personality_snapshot(ambient, config)
-        raise NotImplementedError("LLM generation is implemented in a later phase")
+        snapshot = self._load_personality_snapshot(ambient, config)
+        relevant_notes = self._load_response_context(message, config)
+        completion = _call_generation_llm(
+            self._build_response_generation_messages(
+                message=message,
+                snapshot=snapshot,
+                relevant_notes=relevant_notes,
+                config=config,
+            ),
+            config,
+        )
+        return _parse_generator_output_payload(
+            completion.content,
+            token_usage=completion.token_usage,
+            default_output_mode="response",
+            default_is_lateral=False,
+            fallback_source_note_ids=self._source_note_ids_with(snapshot, relevant_notes),
+            originating_message_id=message.message_id,
+        )

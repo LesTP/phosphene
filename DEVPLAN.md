@@ -2,7 +2,7 @@
 module: GENERATOR
 phase: 2
 phase_title: LLM generation modes and skeptical memory
-step: 5.2.4
+step: 5.2.5
 mode: Build
 blocked: null
 regime: Build
@@ -109,7 +109,7 @@ Build live Generator behavior behind the Phase 1 public contract. Keep Generator
 - [x] **5.2.1 — LLM client boundary and response parsing**: Added internal helpers that call toolkit/llm_client at the configured generation tier, translate provider failures to `LLMAPIError`, parse model JSON into bounded `GeneratorOutput` fields, preserve `TokenUsage`, and test malformed/missing/invalid output handling.
 - [x] **5.2.2 — Prompted generation orchestration**: Implemented `generate()` for explicit topics and unresolved-thread IDs, including fresh personality snapshot loading, Tier 2 enrichment, optional note loading for unresolved threads, deterministic prompt assembly with ambient context, source-note attribution fallback, LLM parsing, and no Memory Store writes.
 - [x] **5.2.3 — Topic selection when prompt topic is absent**: Added deterministic bootstrap topic selection from unresolved thread IDs or high-importance Tier 2 patterns before LLM prompt construction, with explicit no-bootstrap-material prompt metadata while still requiring Tier 3 personality context.
-- [ ] **5.2.4 — Response generation**: Implement `respond()` using inbound message content, relevant Memory Store search/query context, ambient context, personality snapshot, generated response parsing, and `originating_message_id` threading preservation for the router.
+- [x] **5.2.4 — Response generation**: Implemented `respond()` using inbound message content, relevant Memory Store search/query context, ambient context, personality snapshot, generated response parsing, and `originating_message_id` threading preservation for the router.
 - [ ] **5.2.5 — Free-play generation**: Implement `free_play()` by loading trigger notes, carrying affordances and lateral budget into the prompt, setting `output_mode="free_play"` and `is_lateral=True`, and preserving trigger/source note attribution.
 - [ ] **5.2.6 — Skeptical memory verification**: Implement the verification-tier LLM claim extraction and recent Tier 1 counter-evidence check behind `config.skeptical_memory`, recording `Contradiction` objects in `PersonalitySnapshot` and `GeneratorOutput` without writing to Memory Store.
 - [ ] **5.2.7 — Prompt/parse hardening and phase integration**: Add integration coverage across prompted, response, and free-play paths; verify config tier propagation, rotation fallback behavior if supported by toolkit without public API changes, read-only Memory Store behavior, and focused generator/full-suite tests.
