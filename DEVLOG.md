@@ -92,6 +92,17 @@ Log review: No repeated tool failures or wasted-turn patterns were found for thi
 DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary and set frontmatter to await human audit before Generator Phase 2 planning.
 ARCHITECTURE.md: Generator + Output Router row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
 
+### Phase 5.2 Plan: LLM generation modes and skeptical memory
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 5 Phase 2 as a Build phase over live Generator behavior behind the existing public contract. The plan starts with an internal toolkit/llm_client call and JSON parsing boundary, then implements prompted generation, absent-topic selection, response generation with router threading metadata, free-play generation with lateral affordances, skeptical memory verification, and cross-mode integration hardening.
+
+Scope decision recorded in D-40: Phase 2 keeps Generator stateless and read-only against Memory Store, uses fake LLM and fake Memory Store boundaries for deterministic coverage, preserves Phase 1 public dataclasses and Output Router behavior, and excludes new platform routing scope.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
