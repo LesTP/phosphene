@@ -136,6 +136,17 @@ Implemented the Generator's stateless personality snapshot boundary. Each load c
 
 Added optional Tier 2 enrichment without introducing live embedding ownership: callers can provide a topic embedding to use `search_by_embedding(tier=2)`, or fall back to `query_notes(NoteQuery(tier=2))` behind the Memory Store boundary. The current public generation methods now perform the required empty-personality check before stopping at the later-phase LLM placeholder. Focused fake-store tests cover fresh context loads, empty-personality behavior, no Memory Store writes, source ID preservation, embedding-search enrichment, query fallback, and disabled enrichment. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (17 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (413 passed).
 
+### Step 5.1.3: Output Router deterministic delivery
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the Output Router's deterministic `route()` behavior. Intent tags configured for `log` now suppress Gateway delivery and return `None`; other outputs resolve to either an intent-specific platform override or the Gateway default platform. The router selects `text`, `markdown`, or `telegraph` from configured content-length thresholds and threads response outputs by copying `GeneratorOutput.originating_message_id` into `OutboundMessage.reply_to`.
+
+Added focused fake-Gateway coverage for log-only suppression, default-platform text delivery, markdown and Telegraph length boundaries, response threading, platform overrides, and Gateway `DeliveryResult` propagation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (418 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

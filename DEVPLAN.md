@@ -2,7 +2,7 @@
 module: GENERATOR
 phase: 1
 phase_title: Generator Phase 1 — Contract and routing foundation
-step: 5.1.3
+step: 5.1.4
 mode: Code
 blocked: null
 regime: Build
@@ -104,7 +104,7 @@ Build the Generator + Output Router package foundation around ARCH-aligned publi
 
 - [x] **Step 5.1.1 — Public contract, errors, and exports**: Add the `phosphene.generator` package with ARCH-aligned dataclasses, public errors, constructor surface, router config types, and export tests; define validation for obvious config/threshold invariants without adding live LLM behavior.
 - [x] **Step 5.1.2 — Memory Store context-loading boundary**: Implement stateless personality context loading through `memory_store.get_personality_context()`, raise `EmptyPersonalityError` when Tier 3 context is absent, preserve source note IDs, and cover optional Tier 2 enrichment behind a fake embedding/query boundary without changing Memory Store ownership.
-- [ ] **Step 5.1.3 — Output Router deterministic delivery**: Implement `route()` over fake Gateway instances for intent-to-log suppression, length-based `text`/`markdown`/`telegraph` selection, response threading via `originating_message_id`, and delivery-result propagation.
+- [x] **Step 5.1.3 — Output Router deterministic delivery**: Implement `route()` over fake Gateway instances for intent-to-log suppression, length-based `text`/`markdown`/`telegraph` selection, response threading via `originating_message_id`, and delivery-result propagation.
 - [ ] **Step 5.1.4 — Phase foundation integration tests**: Add package-level integration coverage with fake Memory Store and fake Gateway objects showing the foundation remains stateless, does not write to Memory Store, does not require live credentials, and keeps Generator output compatible with Gateway `OutboundMessage`.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
