@@ -1,12 +1,12 @@
 ---
 module: GENERATOR
-phase: 2
-phase_title: LLM generation modes and skeptical memory
-step: 5.2.7
-mode: Review
-blocked: null
+phase: null
+phase_title: Module 5 complete — Module 6 next
+step: null
+mode: Complete
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 5 Phase 2 ready for review: LLM generation modes and skeptical memory
-- **Focus** — Review prompted, response, and free-play generation, skeptical memory verification, prompt/parse hardening, LLM tier/rotation behavior, and read-only Memory Store boundaries against `ARCH_generator.md`
-- **Blocked/Broken** — None
+- **Phase** — Module 5 complete: Generator + Output Router
+- **Focus** — Await human audit before Module 6 Distillation planning
+- **Blocked/Broken** — `awaiting-human-audit`
 
 ## Module 1: Memory Store (complete)
 
@@ -94,24 +94,16 @@ Delivered ARCH-aligned Gateway dataclasses/errors/exports, config validation, in
 
 Delivered concrete Telegram adapter construction behind an injectable toolkit boundary, outbound text/markdown/thread/telegraph delivery, non-blocking polling and inbound normalization, feedback normalization for replies/reactions/edits, mixed Telegram/log integration hardening, and regression coverage for unsupported Telegraph delivery. Reviewed and completed. See DEVLOG "Phase 4.2 Completion" entry.
 
-## Module 5: Generator + Output Router (in progress)
+## Module 5: Generator + Output Router (complete)
 
-Planned phases follow `ARCH_generator.md`: first stabilize the public contract, errors, exports, Memory Store context-loading boundary, empty-personality behavior, and deterministic Output Router behavior without live generation; then add LLM generation/response/free-play behavior, skeptical memory verification, and prompt/parse hardening.
+Planned phases followed `ARCH_generator.md`: first stabilize the public contract, errors, exports, Memory Store context-loading boundary, empty-personality behavior, and deterministic Output Router behavior without live generation; then add LLM generation/response/free-play behavior, skeptical memory verification, and prompt/parse hardening.
 
 ### Phase 1 (complete): Contract and routing foundation
 
 Delivered ARCH-aligned public dataclasses/errors/exports, stateless Memory Store personality context loading, empty-personality behavior, optional Tier 2 enrichment behind Memory Store boundaries, deterministic Output Router delivery decisions, and credential-free fake integration coverage. Reviewed and completed. See DEVLOG "Phase 5.1 Completion" entry.
 
-### Phase 2 (in progress): LLM generation modes and skeptical memory
+### Phase 2 (complete): LLM generation modes and skeptical memory
 
-Build live Generator behavior behind the Phase 1 public contract. Keep Generator stateless and read-only against Memory Store; use fake LLM and fake Memory Store boundaries for deterministic tests; do not add live credentials or Output Router scope.
-
-- [x] **5.2.1 — LLM client boundary and response parsing**: Added internal helpers that call toolkit/llm_client at the configured generation tier, translate provider failures to `LLMAPIError`, parse model JSON into bounded `GeneratorOutput` fields, preserve `TokenUsage`, and test malformed/missing/invalid output handling.
-- [x] **5.2.2 — Prompted generation orchestration**: Implemented `generate()` for explicit topics and unresolved-thread IDs, including fresh personality snapshot loading, Tier 2 enrichment, optional note loading for unresolved threads, deterministic prompt assembly with ambient context, source-note attribution fallback, LLM parsing, and no Memory Store writes.
-- [x] **5.2.3 — Topic selection when prompt topic is absent**: Added deterministic bootstrap topic selection from unresolved thread IDs or high-importance Tier 2 patterns before LLM prompt construction, with explicit no-bootstrap-material prompt metadata while still requiring Tier 3 personality context.
-- [x] **5.2.4 — Response generation**: Implemented `respond()` using inbound message content, relevant Memory Store search/query context, ambient context, personality snapshot, generated response parsing, and `originating_message_id` threading preservation for the router.
-- [x] **5.2.5 — Free-play generation**: Implemented `free_play()` with fresh personality snapshot loading, trigger-note reads, deterministic prompt assembly carrying affordances and lateral budget, generated output parsing with `output_mode="free_play"` and `is_lateral=True`, trigger/source note attribution fallback, and no Memory Store writes.
-- [x] **5.2.6 — Skeptical memory verification**: Implemented verification-tier LLM claim extraction and recent Tier 1 counter-evidence checks behind `config.skeptical_memory`, recording `Contradiction` objects in `PersonalitySnapshot` and `GeneratorOutput` without writing to Memory Store.
-- [x] **5.2.7 — Prompt/parse hardening and phase integration**: Added internal primary-plus-rotation LLM config fallback for provider-call failures without public API changes, preserved parse-error hard stops, and added integration coverage across prompted, response, and free-play paths for config tier propagation, rotation fallback, read-only Memory Store behavior, source attribution, threading, and focused generator/full-suite tests.
+Delivered prompted, response, and free-play generation behind fakeable toolkit/llm_client boundaries; skeptical memory verification with read-only recent Tier 1 checks; provider-failure rotation fallback; parse hard stops; source attribution and response threading preservation; and cross-mode integration coverage. Reviewed and completed. See DEVLOG "Phase 5.2 Review" and "Phase 5.2 Completion" entries.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
