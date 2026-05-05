@@ -151,6 +151,17 @@ Added the internal Gateway adapter protocol, immutable adapter factory registry,
 
 Implemented listener state bookkeeping with idempotent `start_listener`/`stop_listener`, `listen=False` handling, callback storage handoff to adapters, and platform connection error propagation via `PlatformConnectionError`. Kept outbound delivery and fake callback dispatch deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover fake adapter construction, invalid private factory rejection, listener start/stop idempotence, disabled listening, and connection failure wrapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (21 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (367 passed).
 
+### Step 4.1.3: Outbound send routing and default delivery
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `Gateway.send` over the internal adapter protocol with enabled-platform lookup, output-format validation, outbound message handoff, and adapter delivery failure conversion into failed `DeliveryResult` values. `send_to_default` now uses the same route through the configured default platform while preserving format and intent tag fields on the outbound message.
+
+Extended the internal fake/output-only adapter surface with deterministic send behavior for local tests while leaving real log-file delivery to Step 4.1.4. Focused tests cover target-platform routing, reply metadata and intent-tag preservation, platform-not-found and disabled-platform failures, unsupported format rejection, adapter delivery error conversion, and default-platform delivery. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (26 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (372 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

@@ -6,7 +6,13 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from phosphene.gateway.errors import PlatformConnectionError
-from phosphene.gateway.types import FeedbackSignal, InboundMessage, PlatformConfig
+from phosphene.gateway.types import (
+    DeliveryResult,
+    FeedbackSignal,
+    InboundMessage,
+    OutboundMessage,
+    PlatformConfig,
+)
 
 InboundCallback = Callable[[InboundMessage], None]
 FeedbackCallback = Callable[[FeedbackSignal], None]
@@ -14,6 +20,9 @@ FeedbackCallback = Callable[[FeedbackSignal], None]
 
 class GatewayAdapter(Protocol):
     """Internal interface implemented by concrete Gateway adapters."""
+
+    def send(self, message: OutboundMessage) -> DeliveryResult:
+        """Deliver an outbound message through this adapter."""
 
     def start_listener(
         self,
@@ -62,6 +71,15 @@ class OutputOnlyAdapter:
     def __init__(self, config: PlatformConfig) -> None:
         self.config = config
         self.listener_started = False
+        self.sent_messages: list[OutboundMessage] = []
+
+    def send(self, message: OutboundMessage) -> DeliveryResult:
+        self.sent_messages.append(message)
+        return DeliveryResult(
+            success=True,
+            platform=self.config.name,
+            message_id=f"{self.config.name}-{len(self.sent_messages)}",
+        )
 
     def start_listener(
         self,
@@ -83,6 +101,14 @@ class PendingGatewayAdapter:
 
     def __init__(self, config: PlatformConfig) -> None:
         self.config = config
+
+    def send(self, message: OutboundMessage) -> DeliveryResult:
+        return DeliveryResult(
+            success=False,
+            platform=self.config.name,
+            message_id=None,
+            error=f"{self.config.adapter_type} adapter is not implemented",
+        )
 
     def start_listener(
         self,

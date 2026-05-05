@@ -2,7 +2,7 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.3
+step: 4.1.4
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Step 4.1.3: outbound send routing and default delivery
+- **Focus** — Step 4.1.4: local log adapter
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -98,7 +98,7 @@ Build the Gateway public contract and internal adapter foundation without live e
   - Add internal adapter protocol and immutable registry snapshot for concrete/fake factory construction without exposing a new public API.
   - Implement Gateway construction, enabled adapter instantiation, listener state bookkeeping, idempotent `start_listener`/`stop_listener` orchestration, and callback storage.
   - Tests: fake adapter construction, unknown/invalid factory rejection, listener start/stop idempotence, platform connection error propagation.
-- [ ] **Step 4.1.3 — Outbound send routing and default delivery**
+- [x] **Step 4.1.3 — Outbound send routing and default delivery**
   - Implement `send` and `send_to_default` over the adapter protocol with platform lookup, format validation, reply metadata handoff, intent-tag preservation, and adapter failure conversion into `DeliveryResult` where ARCH requires non-raised delivery failures.
   - Tests: platform-not-found, unsupported format, successful delivery with message IDs, adapter delivery failure, default-platform convenience behavior.
 - [ ] **Step 4.1.4 — Local log adapter**

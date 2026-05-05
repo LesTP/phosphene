@@ -11,6 +11,7 @@ from phosphene.gateway.adapters import (
     GatewayAdapter,
 )
 from phosphene.gateway.errors import (
+    DeliveryError,
     FormatNotSupportedError,
     PlatformConfigError,
     PlatformConnectionError,
@@ -67,7 +68,23 @@ class Gateway:
     def send(self, message: OutboundMessage) -> DeliveryResult:
         platform = self._get_enabled_platform(message.platform)
         _validate_message_format(message, platform)
-        raise NotImplementedError("Gateway.send is implemented in Step 4.1.3")
+        adapter = self._adapters_by_platform[platform.name]
+        try:
+            return adapter.send(message)
+        except DeliveryError as exc:
+            return DeliveryResult(
+                success=False,
+                platform=platform.name,
+                message_id=None,
+                error=str(exc),
+            )
+        except Exception as exc:
+            return DeliveryResult(
+                success=False,
+                platform=platform.name,
+                message_id=None,
+                error=str(exc),
+            )
 
     def send_to_default(
         self,
