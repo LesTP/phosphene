@@ -1,12 +1,12 @@
 ---
 module: GATEWAY
-phase: 2
-phase_title: Gateway Phase 2 — Telegram adapter delivery and polling
-step: 4.2.5
+phase: null
+phase_title: Module 4 complete — Module 5 next
+step: null
 mode: Complete
-blocked: null
+blocked: awaiting-human-audit
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 4 Phase 2 reviewed; ready for completion
-- **Focus** — Complete concrete Telegram Gateway adapter delivery and polling
-- **Blocked/Broken** — None
+- **Phase** — Module 4 Gateway complete; awaiting human audit before Module 5 planning
+- **Focus** — Human audit gate before Generator + Output Router
+- **Blocked/Broken** — awaiting-human-audit
 
 ## Module 1: Memory Store (complete)
 
@@ -82,22 +82,16 @@ Added `pytest-cov` dev tooling and captured the full-suite baseline: 310 tests p
 
 Delivered shared adapter utilities, RSS/Atom, local and structured corpus adapters, human-share, Telegram channel, Reddit, Source Ingestion-owned durable marker persistence, and cross-adapter manager coverage while keeping public dataclasses stable and avoiding a Memory Store dependency. Reviewed and completed. See DEVLOG "Phase 3.2 Completion" entry.
 
-## Module 4: Gateway (in progress)
+## Module 4: Gateway (complete)
 
-Planned phases follow `ARCH_gateway.md`: first stabilize the public Gateway contract, validation, adapter registry, outbound routing, local log adapter, and listener callback semantics with fake/local adapters; then add concrete Telegram delivery and polling behavior through the toolkit boundary.
+Planned phases followed `ARCH_gateway.md`: first stabilize the public Gateway contract, validation, adapter registry, outbound routing, local log adapter, and listener callback semantics with fake/local adapters; then add concrete Telegram delivery and polling behavior through the toolkit boundary.
 
 ### Phase 1 (complete): Gateway contract and adapter foundation
 
 Delivered ARCH-aligned Gateway dataclasses/errors/exports, config validation, internal adapter registry/lifecycle, outbound routing, local log delivery, fake inbound/feedback dispatch, callback exception isolation, and bounded in-memory delivery tracking. Reviewed and completed. See DEVLOG "Phase 4.1 Completion" entry.
 
-### Phase 2 (in progress): Telegram adapter delivery and polling
+### Phase 2 (complete): Telegram adapter delivery and polling
 
-Build the concrete Telegram Gateway adapter behind the existing internal adapter protocol without changing public dataclasses. Keep Source Ingestion separate from human-facing Gateway behavior and keep tests credential-free with fake toolkit clients.
-
-- [x] **Step 4.2.1 — Telegram adapter construction and toolkit boundary**: Replace the pending Telegram adapter with a concrete internal adapter, isolate toolkit client construction behind an injectable factory, validate missing toolkit/factory failures as `PlatformConfigError`, and cover construction without live credentials.
-- [x] **Step 4.2.2 — Outbound Telegram delivery**: Route `text`, `markdown`, `thread`, and `telegraph` sends through the toolkit boundary, map platform message IDs into `DeliveryResult`, preserve reply and intent metadata, and convert toolkit/API failures into failed delivery results.
-- [x] **Step 4.2.3 — Polling listener lifecycle and inbound normalization**: Add non-blocking Telegram polling start/stop behavior, normalize incoming updates to `InboundMessage`, honor `listen=False` and idempotent lifecycle semantics, and keep callback exception isolation in Gateway-owned dispatch.
-- [x] **Step 4.2.4 — Telegram feedback signal normalization**: Detect supported Telegram feedback events from replies/reactions/edits exposed by the toolkit boundary, normalize them to `FeedbackSignal`, and preserve raw payload metadata for downstream attribution.
-- [x] **Step 4.2.5 — Gateway Telegram integration hardening**: Add end-to-end fake-client coverage for mixed log/Telegram configs, listener stop cleanup, recent-delivery tracking with Telegram IDs, and full Gateway test-suite verification.
+Delivered concrete Telegram adapter construction behind an injectable toolkit boundary, outbound text/markdown/thread/telegraph delivery, non-blocking polling and inbound normalization, feedback normalization for replies/reactions/edits, mixed Telegram/log integration hardening, and regression coverage for unsupported Telegraph delivery. Reviewed and completed. See DEVLOG "Phase 4.2 Completion" entry.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
