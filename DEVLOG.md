@@ -169,6 +169,17 @@ Implemented skeptical memory verification behind `GeneratorConfig.skeptical_memo
 
 Merged snapshot contradictions into `GeneratorOutput.contradictions_noted` for prompted, response, and free-play paths while preserving any contradictions returned by the generation LLM. The path remains stateless and read-only against Memory Store, with no public API changes. Added focused fake-LLM/fake-store coverage for verification-tier propagation, recent Tier 1 query shape, prompt inclusion of contradictions, output contradiction reporting, and disabled skeptical-memory behavior in existing tests. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (44 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (440 passed).
 
+### Step 5.2.7: Prompt/parse hardening and phase integration
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added internal LLM config rotation fallback for provider-call failures using the existing `GeneratorConfig.llm_configs_rotation` field. Generation and verification calls now try the primary config first, then configured fallback configs at the same requested tier; malformed toolkit/model responses still fail immediately instead of rotating, so parse hardening remains deterministic.
+
+Added focused boundary tests for rotation fallback, tier propagation, token usage preservation, and malformed-completion behavior. Added cross-mode integration coverage that exercises prompted generation, response generation, and free-play generation through primary failure plus fallback success, verifying output modes, lateral flags, response threading, source-note fallback attribution, prompt payload shape, and read-only Memory Store behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (443 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

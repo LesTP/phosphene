@@ -100,6 +100,40 @@ def _toolkit_complete(
         raise LLMAPIError("generation LLM call failed") from exc
 
 
+def _llm_config_candidates(config: GeneratorConfig) -> list[object]:
+    return [config.llm_config, *list(config.llm_configs_rotation or [])]
+
+
+def _call_llm_with_config_rotation(
+    *,
+    messages: list[Mapping[str, str]],
+    llm_configs: Sequence[object],
+    tier: object,
+    failure_message: str,
+    llm_complete_callable: _LLMCompleteCallable,
+) -> _LLMCompletion:
+    last_failure: Exception | None = None
+    for llm_config in llm_configs:
+        try:
+            return _normalize_completion(
+                llm_complete_callable(
+                    messages=messages,
+                    config=llm_config,
+                    tier=tier,
+                )
+            )
+        except LLMAPIError as exc:
+            if exc.__cause__ is None:
+                raise
+            last_failure = exc
+        except Exception as exc:
+            last_failure = exc
+
+    if last_failure is not None:
+        raise LLMAPIError(failure_message) from last_failure
+    raise LLMAPIError(failure_message)
+
+
 def _call_generation_llm(
     messages: list[Mapping[str, str]],
     config: GeneratorConfig,
@@ -109,18 +143,13 @@ def _call_generation_llm(
     if llm_complete_callable is None:
         llm_complete_callable = _toolkit_complete
 
-    try:
-        return _normalize_completion(
-            llm_complete_callable(
-                messages=messages,
-                config=config.llm_config,
-                tier=config.generation_tier,
-            )
-        )
-    except LLMAPIError:
-        raise
-    except Exception as exc:
-        raise LLMAPIError("generation LLM call failed") from exc
+    return _call_llm_with_config_rotation(
+        messages=messages,
+        llm_configs=_llm_config_candidates(config),
+        tier=config.generation_tier,
+        failure_message="generation LLM call failed",
+        llm_complete_callable=llm_complete_callable,
+    )
 
 
 def _call_verification_llm(
@@ -132,18 +161,13 @@ def _call_verification_llm(
     if llm_complete_callable is None:
         llm_complete_callable = _toolkit_complete
 
-    try:
-        return _normalize_completion(
-            llm_complete_callable(
-                messages=messages,
-                config=config.llm_config,
-                tier=config.verification_tier,
-            )
-        )
-    except LLMAPIError:
-        raise
-    except Exception as exc:
-        raise LLMAPIError("verification LLM call failed") from exc
+    return _call_llm_with_config_rotation(
+        messages=messages,
+        llm_configs=_llm_config_candidates(config),
+        tier=config.verification_tier,
+        failure_message="verification LLM call failed",
+        llm_complete_callable=llm_complete_callable,
+    )
 
 
 def _extract_json_object(response_text: str) -> Mapping[str, object]:

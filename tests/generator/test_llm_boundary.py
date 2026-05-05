@@ -113,6 +113,52 @@ def test_call_generation_llm_maps_provider_failures_to_llm_api_error() -> None:
     assert isinstance(exc_info.value.__cause__, ProviderFailure)
 
 
+def test_call_generation_llm_falls_back_to_rotation_after_provider_failure() -> None:
+    class ProviderFailure(Exception):
+        pass
+
+    usage = TokenUsage(prompt_tokens=4, completion_tokens=6, total_tokens=10)
+    calls: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        if kwargs["config"] == "primary":
+            raise ProviderFailure("primary exhausted")
+        return FakeLLMResponse(content='{"content": "ok"}', token_usage=usage)
+
+    completion = _call_generation_llm(
+        [{"role": "user", "content": "{}"}],
+        GeneratorConfig(
+            llm_config="primary",
+            llm_configs_rotation=["fallback"],
+            generation_tier="quality",
+        ),
+        llm_complete_callable=fake_complete,
+    )
+
+    assert completion.content == '{"content": "ok"}'
+    assert completion.token_usage == usage
+    assert [call["config"] for call in calls] == ["primary", "fallback"]
+    assert [call["tier"] for call in calls] == ["quality", "quality"]
+
+
+def test_call_generation_llm_does_not_rotate_malformed_completion() -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        return object()
+
+    with pytest.raises(LLMAPIError, match="content text"):
+        _call_generation_llm(
+            [{"role": "user", "content": "{}"}],
+            GeneratorConfig(llm_config="primary", llm_configs_rotation=["fallback"]),
+            llm_complete_callable=fake_complete,
+        )
+
+    assert [call["config"] for call in calls] == ["primary"]
+
+
 def test_parse_generator_output_payload_preserves_usage_and_bounded_fields() -> None:
     usage = TokenUsage(prompt_tokens=7, completion_tokens=11, total_tokens=18)
 

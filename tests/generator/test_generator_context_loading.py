@@ -664,3 +664,111 @@ def test_free_play_loads_triggers_calls_llm_and_marks_lateral(
             "subscription_proposal",
         ],
     }
+
+
+def test_all_generation_modes_use_rotation_fallback_tiers_and_stay_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ProviderFailure(Exception):
+        pass
+
+    personality = make_note("personality-1", tier=3)
+    relevant = make_note("relevant-1", tier=1, importance=0.7)
+    store = FakeMemoryStore([personality], search_results=[(relevant, 0.84)])
+    calls: list[dict[str, object]] = []
+    fallback_payloads: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        if kwargs["config"] == "primary-config":
+            raise ProviderFailure("primary unavailable")
+
+        payload = json.loads(kwargs["messages"][1]["content"])
+        fallback_payloads.append(payload)
+        output_mode = {
+            "prompted_generation": "prompted",
+            "response_generation": "response",
+            "free_play_generation": "free_play",
+        }[payload["task"]]
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": f"{output_mode} content",
+                    "intent_tag": "synthesis",
+                    "output_mode": output_mode,
+                    "importance_score": 0.61,
+                    "is_lateral": output_mode == "free_play",
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(prompt_tokens=1, completion_tokens=2, total_tokens=3),
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+    config = GeneratorConfig(
+        llm_config="primary-config",
+        llm_configs_rotation=["fallback-config"],
+        generation_tier="quality-tier",
+        include_tier2_patterns=False,
+        skeptical_memory=False,
+    )
+    generator = Generator(store)
+
+    prompted = generator.generate(
+        GenerationPrompt(topic="density", unresolved_thread_ids=["thread-1"]),
+        {"hour": 9},
+        config,
+    )
+    response = generator.respond(
+        InboundMessage(
+            content="What changed?",
+            platform="telegram",
+            message_id="inbound-1",
+            sender="human",
+            timestamp=datetime(2026, 5, 5, 9, 0),
+            raw={"embedding": [0.1, 0.2]},
+        ),
+        {"hour": 10},
+        config,
+    )
+    free_play = generator.free_play(
+        FreePlayTrigger(trigger_note_ids=["trigger-1"]),
+        {"hour": 11},
+        config,
+    )
+
+    assert [prompted.output_mode, response.output_mode, free_play.output_mode] == [
+        "prompted",
+        "response",
+        "free_play",
+    ]
+    assert [prompted.is_lateral, response.is_lateral, free_play.is_lateral] == [
+        False,
+        False,
+        True,
+    ]
+    assert response.originating_message_id == "inbound-1"
+    assert prompted.source_note_ids == ["personality-1", "thread-1"]
+    assert response.source_note_ids == ["personality-1", "relevant-1"]
+    assert free_play.source_note_ids == ["personality-1", "trigger-1"]
+    assert store.context_calls == 3
+    assert store.get_note_calls == ["thread-1", "trigger-1"]
+    assert store.search_calls == [([0.1, 0.2], None, 10)]
+    assert store.query_calls == []
+    assert store.write_calls == 0
+    assert [call["config"] for call in calls] == [
+        "primary-config",
+        "fallback-config",
+        "primary-config",
+        "fallback-config",
+        "primary-config",
+        "fallback-config",
+    ]
+    assert [call["tier"] for call in calls] == ["quality-tier"] * 6
+    assert [payload["task"] for payload in fallback_payloads] == [
+        "prompted_generation",
+        "response_generation",
+        "free_play_generation",
+    ]
+    assert [payload["max_output_tokens"] for payload in fallback_payloads] == [2000] * 3

@@ -3,7 +3,7 @@ module: GENERATOR
 phase: 2
 phase_title: LLM generation modes and skeptical memory
 step: 5.2.7
-mode: Build
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 5 Phase 2 in progress: LLM generation modes and skeptical memory
-- **Focus** — Replace Generator LLM placeholders with prompted, response, and free-play generation using stateless Memory Store context, deterministic prompt/parse boundaries, and skeptical memory verification
+- **Phase** — Module 5 Phase 2 ready for review: LLM generation modes and skeptical memory
+- **Focus** — Review prompted, response, and free-play generation, skeptical memory verification, prompt/parse hardening, LLM tier/rotation behavior, and read-only Memory Store boundaries against `ARCH_generator.md`
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -112,6 +112,6 @@ Build live Generator behavior behind the Phase 1 public contract. Keep Generator
 - [x] **5.2.4 — Response generation**: Implemented `respond()` using inbound message content, relevant Memory Store search/query context, ambient context, personality snapshot, generated response parsing, and `originating_message_id` threading preservation for the router.
 - [x] **5.2.5 — Free-play generation**: Implemented `free_play()` with fresh personality snapshot loading, trigger-note reads, deterministic prompt assembly carrying affordances and lateral budget, generated output parsing with `output_mode="free_play"` and `is_lateral=True`, trigger/source note attribution fallback, and no Memory Store writes.
 - [x] **5.2.6 — Skeptical memory verification**: Implemented verification-tier LLM claim extraction and recent Tier 1 counter-evidence checks behind `config.skeptical_memory`, recording `Contradiction` objects in `PersonalitySnapshot` and `GeneratorOutput` without writing to Memory Store.
-- [ ] **5.2.7 — Prompt/parse hardening and phase integration**: Add integration coverage across prompted, response, and free-play paths; verify config tier propagation, rotation fallback behavior if supported by toolkit without public API changes, read-only Memory Store behavior, and focused generator/full-suite tests.
+- [x] **5.2.7 — Prompt/parse hardening and phase integration**: Added internal primary-plus-rotation LLM config fallback for provider-call failures without public API changes, preserved parse-error hard stops, and added integration coverage across prompted, response, and free-play paths for config tier propagation, rotation fallback, read-only Memory Store behavior, source attribution, threading, and focused generator/full-suite tests.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
