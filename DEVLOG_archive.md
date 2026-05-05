@@ -1,5 +1,57 @@
 # Phosphene — Development Log Archive
 
+## Module 3 Phase 1.5 archived 2026-05-05
+
+### Step 3.1.5.infra: Coverage tooling baseline
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added `pytest-cov` to the project dev dependency set and installed it into the existing `.python_deps/` target for the documented non-venv test workflow. No `src/` or `tests/` files were modified.
+
+Captured the baseline coverage report with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing`; 310 tests pass. Overall coverage is 98%.
+
+Module coverage baseline:
+- `memory_store`: 507 statements, 8 missed, 98% coverage.
+- `attention_filter`: 485 statements, 14 missed, 97% coverage.
+- `source_ingestion`: 197 statements, 2 missed, 99% coverage.
+
+No module is below the 80% follow-up threshold.
+
+## Phase 3.1.5 Review — Coverage Tooling Infra
+
+**Date:** 2026-05-04
+**Regime:** Build
+**Mode:** autonomous
+**Outcome:** Reviewed Module 3 Phase 1.5 against its instrumentation-only scope; no must-fix or should-fix changes were required.
+
+Validated that the phase added `pytest-cov` to project dev dependencies, captured a reproducible baseline coverage report, and avoided `src/` or `tests/` modifications. The baseline remains above the 80% follow-up threshold for `memory_store`, `attention_filter`, and `source_ingestion`.
+
+Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing` (310 passed, 98% total coverage).
+
+### Findings
+- Must fix: none.
+- Should fix: none.
+- Optional: none recorded.
+
+### Phase 3.1.5 Completion: Coverage tooling infra
+
+**Date:** 2026-05-04
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed the Module 3 Phase 1.5 coverage-tooling infra boundary. Final verification ran the full test suite with the coverage command: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing`; 310 tests pass with 98% total coverage.
+
+Phase 1.5 retired the deferred coverage-tooling investment in `ARCHITECTURE.md`: `pytest-cov` is now part of dev dependencies, the existing `.python_deps` workflow supports coverage runs, and the baseline records `memory_store` at 98%, `attention_filter` at 97%, and `source_ingestion` at 99%. No module is below the 80% follow-up threshold.
+DEVLOG learning review: Phase 3.1.5 landed linearly across one instrumentation step and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 3.1.5 step and review entries recorded no contract changes. D-32 documents the instrumentation-only acceptance; no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 3 Phase 1.5 iterations 70-71 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 1.5 to a one-line completion summary, kept Module 3 active, and cleared active frontmatter pending human audit before Module 3 Phase 2 planning.
+ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 1.5 complete"; Deferred Test Investments coverage-tooling row marked complete with baseline numbers.
+
 <!-- Archived module entries from DEVLOG.md.
      Active development entries live in DEVLOG.md; only completed-module
      entries are moved here per the archival rule in GOVERNANCE.md. -->

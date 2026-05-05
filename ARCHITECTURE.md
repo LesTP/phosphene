@@ -60,7 +60,7 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 |-------|--------|-----------|--------|
 | 1 | Memory Store | Leaf. Everything depends on it. Three-tier CRUD, index layer, density metrics API. | Complete |
 | 2 | Attention Filter | First module that actively uses Memory Store. Tests density metrics. Core novel mechanism. | Complete |
-| 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Phase 1.5 complete |
+| 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Complete |
 | 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Not started |
 | 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Not started |
 | 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Not started |
@@ -85,7 +85,7 @@ Test-debt items recognised but not scheduled. Each has an explicit promote-when 
 
 | Investment | Promote when | Status |
 |------------|--------------|--------|
-| Real-adapter integration tests for Source Ingestion (Telegram / RSS / Reddit / corpus) | Concrete adapters land in Module 3 Phase 2+. Each adapter's PR includes at least one test that hits the real API surface (recorded fixture or live, depending on adapter), not just the FakeAdapter path. | Deferred — Phase 1 (foundation) intentionally uses fakes only. |
+| Real-adapter integration tests for Source Ingestion (Telegram / RSS / Reddit / corpus) | Concrete adapters land in Module 3 Phase 2+. Each adapter's PR includes at least one test that hits the real API surface (recorded fixture or live, depending on adapter), not just the FakeAdapter path. | Partially complete — Phase 2 added fixture and fake-boundary coverage for all concrete adapters; live external-service tests remain deferred until credentials and a live integration harness exist. |
 | LLM prompt/parse round-trip tests for Attention Filter | A model upgrade is planned, OR a production parsing failure is observed, OR before Generator (Module 5) ships (since Generator inherits the same prompt/parse risk surface). | Deferred — current FakeLLM tests verify control flow but not the actual prompt strings or JSON-parse-on-real-output. |
 | Property-based tests (decay, scoring blends, normalization helpers) | A bug is found in one of these areas that example-based tests missed, OR before any of these algorithms is changed in a non-trivial way (the property tests then act as regression armour for the change). | Deferred — example-based coverage is currently sufficient and property tests have a non-trivial setup cost (hypothesis dependency, strategy design). |
 | Coverage tooling (pytest-cov + baseline report) | Completed at the Module 3 Phase 1 → Phase 2 boundary. Re-run before phase completions or when coverage drops are suspected. | Complete — baseline captured 2026-05-04: 310 tests pass, 98% total coverage; memory_store 98%, attention_filter 97%, source_ingestion 99%. |

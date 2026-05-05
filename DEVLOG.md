@@ -9,56 +9,6 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
-### Step 3.1.5.infra: Coverage tooling baseline
-
-**Date:** 2026-05-04
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added `pytest-cov` to the project dev dependency set and installed it into the existing `.python_deps/` target for the documented non-venv test workflow. No `src/` or `tests/` files were modified.
-
-Captured the baseline coverage report with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing`; 310 tests pass. Overall coverage is 98%.
-
-Module coverage baseline:
-- `memory_store`: 507 statements, 8 missed, 98% coverage.
-- `attention_filter`: 485 statements, 14 missed, 97% coverage.
-- `source_ingestion`: 197 statements, 2 missed, 99% coverage.
-
-No module is below the 80% follow-up threshold.
-
-## Phase 3.1.5 Review — Coverage Tooling Infra
-
-**Date:** 2026-05-04
-**Regime:** Build
-**Mode:** autonomous
-**Outcome:** Reviewed Module 3 Phase 1.5 against its instrumentation-only scope; no must-fix or should-fix changes were required.
-
-Validated that the phase added `pytest-cov` to project dev dependencies, captured a reproducible baseline coverage report, and avoided `src/` or `tests/` modifications. The baseline remains above the 80% follow-up threshold for `memory_store`, `attention_filter`, and `source_ingestion`.
-
-Tests passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing` (310 passed, 98% total coverage).
-
-### Findings
-- Must fix: none.
-- Should fix: none.
-- Optional: none recorded.
-
-### Phase 3.1.5 Completion: Coverage tooling infra
-
-**Date:** 2026-05-04
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Closed the Module 3 Phase 1.5 coverage-tooling infra boundary. Final verification ran the full test suite with the coverage command: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ --cov=src/phosphene --cov-report=term-missing`; 310 tests pass with 98% total coverage.
-
-Phase 1.5 retired the deferred coverage-tooling investment in `ARCHITECTURE.md`: `pytest-cov` is now part of dev dependencies, the existing `.python_deps` workflow supports coverage runs, and the baseline records `memory_store` at 98%, `attention_filter` at 97%, and `source_ingestion` at 99%. No module is below the 80% follow-up threshold.
-DEVLOG learning review: Phase 3.1.5 landed linearly across one instrumentation step and one review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
-Contract Changes scan: Phase 3.1.5 step and review entries recorded no contract changes. D-32 documents the instrumentation-only acceptance; no upstream contract propagation is required.
-Log review: `logs/loop/summary.log` shows Module 3 Phase 1.5 iterations 70-71 completed without escalations or repeated tool failures. No new operational Gotchas to promote.
-DEVPLAN cleanup: reduced Phase 1.5 to a one-line completion summary, kept Module 3 active, and cleared active frontmatter pending human audit before Module 3 Phase 2 planning.
-ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 1.5 complete"; Deferred Test Investments coverage-tooling row marked complete with baseline numbers.
-
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import
 
 **Date:** 2026-05-04
@@ -150,6 +100,23 @@ Focused tests cover fake Telegram and Reddit clients, marker advancement, captio
 Added optional durable last-seen marker persistence owned entirely by Source Ingestion. Managers now load and save per-adapter markers to a JSON marker store when adapters share a `params["marker_store_path"]`; without that setting, existing in-memory marker behavior is unchanged. Marker writes are atomic, marker types are preserved for datetime/string/numeric/bool/None values, and no Memory Store import or public dataclass/signature change was introduced.
 
 Added cross-adapter manager coverage for mixed adapter polling, per-adapter marker preservation across manager instances, and marker type restoration. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (69 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest --cov=phosphene --cov-report=term-missing` (346 passed, 94% total coverage; Source Ingestion modules remain above 80%).
+
+### Phase 3.2 Completion: Concrete adapters, human-share, and corpus import
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Module 3 Phase 2 and the Source Ingestion module. Final verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (69 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest --cov=phosphene --cov-report=term-missing` (346 passed, 94% total coverage).
+
+Phase 2 delivered the concrete Source Ingestion adapter set behind the existing manager contract: shared fetch/extraction and marker utilities, RSS/Atom polling, local text/blog imports, LiveJournal/Twitter/conversation corpus imports, human-share polling, Telegram channel polling, Reddit polling, and Source Ingestion-owned durable marker persistence. Public dataclass shapes and manager signatures stayed stable, and no Memory Store import was introduced.
+
+DEVLOG learning review: Phase 3.2 landed linearly across plan, seven implementation steps, and review. No repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 3.2 plan and step entries recorded "Contract changes: None"; D-33 and D-34 document internal scope decisions, and no upstream contract propagation is required.
+Log review: `logs/loop/summary.log` shows Module 3 Phase 2 iterations 73-81 completed without repeated tool failures. Review iteration 81 applied two code fixes and escalated for the normal human audit gate; no new operational Gotchas to promote.
+DEVPLAN cleanup: reduced Phase 2 to a one-line completion summary, marked Module 3 complete, and set frontmatter to await human audit before Module 4 Gateway planning.
+ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1.5 complete" to "Complete"; Source Ingestion real-adapter test investment marked partially complete with live external-service testing still deferred.
 
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
