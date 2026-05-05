@@ -2,7 +2,7 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.4
+step: 4.1.5
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Step 4.1.4: local log adapter
+- **Focus** — Step 4.1.5: inbound and feedback callback dispatch harness
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -101,7 +101,7 @@ Build the Gateway public contract and internal adapter foundation without live e
 - [x] **Step 4.1.3 — Outbound send routing and default delivery**
   - Implement `send` and `send_to_default` over the adapter protocol with platform lookup, format validation, reply metadata handoff, intent-tag preservation, and adapter failure conversion into `DeliveryResult` where ARCH requires non-raised delivery failures.
   - Tests: platform-not-found, unsupported format, successful delivery with message IDs, adapter delivery failure, default-platform convenience behavior.
-- [ ] **Step 4.1.4 — Local log adapter**
+- [x] **Step 4.1.4 — Local log adapter**
   - Implement the `log` adapter for local development output with no credentials, `params["log_path"]`, timestamped records, content/format/intent metadata preservation, and no inbound listener behavior.
   - Tests: file creation/append behavior, metadata serialization, missing log-path validation, output-only listener no-op semantics.
 - [ ] **Step 4.1.5 — Inbound and feedback callback dispatch harness**

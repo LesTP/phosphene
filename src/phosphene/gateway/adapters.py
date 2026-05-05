@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+import json
+from pathlib import Path
 from typing import Protocol
 
 from phosphene.gateway.errors import PlatformConnectionError
@@ -96,6 +99,48 @@ class FakeGatewayAdapter(OutputOnlyAdapter):
     """Deterministic in-process adapter for Gateway lifecycle tests."""
 
 
+class LogGatewayAdapter:
+    """Local development adapter that appends outbound messages as JSON lines."""
+
+    def __init__(self, config: PlatformConfig) -> None:
+        self.config = config
+        self.log_path = Path(config.params["log_path"])
+        self.sent_count = 0
+
+    def send(self, message: OutboundMessage) -> DeliveryResult:
+        self.sent_count += 1
+        message_id = f"{self.config.name}-{self.sent_count}"
+        record = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "platform": self.config.name,
+            "message_id": message_id,
+            "content": message.content,
+            "format": message.format,
+            "reply_to": message.reply_to,
+            "intent_tag": message.intent_tag,
+            "metadata": message.metadata,
+        }
+        self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(record, sort_keys=True) + "\n")
+
+        return DeliveryResult(
+            success=True,
+            platform=self.config.name,
+            message_id=message_id,
+        )
+
+    def start_listener(
+        self,
+        on_message: InboundCallback,
+        on_feedback: FeedbackCallback,
+    ) -> None:
+        return None
+
+    def stop_listener(self) -> None:
+        return None
+
+
 class PendingGatewayAdapter:
     """Placeholder for ARCH adapter types implemented in later phases."""
 
@@ -128,7 +173,7 @@ def fake_adapter_factory(config: PlatformConfig) -> GatewayAdapter:
 
 
 def log_adapter_factory(config: PlatformConfig) -> GatewayAdapter:
-    return OutputOnlyAdapter(config)
+    return LogGatewayAdapter(config)
 
 
 def pending_adapter_factory(config: PlatformConfig) -> GatewayAdapter:

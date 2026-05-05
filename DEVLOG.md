@@ -162,6 +162,17 @@ Implemented `Gateway.send` over the internal adapter protocol with enabled-platf
 
 Extended the internal fake/output-only adapter surface with deterministic send behavior for local tests while leaving real log-file delivery to Step 4.1.4. Focused tests cover target-platform routing, reply metadata and intent-tag preservation, platform-not-found and disabled-platform failures, unsupported format rejection, adapter delivery error conversion, and default-platform delivery. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (26 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (372 passed).
 
+### Step 4.1.4: Local log adapter
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the concrete `log` Gateway adapter for local development output behind the existing internal adapter registry. The adapter uses `params["log_path"]`, creates parent directories as needed, appends one JSON record per outbound message, preserves content, format, reply target, intent tag, and metadata, and returns deterministic local message IDs for feedback attribution tests.
+
+Kept the adapter output-only: listener start/stop hooks are no-ops and do not create inbound activity or persistent listener state beyond the Gateway lifecycle bookkeeping already established in Step 4.1.2. Focused tests cover log file creation, append ordering, metadata serialization, missing log-path validation through existing config coverage, and listener no-op behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (375 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
