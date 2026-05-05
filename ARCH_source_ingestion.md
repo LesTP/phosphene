@@ -21,7 +21,7 @@ class ContentItem:
 
 @dataclass
 class AdapterConfig:
-    adapter_type: str                               # "telegram_channel", "telegram_bot", "rss", "reddit", "human_share",
+    adapter_type: str                               # "telegram_channel", "rss", "reddit", "human_share",
                                                      # "corpus_livejournal", "corpus_twitter", "corpus_blog",
                                                      # "corpus_conversations", "corpus_text"
     source_label: str                               # human-readable name (e.g., "Philosophy channel", "My shares")

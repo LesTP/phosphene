@@ -40,7 +40,6 @@ from phosphene.source_ingestion.types import (
 
 _SUPPORTED_ADAPTER_TYPES = {
     "telegram_channel",
-    "telegram_bot",
     "rss",
     "reddit",
     "human_share",
