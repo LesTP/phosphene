@@ -3,10 +3,10 @@ module: GATEWAY
 phase: 2
 phase_title: Gateway Phase 2 — Telegram adapter delivery and polling
 step: 4.2.5
-mode: Review
+mode: Complete
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 4 Phase 2 ready for review
-- **Focus** — Review concrete Telegram Gateway adapter delivery and polling
+- **Phase** — Module 4 Phase 2 reviewed; ready for completion
+- **Focus** — Complete concrete Telegram Gateway adapter delivery and polling
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)

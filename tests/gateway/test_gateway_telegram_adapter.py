@@ -247,6 +247,29 @@ def test_telegram_adapter_sends_telegraph_format_via_supported_long_method() -> 
     ]
 
 
+def test_telegram_adapter_rejects_telegraph_without_long_content_method() -> None:
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=FakeTelegramClient,
+    )
+    adapter = gateway._adapters_by_platform["telegram"]
+
+    result = gateway.send(
+        OutboundMessage(content="long", platform="telegram", format="telegraph")
+    )
+
+    assert result == DeliveryResult(
+        success=False,
+        platform="telegram",
+        message_id=None,
+        error="telegram client does not expose a supported telegraph send method",
+    )
+    assert adapter.client.sent_messages == []
+    assert adapter.client.api_requests == []
+
+
 def test_telegram_adapter_converts_client_send_failure_to_delivery_result() -> None:
     class FailingClient(FakeTelegramClient):
         async def send_message(

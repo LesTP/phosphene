@@ -169,6 +169,17 @@ Added end-to-end fake-client Gateway coverage for mixed Telegram/log platform co
 
 Added mixed-platform listener cleanup coverage showing Gateway starts both enabled adapters, stops the Telegram polling thread through the fake toolkit client's shutdown hook, clears all listening platform state, and leaves the output-only log adapter without file side effects. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (49 passed).
 
+### Phase 4.2 Review: Telegram adapter delivery and polling
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Gateway Phase 2 against `ARCH_gateway.md`. Must fix: prevent requested `telegraph` delivery from silently falling back to plain Telegram sends when the toolkit client does not expose a supported long-content/Telegraph method. Should fix: none beyond that correctness hardening. Optional: no optional changes deferred.
+
+Added focused regression coverage for unsupported Telegraph delivery and verified the full Gateway suite with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (50 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

@@ -349,6 +349,9 @@ def _send_telegram_message(
                         )
                     )
                 )
+        raise RuntimeError(
+            "telegram client does not expose a supported telegraph send method"
+        )
 
     return _send_plain_telegram_message(
         client,
