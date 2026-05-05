@@ -4,7 +4,7 @@ phase: null
 phase_title: Gateway Phase 1 complete — Gateway Phase 2 next
 step: null
 mode: Complete
-blocked: "awaiting-human-audit"
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -35,7 +35,7 @@ review_done: false
 
 - **Phase** — Module 4 Phase 1 complete; awaiting human audit before Gateway Phase 2 planning
 - **Focus** — Gateway contract and local/fake adapter foundation delivered
-- **Blocked/Broken** — Awaiting human audit
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
