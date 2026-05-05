@@ -127,6 +127,19 @@ Implemented the concrete `human_share` adapter behind the existing Source Ingest
 
 No public dataclasses or manager signatures changed. Last-seen markers remain manager-owned and adapter-local, and the toolkit dependency stays behind an internal boundary so tests use fake Telegram clients without importing external services. Focused tests cover fake Telegram messages for all three message shapes, page fetch success/failure, annotation/link preservation, marker advancement, and ignored non-target chats. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (62 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (339 passed).
 
+### Step 3.2.6: Telegram channel and Reddit adapters
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented concrete `telegram_channel` and `reddit` adapters behind the existing Source Ingestion manager/registry contract. Telegram channel polling stays behind the toolkit Telegram client boundary, normalizes text, captions, and forwarded message content, extracts links through shared normalization, and reports API failures inside `IngestionResult.errors`.
+
+Added a small internal Reddit HTTP/API boundary that normalizes subreddit listing posts for the existing `new`, `hot`, and `top` sort values. The Reddit adapter preserves self-post and link-post titles, bodies, authors, timestamps, and URLs without ingesting comments, and converts API failures into adapter-local errors. No public dataclasses or manager signatures changed.
+
+Focused tests cover fake Telegram and Reddit clients, marker advancement, caption/forwarded-content normalization, Reddit self/link post handling, sort propagation, and API failure conversion. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (66 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
