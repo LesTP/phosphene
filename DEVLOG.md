@@ -147,6 +147,17 @@ Implemented non-blocking Telegram listener polling behind the existing internal 
 
 Added private normalization helpers for toolkit-normalized Telegram updates and raw Bot API update dictionaries, producing Gateway `InboundMessage` values with content, platform, message ID, sender, timestamp, reply target, reactions when present, and raw payload metadata. Callback exception isolation remains Gateway-owned through the existing dispatch wrappers. Focused fake-client tests cover polling delivery, inbound normalization, non-blocking/idempotent lifecycle behavior, `listen=False`, and callback exception recording. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (45 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (391 passed).
 
+### Step 4.2.4: Telegram feedback signal normalization
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Extended the Telegram polling path to normalize feedback events alongside inbound messages without changing public Gateway dataclasses. Raw Telegram reaction updates now emit `FeedbackSignal(signal_type="reaction")`, reply messages emit `signal_type="reply"` against the replied-to message ID, and edited messages emit `signal_type="edit"` against the edited message ID. Toolkit-normalized feedback objects are also supported through the same private boundary.
+
+The adapter now forwards `on_feedback` through the existing Gateway-owned dispatch wrapper, so feedback callback failures are isolated and recorded consistently with inbound callback failures. Raw update dictionaries are preserved on emitted feedback signals as adapter-owned metadata for downstream attribution while the public dataclass field list remains stable. Focused fake-client tests cover reactions, replies, edits, sender/timestamp normalization, raw metadata preservation, and feedback callback exception isolation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (393 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

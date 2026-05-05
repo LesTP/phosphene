@@ -6,6 +6,7 @@ import pytest
 
 from phosphene.gateway import (
     DeliveryResult,
+    FeedbackSignal,
     Gateway,
     GatewayConfig,
     OutboundMessage,
@@ -357,6 +358,113 @@ def test_telegram_callback_exceptions_remain_gateway_owned() -> None:
     gateway.stop_listener()
 
     assert [str(error) for error in gateway._callback_errors] == ["callback failed"]
+
+
+def test_telegram_listener_normalizes_feedback_from_reactions_replies_and_edits() -> None:
+    class FeedbackTelegramClient(PollingTelegramClient):
+        def __init__(self, config: PlatformConfig) -> None:
+            super().__init__(config)
+            self.update_batches = [
+                [
+                    {
+                        "update_id": 20,
+                        "message_reaction": {
+                            "message_id": 201,
+                            "date": 1_777_777_781,
+                            "user": {"id": 42, "username": "human"},
+                            "new_reaction": [{"type": "emoji", "emoji": "heart"}],
+                        },
+                    },
+                    {
+                        "update_id": 21,
+                        "message": {
+                            "message_id": 202,
+                            "date": 1_777_777_782,
+                            "text": "that landed",
+                            "from": {"id": 43},
+                            "reply_to_message": {"message_id": 201},
+                        },
+                    },
+                    {
+                        "update_id": 22,
+                        "edited_message": {
+                            "message_id": 201,
+                            "date": 1_777_777_780,
+                            "edit_date": 1_777_777_783,
+                            "text": "edited thought",
+                            "from": {"id": 44, "username": "editor"},
+                        },
+                    },
+                ]
+            ]
+
+    received: list[FeedbackSignal] = []
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        lambda _: None,
+        received.append,
+        _telegram_client_factory=FeedbackTelegramClient,
+    )
+
+    gateway.start_listener()
+    _wait_for(lambda: len(received) == 3)
+    gateway.stop_listener()
+
+    normalized = [
+        (signal.signal_type, signal.message_id, signal.value) for signal in received
+    ]
+    assert normalized == [
+        ("reaction", "201", "heart"),
+        ("reply", "201", "that landed"),
+        ("edit", "201", "edited thought"),
+    ]
+    assert [signal.sender for signal in received] == ["human", "43", "editor"]
+    assert received[0].timestamp == datetime.fromtimestamp(
+        1_777_777_781, timezone.utc
+    )
+    assert received[2].timestamp == datetime.fromtimestamp(
+        1_777_777_783, timezone.utc
+    )
+    assert received[0].raw["update_id"] == 20
+    assert received[1].raw["message"]["message_id"] == 202
+
+
+def test_telegram_feedback_callback_exceptions_remain_gateway_owned() -> None:
+    class FeedbackTelegramClient(PollingTelegramClient):
+        def __init__(self, config: PlatformConfig) -> None:
+            super().__init__(config)
+            self.update_batches = [
+                [
+                    {
+                        "update_id": 23,
+                        "message_reaction": {
+                            "message_id": 300,
+                            "date": 1_777_777_784,
+                            "user": {"id": 42},
+                            "new_reaction": [{"type": "emoji", "emoji": "thumbs_up"}],
+                        },
+                    }
+                ]
+            ]
+
+    received: list[str] = []
+
+    def on_feedback(signal: FeedbackSignal) -> None:
+        received.append(signal.message_id)
+        raise RuntimeError("feedback failed")
+
+    gateway = Gateway(
+        GatewayConfig(platforms=[_telegram_platform()], default_platform="telegram"),
+        lambda _: None,
+        on_feedback,
+        _telegram_client_factory=FeedbackTelegramClient,
+    )
+
+    gateway.start_listener()
+    _wait_for(lambda: received == ["300"])
+    gateway.stop_listener()
+
+    assert [str(error) for error in gateway._callback_errors] == ["feedback failed"]
 
 
 def test_telegram_adapter_rejects_noncallable_client_factory() -> None:

@@ -210,7 +210,6 @@ class TelegramGatewayAdapter:
         on_message: InboundCallback,
         on_feedback: FeedbackCallback,
     ) -> None:
-        del on_feedback
         if self._listener_thread is not None and self._listener_thread.is_alive():
             return
         if not _supports_telegram_polling(self.client):
@@ -222,7 +221,7 @@ class TelegramGatewayAdapter:
         self._stop_polling.clear()
         self._listener_thread = threading.Thread(
             target=self._run_polling,
-            args=(on_message,),
+            args=(on_message, on_feedback),
             name=f"phosphene-gateway-{self.config.name}-poller",
             daemon=True,
         )
@@ -237,25 +236,38 @@ class TelegramGatewayAdapter:
             self._listener_thread.join(timeout=1.0)
             self._listener_thread = None
 
-    def _run_polling(self, on_message: InboundCallback) -> None:
+    def _run_polling(
+        self,
+        on_message: InboundCallback,
+        on_feedback: FeedbackCallback,
+    ) -> None:
         while not self._stop_polling.is_set():
             try:
-                for message in _poll_telegram_inbound(
+                events = _poll_telegram_events(
                     self.client,
                     platform=self.config.name,
                     offset=self._poll_offset,
                     timeout=self._poll_timeout_seconds,
-                ):
+                )
+                for update in events.updates:
                     if self._stop_polling.is_set():
                         break
-                    if (update_id := _raw_update_id(message.raw)) is not None:
+                    raw_update = _object_to_raw_dict(update)
+                    if (update_id := _raw_update_id(raw_update)) is not None:
                         next_offset = update_id + 1
                         self._poll_offset = (
                             next_offset
                             if self._poll_offset is None
                             else max(self._poll_offset, next_offset)
                         )
+                for message in events.messages:
+                    if self._stop_polling.is_set():
+                        break
                     on_message(message)
+                for signal in events.feedback:
+                    if self._stop_polling.is_set():
+                        break
+                    on_feedback(signal)
             except Exception as exc:  # noqa: BLE001 - keep background listener alive.
                 self._listener_error = exc
                 if self._stop_polling.wait(self._poll_interval_seconds):
@@ -436,9 +448,37 @@ def _poll_telegram_inbound(
     offset: int | None,
     timeout: int,
 ) -> list[InboundMessage]:
+    return _poll_telegram_events(
+        client,
+        platform=platform,
+        offset=offset,
+        timeout=timeout,
+    ).messages
+
+
+class _TelegramPollEvents:
+    def __init__(
+        self,
+        *,
+        updates: list[object],
+        messages: list[InboundMessage],
+        feedback: list[FeedbackSignal],
+    ) -> None:
+        self.updates = updates
+        self.messages = messages
+        self.feedback = feedback
+
+
+def _poll_telegram_events(
+    client: object,
+    *,
+    platform: str,
+    offset: int | None,
+    timeout: int,
+) -> _TelegramPollEvents:
     raw_updates = _fetch_telegram_updates(client, offset=offset, timeout=timeout)
     if raw_updates is None:
-        return []
+        return _TelegramPollEvents(updates=[], messages=[], feedback=[])
     if not isinstance(raw_updates, list):
         raw_updates = [raw_updates]
 
@@ -451,11 +491,17 @@ def _poll_telegram_inbound(
             raw_updates = normalized
 
     messages: list[InboundMessage] = []
+    feedback: list[FeedbackSignal] = []
     for update in raw_updates:
         message = _normalize_telegram_inbound(update, platform=platform)
         if message is not None:
             messages.append(message)
-    return messages
+        feedback.extend(_normalize_telegram_feedback(update, platform=platform))
+    return _TelegramPollEvents(
+        updates=list(raw_updates),
+        messages=messages,
+        feedback=feedback,
+    )
 
 
 def _fetch_telegram_updates(
@@ -526,6 +572,165 @@ def _normalize_telegram_inbound(
         reactions=_telegram_reactions(message),
         raw=dict(update),
     )
+
+
+def _normalize_telegram_feedback(
+    update: object,
+    *,
+    platform: str,
+) -> list[FeedbackSignal]:
+    raw = _object_to_raw_dict(update)
+    signals: list[FeedbackSignal] = []
+    if isinstance(update, Mapping):
+        reaction_payload = update.get("message_reaction")
+        if isinstance(reaction_payload, Mapping):
+            signal = _feedback_from_reaction_payload(
+                reaction_payload,
+                platform=platform,
+                raw=raw,
+            )
+            if signal is not None:
+                signals.append(signal)
+
+        message = update.get("message")
+        if isinstance(message, Mapping):
+            reply_signal = _feedback_from_reply_message(
+                message,
+                platform=platform,
+                raw=raw,
+            )
+            if reply_signal is not None:
+                signals.append(reply_signal)
+
+        edited_message = update.get("edited_message")
+        if isinstance(edited_message, Mapping):
+            edit_signal = _feedback_from_edited_message(
+                edited_message,
+                platform=platform,
+                raw=raw,
+            )
+            if edit_signal is not None:
+                signals.append(edit_signal)
+    elif _has_attr(update, "feedback_type"):
+        signal = _feedback_from_normalized_update(update, platform=platform, raw=raw)
+        if signal is not None:
+            signals.append(signal)
+    return signals
+
+
+def _feedback_from_reaction_payload(
+    payload: Mapping,
+    *,
+    platform: str,
+    raw: dict | None,
+) -> FeedbackSignal | None:
+    message_id = _coerce_optional_int(payload.get("message_id"))
+    if message_id is None:
+        return None
+    values = _telegram_reaction_values(payload.get("new_reaction"))
+    if not values:
+        values = _telegram_reaction_values(payload.get("reaction"))
+    value = ",".join(values) if values else None
+    return _with_raw_feedback(
+        FeedbackSignal(
+            platform=platform,
+            message_id=str(message_id),
+            signal_type="reaction",
+            value=value,
+            sender=_telegram_sender(payload.get("user")),
+            timestamp=_telegram_timestamp(payload.get("date")),
+        ),
+        raw,
+    )
+
+
+def _feedback_from_reply_message(
+    message: Mapping,
+    *,
+    platform: str,
+    raw: dict | None,
+) -> FeedbackSignal | None:
+    reply_payload = message.get("reply_to_message")
+    if not isinstance(reply_payload, Mapping):
+        return None
+    replied_id = _coerce_optional_int(reply_payload.get("message_id"))
+    if replied_id is None:
+        return None
+    value = message.get("text")
+    if not isinstance(value, str):
+        value = message.get("caption")
+    return _with_raw_feedback(
+        FeedbackSignal(
+            platform=platform,
+            message_id=str(replied_id),
+            signal_type="reply",
+            value=value if isinstance(value, str) else None,
+            sender=_telegram_sender(message.get("from")),
+            timestamp=_telegram_timestamp(message.get("date")),
+        ),
+        raw,
+    )
+
+
+def _feedback_from_edited_message(
+    message: Mapping,
+    *,
+    platform: str,
+    raw: dict | None,
+) -> FeedbackSignal | None:
+    message_id = _coerce_optional_int(message.get("message_id"))
+    if message_id is None:
+        return None
+    value = message.get("text")
+    if not isinstance(value, str):
+        value = message.get("caption")
+    return _with_raw_feedback(
+        FeedbackSignal(
+            platform=platform,
+            message_id=str(message_id),
+            signal_type="edit",
+            value=value if isinstance(value, str) else None,
+            sender=_telegram_sender(message.get("from")),
+            timestamp=_telegram_timestamp(
+                message.get("edit_date")
+                if message.get("edit_date") is not None
+                else message.get("date")
+            ),
+        ),
+        raw,
+    )
+
+
+def _feedback_from_normalized_update(
+    update: object,
+    *,
+    platform: str,
+    raw: dict | None,
+) -> FeedbackSignal | None:
+    message_id = getattr(update, "message_id", None)
+    signal_type = getattr(update, "feedback_type", None)
+    sender = getattr(update, "user_id", None)
+    if message_id is None or not isinstance(signal_type, str) or sender is None:
+        return None
+    return _with_raw_feedback(
+        FeedbackSignal(
+            platform=platform,
+            message_id=str(message_id),
+            signal_type=signal_type,
+            value=getattr(update, "value", None),
+            sender=str(sender),
+            timestamp=_telegram_timestamp(_field_from_raw(raw, "date")),
+        ),
+        raw,
+    )
+
+
+def _with_raw_feedback(
+    signal: FeedbackSignal,
+    raw: dict | None,
+) -> FeedbackSignal:
+    signal.raw = raw
+    return signal
 
 
 def _inbound_from_normalized_update(
@@ -599,6 +804,10 @@ def _telegram_reactions(message: Mapping) -> list[str] | None:
     raw_reactions = message.get("reactions") or message.get("reaction")
     if raw_reactions is None:
         return None
+    return _telegram_reaction_values(raw_reactions) or None
+
+
+def _telegram_reaction_values(raw_reactions: object) -> list[str]:
     if isinstance(raw_reactions, str):
         return [raw_reactions]
     if isinstance(raw_reactions, list):
@@ -608,10 +817,18 @@ def _telegram_reactions(message: Mapping) -> list[str] | None:
                 reactions.append(reaction)
             elif isinstance(reaction, Mapping):
                 value = reaction.get("emoji") or reaction.get("type")
+                if isinstance(value, Mapping):
+                    value = value.get("emoji") or value.get("type")
                 if value is not None:
                     reactions.append(str(value))
-        return reactions or None
-    return None
+        return reactions
+    if isinstance(raw_reactions, Mapping):
+        value = raw_reactions.get("emoji") or raw_reactions.get("type")
+        if isinstance(value, Mapping):
+            value = value.get("emoji") or value.get("type")
+        if value is not None:
+            return [str(value)]
+    return []
 
 
 def _raw_update_id(raw: dict | None) -> int | None:
