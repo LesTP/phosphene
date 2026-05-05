@@ -1,10 +1,10 @@
 ---
-module: SOURCE_INGESTION
-phase: null
-phase_title: Module 3 complete — Module 4 Gateway next
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+module: GATEWAY
+phase: 1
+phase_title: Gateway contract and adapter foundation
+step: 4.1.1
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -28,12 +28,14 @@ review_done: false
   - Model selection policy D-5: single primary model during establishment phase (~90 days)
   - NTFS drives: use `bash script.sh`, not `./script.sh`
   - **Test environment** — system Python is 3.11.2 with no pytest; `pip install --user` is blocked (externally-managed-environment); `python3 -m venv .venv` creates binaries that can't run on this NTFS-3G mount (no exec bits, can't chmod). Working pattern: `pip install --target .python_deps` (already pre-installed in repo root) and run with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`. Do NOT recreate `.venv` or reinstall — `.python_deps/` is gitignored and persists.
+  - **No ripgrep** — `rg` is not installed in the Codex container. Use `find` and `grep` instead. Do not attempt `rg` on first command.
+  - **Subagent context** — when spawning Explore or review subagents, include in the prompt: (1) source tree layout is `src/phosphene/<module>/`, not `src/<module>/`; (2) the working test command is `PYTHONPATH=src:.python_deps python3 -m pytest`; (3) `.python_deps/` contains all pip dependencies. Subagents have no memory of the parent's environment discovery.
 
 ## Current Status
 
-- **Phase** — Module 3 Source Ingestion complete
-- **Focus** — Awaiting human audit before Module 4 Gateway planning
-- **Blocked/Broken** — awaiting-human-audit
+- **Phase** — Module 4 Phase 1 in progress
+- **Focus** — Step 4.1.1: public contract, errors, exports, and config validation
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
@@ -79,5 +81,32 @@ Added `pytest-cov` dev tooling and captured the full-suite baseline: 310 tests p
 ### Phase 2 (complete): Concrete adapters, human-share, and corpus import
 
 Delivered shared adapter utilities, RSS/Atom, local and structured corpus adapters, human-share, Telegram channel, Reddit, Source Ingestion-owned durable marker persistence, and cross-adapter manager coverage while keeping public dataclasses stable and avoiding a Memory Store dependency. Reviewed and completed. See DEVLOG "Phase 3.2 Completion" entry.
+
+## Module 4: Gateway (in progress)
+
+Planned phases follow `ARCH_gateway.md`: first stabilize the public Gateway contract, validation, adapter registry, outbound routing, local log adapter, and listener callback semantics with fake/local adapters; then add concrete Telegram delivery and polling behavior through the toolkit boundary.
+
+### Phase 1 (in progress): Gateway contract and adapter foundation
+
+Build the Gateway public contract and internal adapter foundation without live external-service behavior. Scope includes ARCH-aligned dataclasses/errors/exports, config validation, adapter protocol/registry seams, outbound send routing, local log delivery, listener lifecycle orchestration, and fake-adapter inbound/feedback callback dispatch.
+
+- [ ] **Step 4.1.1 — Public contract, errors, exports, and config validation**
+  - Add `src/phosphene/gateway/` package scaffold with ARCH-aligned public dataclasses, errors, and package exports.
+  - Validate duplicate platform names, default-platform presence/enabled state, unknown adapter types, missing required credentials/params, enabled-platform selection, and supported output format lists.
+  - Tests: dataclass defaults/field order where relevant, package exports, validation success/failure cases, disabled platform behavior.
+- [ ] **Step 4.1.2 — Adapter protocol, registry, and Gateway lifecycle foundation**
+  - Add internal adapter protocol and immutable registry snapshot for concrete/fake factory construction without exposing a new public API.
+  - Implement Gateway construction, enabled adapter instantiation, listener state bookkeeping, idempotent `start_listener`/`stop_listener` orchestration, and callback storage.
+  - Tests: fake adapter construction, unknown/invalid factory rejection, listener start/stop idempotence, platform connection error propagation.
+- [ ] **Step 4.1.3 — Outbound send routing and default delivery**
+  - Implement `send` and `send_to_default` over the adapter protocol with platform lookup, format validation, reply metadata handoff, intent-tag preservation, and adapter failure conversion into `DeliveryResult` where ARCH requires non-raised delivery failures.
+  - Tests: platform-not-found, unsupported format, successful delivery with message IDs, adapter delivery failure, default-platform convenience behavior.
+- [ ] **Step 4.1.4 — Local log adapter**
+  - Implement the `log` adapter for local development output with no credentials, `params["log_path"]`, timestamped records, content/format/intent metadata preservation, and no inbound listener behavior.
+  - Tests: file creation/append behavior, metadata serialization, missing log-path validation, output-only listener no-op semantics.
+- [ ] **Step 4.1.5 — Inbound and feedback callback dispatch harness**
+  - Add fake/listener adapter support for dispatching `InboundMessage` and `FeedbackSignal` callbacks through Gateway-owned wrappers while preserving platform/message metadata.
+  - Keep message-id mapping in memory only and bounded enough for later feedback attribution tests, without adding persistent state.
+  - Tests: inbound callback dispatch, feedback callback dispatch, callback exception isolation/propagation decision as documented in code, stop prevents further dispatch.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

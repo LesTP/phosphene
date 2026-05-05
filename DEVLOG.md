@@ -118,6 +118,17 @@ Log review: `logs/loop/summary.log` shows Module 3 Phase 2 iterations 73-81 comp
 DEVPLAN cleanup: reduced Phase 2 to a one-line completion summary, marked Module 3 complete, and set frontmatter to await human audit before Module 4 Gateway planning.
 ARCHITECTURE.md: Source Ingestion row in the Implementation Sequence table updated from "Phase 1.5 complete" to "Complete"; Source Ingestion real-adapter test investment marked partially complete with live external-service testing still deferred.
 
+### Phase 4.1 Plan: Gateway contract and adapter foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 4 Phase 1 as a Build phase over the Gateway public contract and internal adapter foundation. The plan starts with ARCH-aligned dataclasses, errors, package exports, and config validation, then builds the adapter protocol/registry lifecycle, outbound send routing, local log delivery, and inbound/feedback callback dispatch using fake/local adapters only.
+
+Scope decision recorded in D-36: live Telegram behavior is deferred to a later Gateway phase. Phase 1 should establish the reusable message-bus shape and local/fake testing surface without requiring credentials or external platform calls.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
