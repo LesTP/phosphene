@@ -114,6 +114,17 @@ Planned Module 5 Phase 1 as a Build phase over the Generator + Output Router fou
 
 Scope decision recorded in D-39: Phase 1 deliberately excludes live LLM generation, skeptical memory verification, and real prompt/parse behavior while preserving interface room for Tier 2 relevance and embedding boundaries. Those behaviors remain for later Generator phases once the public contract and Gateway routing surface are stable.
 
+### Step 5.1.1: Public contract, errors, and exports
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the `phosphene.generator` package foundation with ARCH-aligned public dataclasses, exception hierarchy, constructor surface, Output Router config types, and package exports. The Generator facade now exposes `generate`, `free_play`, and `respond` signatures without live LLM behavior, and `route()` is present as the Output Router boundary for later deterministic delivery implementation.
+
+Added validation for obvious config and threshold invariants: positive token budgets and window sizes, non-negative Tier 2 limits, probability-bounded output importance, non-empty free-play triggers, and ordered positive routing length thresholds. Focused export and dataclass tests cover the public API surface and fallback import compatibility for toolkit LLM types. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (12 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (408 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
