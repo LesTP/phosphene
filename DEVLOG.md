@@ -147,6 +147,17 @@ Implemented the Output Router's deterministic `route()` behavior. Intent tags co
 
 Added focused fake-Gateway coverage for log-only suppression, default-platform text delivery, markdown and Telegraph length boundaries, response threading, platform overrides, and Gateway `DeliveryResult` propagation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (418 passed).
 
+### Step 5.1.4: Phase foundation integration tests
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added package-level Generator foundation integration coverage using fake Memory Store and fake Gateway objects. The new tests show repeated activations load fresh personality snapshots, preserve Tier 3 and Tier 2 source note IDs, avoid Memory Store writes, route credential-free through a fake Gateway, and produce Gateway-compatible `OutboundMessage` values from `GeneratorOutput`.
+
+Also covered the public `generate()` Phase 1 boundary: it loads personality context before stopping at the later-phase LLM placeholder without requiring live credentials or writing to Memory Store. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (24 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (420 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
