@@ -125,6 +125,17 @@ Added the `phosphene.generator` package foundation with ARCH-aligned public data
 
 Added validation for obvious config and threshold invariants: positive token budgets and window sizes, non-negative Tier 2 limits, probability-bounded output importance, non-empty free-play triggers, and ordered positive routing length thresholds. Focused export and dataclass tests cover the public API surface and fallback import compatibility for toolkit LLM types. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (12 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (408 passed).
 
+### Step 5.1.2: Memory Store context-loading boundary
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the Generator's stateless personality snapshot boundary. Each load calls `memory_store.get_personality_context()`, raises `EmptyPersonalityError` when no Tier 3 personality files exist, carries the ambient context through the snapshot, and preserves contributing personality and Tier 2 pattern note IDs for later output attribution.
+
+Added optional Tier 2 enrichment without introducing live embedding ownership: callers can provide a topic embedding to use `search_by_embedding(tier=2)`, or fall back to `query_notes(NoteQuery(tier=2))` behind the Memory Store boundary. The current public generation methods now perform the required empty-personality check before stopping at the later-phase LLM placeholder. Focused fake-store tests cover fresh context loads, empty-personality behavior, no Memory Store writes, source ID preservation, embedding-search enrichment, query fallback, and disabled enrichment. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (17 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (413 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
