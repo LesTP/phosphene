@@ -62,7 +62,7 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 | 2 | Attention Filter | First module that actively uses Memory Store. Tests density metrics. Core novel mechanism. | Complete |
 | 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Complete |
 | 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Complete |
-| 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | In progress |
+| 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Phase 1 complete |
 | 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Not started |
 | 7 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Not started |
 | 8 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
@@ -103,7 +103,7 @@ Test-debt items recognised but not scheduled. Each has an explicit promote-when 
 
 ## Key Decisions
 
-See DECISIONS.md for the full decision log (D-1 through D-38).
+See DECISIONS.md for the full decision log (D-1 through D-39).
 
 ## Provisional Contracts
 

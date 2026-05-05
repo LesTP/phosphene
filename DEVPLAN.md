@@ -1,12 +1,12 @@
 ---
 module: GENERATOR
-phase: 1
-phase_title: Generator Phase 1 — Contract and routing foundation
-step: 5.1.review
-mode: Review
-blocked: null
+phase: null
+phase_title: Generator Phase 1 complete — Generator Phase 2 next after human audit
+step: null
+mode: Complete
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 5 Phase 1 ready for review
-- **Focus** — Build Generator + Output Router contract, stateless context-loading foundation, and deterministic routing behavior
-- **Blocked/Broken** — None
+- **Phase** — Module 5 Phase 1 complete; awaiting human audit before Generator Phase 2 planning
+- **Focus** — Generator + Output Router foundation delivered: public contract, stateless Memory Store context loading, and deterministic routing
+- **Blocked/Broken** — awaiting-human-audit
 
 ## Module 1: Memory Store (complete)
 
@@ -98,13 +98,8 @@ Delivered concrete Telegram adapter construction behind an injectable toolkit bo
 
 Planned phases follow `ARCH_generator.md`: first stabilize the public contract, errors, exports, Memory Store context-loading boundary, empty-personality behavior, and deterministic Output Router behavior without live generation; then add LLM generation/response/free-play behavior, skeptical memory verification, and prompt/parse hardening.
 
-### Phase 1 (in progress): Contract and routing foundation
+### Phase 1 (complete): Contract and routing foundation
 
-Build the Generator + Output Router package foundation around ARCH-aligned public dataclasses and deterministic behavior. Keep generation LLM calls, skeptical memory verification, and live prompt parsing out of this phase except for interfaces/fakes needed to preserve the public contract.
-
-- [x] **Step 5.1.1 — Public contract, errors, and exports**: Add the `phosphene.generator` package with ARCH-aligned dataclasses, public errors, constructor surface, router config types, and export tests; define validation for obvious config/threshold invariants without adding live LLM behavior.
-- [x] **Step 5.1.2 — Memory Store context-loading boundary**: Implement stateless personality context loading through `memory_store.get_personality_context()`, raise `EmptyPersonalityError` when Tier 3 context is absent, preserve source note IDs, and cover optional Tier 2 enrichment behind a fake embedding/query boundary without changing Memory Store ownership.
-- [x] **Step 5.1.3 — Output Router deterministic delivery**: Implement `route()` over fake Gateway instances for intent-to-log suppression, length-based `text`/`markdown`/`telegraph` selection, response threading via `originating_message_id`, and delivery-result propagation.
-- [x] **Step 5.1.4 — Phase foundation integration tests**: Add package-level integration coverage with fake Memory Store and fake Gateway objects showing the foundation remains stateless, does not write to Memory Store, does not require live credentials, and keeps Generator output compatible with Gateway `OutboundMessage`.
+Delivered ARCH-aligned public dataclasses/errors/exports, stateless Memory Store personality context loading, empty-personality behavior, optional Tier 2 enrichment behind Memory Store boundaries, deterministic Output Router delivery decisions, and credential-free fake integration coverage. Reviewed and completed. See DEVLOG "Phase 5.1 Completion" entry.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
