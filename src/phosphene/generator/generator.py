@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from phosphene.gateway import InboundMessage
@@ -215,6 +216,51 @@ def _parse_generator_output_payload(
     )
 
 
+def _json_ready(value: object) -> object:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, str | int | float | bool) or value is None:
+        return value
+    return str(value)
+
+
+def _note_payload(note: MemoryNote) -> dict[str, object]:
+    return {
+        "note_id": str(note.note_id),
+        "tier": note.tier,
+        "title": note.title,
+        "content": note.content,
+        "importance": note.importance,
+        "unresolvedness": note.unresolvedness,
+        "links": list(note.links),
+        "tags": list(note.tags),
+        "source": note.source,
+        "friction_target": note.friction_target,
+        "attractor_relevance": note.attractor_relevance,
+        "cluster_group": note.cluster_group,
+        "link_count": note.link_count,
+        "created_at": note.created_at.isoformat(),
+        "updated_at": note.updated_at.isoformat(),
+    }
+
+
+def _system_message() -> str:
+    return (
+        "You are the Phosphene Generator. Produce original text grounded only in "
+        "the supplied personality files, relevant patterns, unresolved threads, "
+        "and ambient context. Return a single JSON object with these fields: "
+        "content, intent_tag, output_mode, importance_score, is_lateral, "
+        "source_note_ids, contradictions_noted. For prompted generation, "
+        'output_mode must be "prompted" and is_lateral must be false. '
+        "contradictions_noted must be a list of objects with personality_note_id, "
+        "claim_summary, counter_evidence_ids, and counter_summary."
+    )
+
+
 class Generator:
     """Stateless Generator facade.
 
@@ -282,14 +328,103 @@ class Generator:
         notes = [*snapshot.personality_files, *snapshot.relevant_patterns]
         return [str(note.note_id) for note in notes]
 
+    @staticmethod
+    def _source_note_ids_with(
+        snapshot: PersonalitySnapshot,
+        extra_notes: Sequence[MemoryNote],
+    ) -> list[str]:
+        source_ids: list[str] = []
+        for note in [*snapshot.personality_files, *snapshot.relevant_patterns, *extra_notes]:
+            note_id = str(note.note_id)
+            if note_id not in source_ids:
+                source_ids.append(note_id)
+        return source_ids
+
+    def _load_notes_by_id(self, note_ids: Sequence[str] | None) -> list[MemoryNote]:
+        if not note_ids or not hasattr(self.memory_store, "get_note"):
+            return []
+
+        notes: list[MemoryNote] = []
+        for note_id in note_ids:
+            notes.append(self.memory_store.get_note(note_id))
+        return notes
+
+    def _build_prompted_generation_messages(
+        self,
+        *,
+        prompt: GenerationPrompt,
+        snapshot: PersonalitySnapshot,
+        unresolved_notes: Sequence[MemoryNote],
+        config: GeneratorConfig,
+    ) -> list[Mapping[str, str]]:
+        payload = {
+            "task": "prompted_generation",
+            "topic": prompt.topic,
+            "budget_tokens": prompt.budget_tokens,
+            "max_output_tokens": config.max_output_tokens,
+            "ambient_context": _json_ready(snapshot.ambient_context),
+            "personality_files": [
+                _note_payload(note) for note in snapshot.personality_files
+            ],
+            "relevant_patterns": [
+                _note_payload(note) for note in snapshot.relevant_patterns
+            ],
+            "unresolved_threads": [_note_payload(note) for note in unresolved_notes],
+            "contradictions": [
+                {
+                    "personality_note_id": contradiction.personality_note_id,
+                    "claim_summary": contradiction.claim_summary,
+                    "counter_evidence_ids": list(contradiction.counter_evidence_ids),
+                    "counter_summary": contradiction.counter_summary,
+                }
+                for contradiction in snapshot.contradictions
+            ],
+            "required_output": {
+                "output_mode": "prompted",
+                "is_lateral": False,
+                "intent_tag_options": [
+                    "synthesis",
+                    "provocation",
+                    "question",
+                    "aesthetic",
+                    "internal_note",
+                    "log_surfacing",
+                    "subscription_proposal",
+                ],
+            },
+        }
+        return [
+            {"role": "system", "content": _system_message()},
+            {
+                "role": "user",
+                "content": json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            },
+        ]
+
     def generate(
         self,
         prompt: GenerationPrompt,
         ambient: AmbientContext,
         config: GeneratorConfig,
     ) -> GeneratorOutput:
-        self._load_personality_snapshot(ambient, config)
-        raise NotImplementedError("LLM generation is implemented in a later phase")
+        snapshot = self._load_personality_snapshot(ambient, config)
+        unresolved_notes = self._load_notes_by_id(prompt.unresolved_thread_ids)
+        completion = _call_generation_llm(
+            self._build_prompted_generation_messages(
+                prompt=prompt,
+                snapshot=snapshot,
+                unresolved_notes=unresolved_notes,
+                config=config,
+            ),
+            config,
+        )
+        return _parse_generator_output_payload(
+            completion.content,
+            token_usage=completion.token_usage,
+            default_output_mode="prompted",
+            default_is_lateral=False,
+            fallback_source_note_ids=self._source_note_ids_with(snapshot, unresolved_notes),
+        )
 
     def free_play(
         self,

@@ -114,6 +114,17 @@ Added private Generator LLM boundary helpers that call `toolkit/llm_client.compl
 
 Added JSON parsing for model output into bounded `GeneratorOutput` fields: non-empty content and intent tag, request-matching output mode, boolean lateral flag, probability-bounded importance, source-note attribution with fallback IDs, parsed contradiction objects, preserved token usage, and optional response threading metadata. Focused tests cover generation tier propagation, token usage preservation, provider failure wrapping, valid parsing, fallback attribution, and malformed/missing/invalid payload rejection. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (35 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (431 passed).
 
+### Step 5.2.2: Prompted generation orchestration
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented live prompted `Generator.generate()` orchestration behind the existing public contract. The method now loads a fresh Tier 3 personality snapshot per call, includes configured Tier 2 enrichment, optionally loads unresolved-thread notes by ID, builds a deterministic JSON prompt with ambient context and source material, calls the generation LLM boundary, parses the JSON response into `GeneratorOutput`, preserves token usage, and falls back to source attribution from personality, pattern, and unresolved-thread notes when the model omits attribution.
+
+Kept the Generator stateless and read-only against Memory Store: the prompted path uses only `get_personality_context()`, Tier 2 query/search reads, and optional `get_note()` reads. Added fake-LLM and fake-store coverage for prompt contents, generation tier/config propagation, unresolved-note loading, source-note fallback, token usage preservation, and no Memory Store writes. Updated the foundation integration test now that `generate()` is implemented for prompted generation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (36 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (432 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

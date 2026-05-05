@@ -1,8 +1,8 @@
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 
-import pytest
-
+import phosphene.generator.generator as generator_module
 from phosphene.gateway import DeliveryResult, OutboundMessage
 from phosphene.generator import (
     GenerationPrompt,
@@ -157,15 +157,36 @@ def test_foundation_is_stateless_read_only_and_routes_gateway_compatible_output(
     ]
 
 
-def test_public_generate_boundary_loads_context_without_live_llm_or_credentials() -> None:
+def test_public_generate_boundary_loads_context_without_live_credentials(
+    monkeypatch,
+) -> None:
     store = RecordingMemoryStore([make_note("personality-1", tier=3)])
 
-    with pytest.raises(NotImplementedError, match="later phase"):
-        Generator(store).generate(
-            GenerationPrompt(topic="density"),
-            {},
-            GeneratorConfig(llm_config=object()),
+    def fake_complete(**_kwargs: object) -> object:
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated",
+                    "intent_tag": "synthesis",
+                    "output_mode": "prompted",
+                    "importance_score": 0.5,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(),
         )
 
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).generate(
+        GenerationPrompt(topic="density"),
+        {},
+        GeneratorConfig(llm_config=object()),
+    )
+
+    assert output.content == "generated"
+    assert output.source_note_ids == ["personality-1"]
     assert store.context_calls == 1
     assert store.write_calls == []
