@@ -2,7 +2,7 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.2
+step: 4.1.3
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Step 4.1.2: adapter protocol, registry, and Gateway lifecycle foundation
+- **Focus** — Step 4.1.3: outbound send routing and default delivery
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -94,7 +94,7 @@ Build the Gateway public contract and internal adapter foundation without live e
   - Add `src/phosphene/gateway/` package scaffold with ARCH-aligned public dataclasses, errors, and package exports.
   - Validate duplicate platform names, default-platform presence/enabled state, unknown adapter types, missing required credentials/params, enabled-platform selection, and supported output format lists.
   - Tests: dataclass defaults/field order where relevant, package exports, validation success/failure cases, disabled platform behavior.
-- [ ] **Step 4.1.2 — Adapter protocol, registry, and Gateway lifecycle foundation**
+- [x] **Step 4.1.2 — Adapter protocol, registry, and Gateway lifecycle foundation**
   - Add internal adapter protocol and immutable registry snapshot for concrete/fake factory construction without exposing a new public API.
   - Implement Gateway construction, enabled adapter instantiation, listener state bookkeeping, idempotent `start_listener`/`stop_listener` orchestration, and callback storage.
   - Tests: fake adapter construction, unknown/invalid factory rejection, listener start/stop idempotence, platform connection error propagation.

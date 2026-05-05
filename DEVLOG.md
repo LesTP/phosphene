@@ -140,6 +140,17 @@ Added the `phosphene.gateway` package scaffold with ARCH-aligned public dataclas
 
 Kept this step to the public contract and validation boundary: adapter construction, listener lifecycle, outbound delivery, and callback dispatch remain deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover dataclass field order/defaults, package exports, valid Telegram/log configs, validation failures, and disabled non-default platform behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (16 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (362 passed).
 
+### Step 4.1.2: Adapter protocol, registry, and Gateway lifecycle foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the internal Gateway adapter protocol, immutable adapter factory registry, default fake/log/pending adapter factories, and Gateway-owned enabled-adapter construction without adding public API exports. Gateway construction now validates adapter support through the internal registry and normalizes private registry/factory failures to `PlatformConfigError`.
+
+Implemented listener state bookkeeping with idempotent `start_listener`/`stop_listener`, `listen=False` handling, callback storage handoff to adapters, and platform connection error propagation via `PlatformConnectionError`. Kept outbound delivery and fake callback dispatch deferred to the later Phase 1 steps already listed in DEVPLAN. Focused tests cover fake adapter construction, invalid private factory rejection, listener start/stop idempotence, disabled listening, and connection failure wrapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (21 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (367 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan

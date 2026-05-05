@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 
+from phosphene.gateway.adapters import (
+    DEFAULT_ADAPTER_REGISTRY,
+    AdapterFactory,
+    AdapterRegistry,
+    GatewayAdapter,
+)
 from phosphene.gateway.errors import (
     FormatNotSupportedError,
     PlatformConfigError,
+    PlatformConnectionError,
     PlatformNotFoundError,
 )
 from phosphene.gateway.types import (
@@ -39,11 +46,23 @@ class Gateway:
         config: GatewayConfig,
         on_message: Callable[[InboundMessage], None],
         on_feedback: Callable[[FeedbackSignal], None],
+        *,
+        _adapter_factories: Mapping[str, AdapterFactory] | None = None,
     ) -> None:
         self.config = config
         self.on_message = on_message
         self.on_feedback = on_feedback
-        self._platforms_by_name = _validate_and_index_platforms(config)
+        try:
+            self._adapter_registry = DEFAULT_ADAPTER_REGISTRY.with_factories(
+                _adapter_factories
+            )
+        except (TypeError, ValueError) as exc:
+            raise PlatformConfigError(f"invalid adapter registry: {exc}") from exc
+        self._platforms_by_name = _validate_and_index_platforms(
+            config, self._adapter_registry
+        )
+        self._adapters_by_platform = self._build_enabled_adapters()
+        self._listening_platforms: set[str] = set()
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
         platform = self._get_enabled_platform(message.platform)
@@ -66,13 +85,41 @@ class Gateway:
         )
 
     def start_listener(self) -> None:
-        raise NotImplementedError("Gateway.start_listener is implemented in Step 4.1.2")
+        if not self.config.listen:
+            return
+
+        for platform_name, adapter in self._adapters_by_platform.items():
+            if platform_name in self._listening_platforms:
+                continue
+            try:
+                adapter.start_listener(self.on_message, self.on_feedback)
+            except PlatformConnectionError:
+                raise
+            except Exception as exc:
+                raise PlatformConnectionError(
+                    f"failed to start listener for platform {platform_name}: {exc}"
+                ) from exc
+            self._listening_platforms.add(platform_name)
 
     def stop_listener(self) -> None:
-        raise NotImplementedError("Gateway.stop_listener is implemented in Step 4.1.2")
+        for platform_name in list(self._listening_platforms):
+            adapter = self._adapters_by_platform[platform_name]
+            adapter.stop_listener()
+            self._listening_platforms.remove(platform_name)
 
     def _enabled_platform_configs(self) -> list[PlatformConfig]:
         return [platform for platform in self.config.platforms if platform.enabled]
+
+    def _build_enabled_adapters(self) -> dict[str, GatewayAdapter]:
+        adapters: dict[str, GatewayAdapter] = {}
+        for platform in self._enabled_platform_configs():
+            try:
+                adapters[platform.name] = self._adapter_registry.create(platform)
+            except Exception as exc:
+                raise PlatformConfigError(
+                    f"failed to create adapter for platform {platform.name}: {exc}"
+                ) from exc
+        return adapters
 
     def _get_enabled_platform(self, platform_name: str) -> PlatformConfig:
         try:
@@ -88,10 +135,12 @@ class Gateway:
 
 def _validate_and_index_platforms(
     config: GatewayConfig,
+    adapter_registry: AdapterRegistry | None = None,
 ) -> dict[str, PlatformConfig]:
+    registry = adapter_registry or DEFAULT_ADAPTER_REGISTRY
     platforms_by_name: dict[str, PlatformConfig] = {}
     for platform in config.platforms:
-        _validate_platform_config(platform)
+        _validate_platform_config(platform, registry)
         if platform.name in platforms_by_name:
             raise PlatformConfigError(f"duplicate platform name: {platform.name}")
         platforms_by_name[platform.name] = platform
@@ -109,12 +158,18 @@ def _validate_and_index_platforms(
     return platforms_by_name
 
 
-def _validate_platform_config(platform: PlatformConfig) -> None:
+def _validate_platform_config(
+    platform: PlatformConfig,
+    adapter_registry: AdapterRegistry | None = None,
+) -> None:
+    registry = adapter_registry or DEFAULT_ADAPTER_REGISTRY
     if not platform.name:
         raise PlatformConfigError("platform name is required")
     if not platform.adapter_type:
         raise PlatformConfigError("platform adapter_type is required")
-    if platform.adapter_type not in _SUPPORTED_ADAPTER_TYPES:
+    if platform.adapter_type not in _SUPPORTED_ADAPTER_TYPES or not registry.supports(
+        platform.adapter_type
+    ):
         raise PlatformConfigError(f"unknown adapter_type: {platform.adapter_type}")
 
     _validate_required_keys(
