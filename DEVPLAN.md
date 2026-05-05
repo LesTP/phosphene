@@ -2,11 +2,11 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.review
-mode: Review
+step: 4.1.complete
+mode: Complete
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Phase 1 review: Gateway contract and adapter foundation
+- **Focus** — Phase 1 complete: Gateway contract and adapter foundation
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)

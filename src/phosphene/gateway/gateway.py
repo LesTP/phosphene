@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 
 from phosphene.gateway.adapters import (
     DEFAULT_ADAPTER_REGISTRY,
@@ -308,7 +308,3 @@ def _validate_message_format(
         raise FormatNotSupportedError(
             f"format not supported by platform {platform.name}: {message.format}"
         )
-
-
-def _enabled_platforms(platforms: Iterable[PlatformConfig]) -> list[PlatformConfig]:
-    return [platform for platform in platforms if platform.enabled]

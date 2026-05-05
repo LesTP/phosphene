@@ -184,6 +184,17 @@ Added Gateway-owned inbound and feedback dispatch wrappers for listener adapters
 
 Extended the fake Gateway adapter with deterministic in-process inbound and feedback dispatch helpers, and added bounded in-memory recent-delivery tracking keyed by platform/message ID for later feedback attribution work. No persistent state or public API surface was added. Focused tests cover inbound dispatch, feedback dispatch, callback exception isolation, stopped-listener suppression, and bounded recent message mapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (380 passed).
 
+### Phase 4.1 Review: Gateway contract and adapter foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Gateway Phase 1 against `ARCH_gateway.md`. Must fix: none. Should fix: removed one unused internal helper and import from `gateway.py`. Optional: no optional changes deferred.
+
+The phase remains scoped to the public Gateway contract, validation, internal adapter registry, fake/local adapters, outbound routing, listener lifecycle, callback dispatch, and bounded in-memory delivery tracking. Live Telegram delivery and polling remain deferred to the later Gateway phase as planned in D-36.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
