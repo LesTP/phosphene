@@ -180,6 +180,17 @@ Added internal LLM config rotation fallback for provider-call failures using the
 
 Added focused boundary tests for rotation fallback, tier propagation, token usage preservation, and malformed-completion behavior. Added cross-mode integration coverage that exercises prompted generation, response generation, and free-play generation through primary failure plus fallback success, verifying output modes, lateral flags, response threading, source-note fallback attribution, prompt payload shape, and read-only Memory Store behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (443 passed).
 
+### Phase 5.2 Review: LLM generation modes and skeptical memory
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Generator Phase 2 against `ARCH_generator.md`. Must fix: none. Should fix: refreshed a stale `Generator` class docstring that still described LLM generation as future work. Optional: no optional changes deferred.
+
+The phase remains within the planned live-generation boundary: prompted generation, response generation, and free-play generation all load fresh personality context, build deterministic LLM prompt payloads, parse bounded `GeneratorOutput` values, preserve response threading and token usage, use LLM config rotation only for provider-call fallback, and keep Memory Store access read-only. Skeptical memory records contradictions from verification-tier LLM checks without writing them back to Memory Store. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (443 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

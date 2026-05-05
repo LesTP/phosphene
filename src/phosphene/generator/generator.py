@@ -452,8 +452,8 @@ def _parse_verification_contradictions(
 class Generator:
     """Stateless Generator facade.
 
-    LLM-backed generation behavior is introduced in a later phase; this phase
-    establishes the public constructor and method surface.
+    Each public generation call loads fresh Memory Store context, builds a
+    bounded LLM prompt, parses a typed GeneratorOutput, and performs no writes.
     """
 
     def __init__(self, memory_store: object) -> None:

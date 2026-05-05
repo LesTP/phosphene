@@ -294,3 +294,10 @@ Priority: Important
 Decision: Generator LLM calls use `GeneratorConfig.llm_config` first and then `llm_configs_rotation` candidates only when the provider call itself fails. Malformed or schema-invalid LLM completions do not rotate; they raise `LLMAPIError` at the parse boundary.
 Rationale: Rotation is a budget/availability fallback, not a way to mask prompt or parser defects. Retrying malformed completions against another config would make integration failures nondeterministic and could hide a prompt-contract regression. Keeping provider failures rotatable while parse failures are terminal preserves the existing public API and deterministic fake-LLM tests.
 Revisit if: toolkit/llm_client exposes typed retryable/non-retryable errors that let the Generator distinguish quota exhaustion, transient transport failures, content-filter refusals, and provider-side schema drift more precisely.
+
+D-42: Generator Phase 2 review accepts live-generation boundary
+Date: 2026-05-05 | Status: Closed
+Priority: Important
+Decision: Accept Module 5 Phase 2 as architecturally aligned after one documentation cleanup. The reviewed output implements prompted, response, and free-play generation; skeptical memory contradiction reporting; prompt/parse hardening; token-usage preservation; response threading metadata; source-note attribution fallback; and provider-failure rotation fallback while preserving the Phase 1 public Generator and Output Router contracts.
+Rationale: The implementation keeps Generator stateless and read-only against Memory Store, uses deterministic fake LLM and fake Memory Store boundaries for coverage, avoids live credentials, and leaves Output Router behavior unchanged. Full-suite tests pass, and malformed/schema-invalid model responses remain terminal parse failures rather than rotating across configs.
+Revisit if: Later embedding ownership or runtime model-router work requires public Generator configuration changes for topic relevance, claim relevance, or provider retry taxonomy.
