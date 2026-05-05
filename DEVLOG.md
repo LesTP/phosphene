@@ -158,6 +158,17 @@ Implemented live `Generator.free_play()` orchestration behind the existing publi
 
 Preserved lateral semantics by requiring `output_mode="free_play"` and `is_lateral=True`, preserved trigger/source note attribution fallback across personality, pattern, and trigger notes, and kept the Generator stateless and read-only against Memory Store with no public API changes. Added fake-LLM/fake-store coverage for prompt contents, config and tier propagation, token usage preservation, trigger-note loading, no Memory Store writes, lateral flags, and source attribution. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (437 passed).
 
+### Step 5.2.6: Skeptical memory verification
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented skeptical memory verification behind `GeneratorConfig.skeptical_memory`. The Generator now performs verification-tier LLM claim extraction for each Tier 3 personality file, reads recent Tier 1 notes through a bounded `NoteQuery` using `skeptical_window_days`, checks extracted claims against that recent evidence with a verification-tier LLM call, and records resulting `Contradiction` objects in the `PersonalitySnapshot`.
+
+Merged snapshot contradictions into `GeneratorOutput.contradictions_noted` for prompted, response, and free-play paths while preserving any contradictions returned by the generation LLM. The path remains stateless and read-only against Memory Store, with no public API changes. Added focused fake-LLM/fake-store coverage for verification-tier propagation, recent Tier 1 query shape, prompt inclusion of contradictions, output contradiction reporting, and disabled skeptical-memory behavior in existing tests. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (44 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (440 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

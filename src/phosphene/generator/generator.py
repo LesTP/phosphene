@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol
 
 from phosphene.gateway import InboundMessage
@@ -123,6 +123,29 @@ def _call_generation_llm(
         raise LLMAPIError("generation LLM call failed") from exc
 
 
+def _call_verification_llm(
+    messages: list[Mapping[str, str]],
+    config: GeneratorConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> _LLMCompletion:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    try:
+        return _normalize_completion(
+            llm_complete_callable(
+                messages=messages,
+                config=config.llm_config,
+                tier=config.verification_tier,
+            )
+        )
+    except LLMAPIError:
+        raise
+    except Exception as exc:
+        raise LLMAPIError("verification LLM call failed") from exc
+
+
 def _extract_json_object(response_text: str) -> Mapping[str, object]:
     try:
         payload = json.loads(response_text)
@@ -189,6 +212,25 @@ def _parse_contradictions(payload: Mapping[str, object]) -> list[Contradiction]:
     return contradictions
 
 
+def _merge_contradictions(
+    primary: Sequence[Contradiction],
+    fallback: Sequence[Contradiction],
+) -> list[Contradiction]:
+    merged: list[Contradiction] = []
+    seen: set[tuple[str, str, tuple[str, ...], str]] = set()
+    for contradiction in [*primary, *fallback]:
+        key = (
+            contradiction.personality_note_id,
+            contradiction.claim_summary,
+            tuple(contradiction.counter_evidence_ids),
+            contradiction.counter_summary,
+        )
+        if key not in seen:
+            seen.add(key)
+            merged.append(contradiction)
+    return merged
+
+
 def _parse_generator_output_payload(
     response_text: str,
     *,
@@ -196,6 +238,7 @@ def _parse_generator_output_payload(
     default_output_mode: str,
     default_is_lateral: bool,
     fallback_source_note_ids: list[str],
+    fallback_contradictions: Sequence[Contradiction] | None = None,
     originating_message_id: str | None = None,
 ) -> GeneratorOutput:
     payload = _extract_json_object(response_text)
@@ -210,6 +253,7 @@ def _parse_generator_output_payload(
     if not source_note_ids:
         source_note_ids = list(fallback_source_note_ids)
 
+    parsed_contradictions = _parse_contradictions(payload)
     return GeneratorOutput(
         content=_require_string(payload, "content"),
         intent_tag=_require_string(payload, "intent_tag"),
@@ -217,7 +261,10 @@ def _parse_generator_output_payload(
         importance_score=_require_probability(payload, "importance_score"),
         is_lateral=is_lateral,
         source_note_ids=source_note_ids,
-        contradictions_noted=_parse_contradictions(payload),
+        contradictions_noted=_merge_contradictions(
+            parsed_contradictions,
+            list(fallback_contradictions or []),
+        ),
         token_usage=token_usage,
         originating_message_id=originating_message_id,
     )
@@ -282,6 +329,102 @@ def _system_message() -> str:
     )
 
 
+def _verification_system_message() -> str:
+    return (
+        "You are the Phosphene skeptical-memory verifier. Return only JSON. "
+        "For claim extraction, return {\"claims\":[{\"claim_summary\":\"...\"}]}. "
+        "For contradiction checks, return {\"contradictions\":[{\"personality_note_id\":"
+        "\"...\",\"claim_summary\":\"...\",\"counter_evidence_ids\":[\"...\"],"
+        "\"counter_summary\":\"...\"}]}."
+    )
+
+
+def _build_claim_extraction_messages(note: MemoryNote) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "extract_personality_claims",
+        "personality_file": _note_payload(note),
+    }
+    return [
+        {"role": "system", "content": _verification_system_message()},
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        },
+    ]
+
+
+def _build_contradiction_check_messages(
+    *,
+    personality_note: MemoryNote,
+    claims: Sequence[str],
+    recent_notes: Sequence[MemoryNote],
+) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "check_personality_claims_against_recent_tier1",
+        "personality_note_id": str(personality_note.note_id),
+        "claims": list(claims),
+        "recent_tier1_notes": [_note_payload(note) for note in recent_notes],
+        "required_output": {
+            "contradictions_field": "contradictions",
+            "personality_note_id": str(personality_note.note_id),
+        },
+    }
+    return [
+        {"role": "system", "content": _verification_system_message()},
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        },
+    ]
+
+
+def _parse_claim_summaries(response_text: str) -> list[str]:
+    payload = _extract_json_object(response_text)
+    value = payload.get("claims", [])
+    if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+        raise LLMAPIError("verification LLM response claims must be a list")
+
+    claims: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            claim = item.strip()
+        elif isinstance(item, Mapping):
+            claim = _require_string(item, "claim_summary")
+        else:
+            raise LLMAPIError("verification LLM claim entries must be strings or objects")
+        if claim:
+            claims.append(claim)
+    return claims
+
+
+def _parse_verification_contradictions(
+    response_text: str,
+    *,
+    personality_note_id: str,
+) -> list[Contradiction]:
+    payload = _extract_json_object(response_text)
+    value = payload.get("contradictions", [])
+    if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+        raise LLMAPIError("verification LLM response contradictions must be a list")
+
+    contradictions: list[Contradiction] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise LLMAPIError("verification LLM contradiction entries must be objects")
+        note_id = item.get("personality_note_id", personality_note_id)
+        if not isinstance(note_id, str) or not note_id.strip():
+            raise LLMAPIError("verification LLM contradiction personality_note_id invalid")
+        contradictions.append(
+            Contradiction(
+                personality_note_id=note_id.strip(),
+                claim_summary=_require_string(item, "claim_summary"),
+                counter_evidence_ids=_parse_string_list(item, "counter_evidence_ids"),
+                counter_summary=_require_string(item, "counter_summary"),
+            )
+        )
+    return contradictions
+
+
 class Generator:
     """Stateless Generator facade.
 
@@ -304,14 +447,70 @@ class Generator:
         if not personality_files:
             raise EmptyPersonalityError("no Tier 3 personality context exists")
 
+        contradictions = self._load_skeptical_contradictions(personality_files, config)
+
         return PersonalitySnapshot(
             personality_files=personality_files,
             relevant_patterns=self._load_relevant_patterns(
                 config,
                 topic_embedding=topic_embedding,
             ),
-            contradictions=[],
+            contradictions=contradictions,
             ambient_context=ambient,
+        )
+
+    def _load_skeptical_contradictions(
+        self,
+        personality_files: Sequence[MemoryNote],
+        config: GeneratorConfig,
+    ) -> list[Contradiction]:
+        if not config.skeptical_memory:
+            return []
+
+        recent_notes = self._load_recent_tier1_notes(config)
+        if not recent_notes:
+            return []
+
+        contradictions: list[Contradiction] = []
+        for personality_note in personality_files:
+            claims_completion = _call_verification_llm(
+                _build_claim_extraction_messages(personality_note),
+                config,
+            )
+            claims = _parse_claim_summaries(claims_completion.content)
+            if not claims:
+                continue
+
+            contradiction_completion = _call_verification_llm(
+                _build_contradiction_check_messages(
+                    personality_note=personality_note,
+                    claims=claims,
+                    recent_notes=recent_notes,
+                ),
+                config,
+            )
+            contradictions.extend(
+                _parse_verification_contradictions(
+                    contradiction_completion.content,
+                    personality_note_id=str(personality_note.note_id),
+                )
+            )
+        return contradictions
+
+    def _load_recent_tier1_notes(self, config: GeneratorConfig) -> list[MemoryNote]:
+        if not hasattr(self.memory_store, "query_notes"):
+            return []
+
+        since = datetime.now() - timedelta(days=config.skeptical_window_days)
+        return list(
+            self.memory_store.query_notes(
+                NoteQuery(
+                    tier=1,
+                    since=since,
+                    limit=50,
+                    order_by="created_at",
+                )
+            )
         )
 
     def _load_relevant_patterns(
@@ -633,6 +832,7 @@ class Generator:
             default_output_mode="prompted",
             default_is_lateral=False,
             fallback_source_note_ids=self._source_note_ids_with(snapshot, unresolved_notes),
+            fallback_contradictions=snapshot.contradictions,
         )
 
     def free_play(
@@ -658,8 +858,8 @@ class Generator:
             default_output_mode="free_play",
             default_is_lateral=True,
             fallback_source_note_ids=self._source_note_ids_with(snapshot, trigger_notes),
+            fallback_contradictions=snapshot.contradictions,
         )
-
 
     def respond(
         self,
@@ -684,5 +884,6 @@ class Generator:
             default_output_mode="response",
             default_is_lateral=False,
             fallback_source_note_ids=self._source_note_ids_with(snapshot, relevant_notes),
+            fallback_contradictions=snapshot.contradictions,
             originating_message_id=message.message_id,
         )

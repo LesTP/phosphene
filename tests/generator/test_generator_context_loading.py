@@ -96,7 +96,7 @@ def test_snapshot_loads_fresh_tier_three_context_and_preserves_source_ids() -> N
 
     snapshot = generator._load_personality_snapshot(
         {"hour": 12},
-        GeneratorConfig(llm_config=object()),
+        GeneratorConfig(llm_config=object(), skeptical_memory=False),
     )
 
     assert store.context_calls == 1
@@ -114,7 +114,7 @@ def test_snapshot_raises_empty_personality_when_tier_three_context_absent() -> N
     with pytest.raises(EmptyPersonalityError, match="Tier 3"):
         Generator(store)._load_personality_snapshot(
             {},
-            GeneratorConfig(llm_config=object()),
+            GeneratorConfig(llm_config=object(), skeptical_memory=False),
         )
 
     assert store.query_calls == []
@@ -129,7 +129,7 @@ def test_public_generation_methods_check_empty_personality_before_llm_phase() ->
         Generator(store).generate(
             GenerationPrompt(topic="density"),
             {},
-            GeneratorConfig(llm_config=object()),
+            GeneratorConfig(llm_config=object(), skeptical_memory=False),
         )
 
 
@@ -141,7 +141,7 @@ def test_tier_two_enrichment_can_use_embedding_search_boundary() -> None:
 
     snapshot = Generator(store)._load_personality_snapshot(
         {},
-        GeneratorConfig(llm_config=object(), tier2_pattern_limit=3),
+        GeneratorConfig(llm_config=object(), tier2_pattern_limit=3, skeptical_memory=False),
         topic_embedding=embedding,
     )
 
@@ -156,12 +156,107 @@ def test_tier_two_enrichment_can_be_disabled() -> None:
 
     snapshot = Generator(store)._load_personality_snapshot(
         {},
-        GeneratorConfig(llm_config=object(), include_tier2_patterns=False),
+        GeneratorConfig(
+            llm_config=object(),
+            include_tier2_patterns=False,
+            skeptical_memory=False,
+        ),
     )
 
     assert snapshot.relevant_patterns == []
     assert store.query_calls == []
     assert store.search_calls == []
+
+
+def test_skeptical_memory_extracts_claims_checks_recent_tier1_and_marks_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    personality = make_note("personality-1", tier=3)
+    recent = make_note("recent-1", tier=1, importance=0.9)
+    store = FakeMemoryStore([personality], query_results=[recent])
+    calls: list[dict[str, object]] = []
+    captured_generation_payloads: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        messages = kwargs["messages"]
+        payload = json.loads(messages[1]["content"])
+        task = payload["task"]
+        if task == "extract_personality_claims":
+            assert payload["personality_file"]["note_id"] == "personality-1"
+            return generator_module._LLMCompletion(
+                content=json.dumps(
+                    {"claims": [{"claim_summary": "I avoid direct contradiction"}]}
+                ),
+                token_usage=TokenUsage(),
+            )
+        if task == "check_personality_claims_against_recent_tier1":
+            assert payload["personality_note_id"] == "personality-1"
+            assert payload["claims"] == ["I avoid direct contradiction"]
+            assert payload["recent_tier1_notes"][0]["note_id"] == "recent-1"
+            return generator_module._LLMCompletion(
+                content=json.dumps(
+                    {
+                        "contradictions": [
+                            {
+                                "personality_note_id": "personality-1",
+                                "claim_summary": "I avoid direct contradiction",
+                                "counter_evidence_ids": ["recent-1"],
+                                "counter_summary": "recent note embraces contradiction",
+                            }
+                        ]
+                    }
+                ),
+                token_usage=TokenUsage(),
+            )
+
+        captured_generation_payloads.append(payload)
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated with tension",
+                    "intent_tag": "synthesis",
+                    "output_mode": "prompted",
+                    "importance_score": 0.7,
+                    "is_lateral": False,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=TokenUsage(),
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).generate(
+        GenerationPrompt(topic="contradiction"),
+        {},
+        GeneratorConfig(
+            llm_config="llm-config",
+            generation_tier="quality",
+            verification_tier="commodity",
+            include_tier2_patterns=False,
+        ),
+    )
+
+    assert output.content == "generated with tension"
+    assert output.contradictions_noted[0].personality_note_id == "personality-1"
+    assert output.contradictions_noted[0].counter_evidence_ids == ["recent-1"]
+    assert captured_generation_payloads[0]["contradictions"] == [
+        {
+            "personality_note_id": "personality-1",
+            "claim_summary": "I avoid direct contradiction",
+            "counter_evidence_ids": ["recent-1"],
+            "counter_summary": "recent note embraces contradiction",
+        }
+    ]
+    assert [call["tier"] for call in calls] == ["commodity", "commodity", "quality"]
+    assert [call["config"] for call in calls] == ["llm-config"] * 3
+    assert len(store.query_calls) == 1
+    assert store.query_calls[0].tier == 1
+    assert store.query_calls[0].since is not None
+    assert store.query_calls[0].limit == 50
+    assert store.write_calls == 0
 
 
 def test_generate_builds_prompted_context_calls_llm_and_preserves_output(
@@ -195,7 +290,11 @@ def test_generate_builds_prompted_context_calls_llm_and_preserves_output(
     output = Generator(store).generate(
         GenerationPrompt(topic="density", unresolved_thread_ids=["thread-1"]),
         {"hour": 12},
-        GeneratorConfig(llm_config="llm-config", generation_tier="quality"),
+        GeneratorConfig(
+            llm_config="llm-config",
+            generation_tier="quality",
+            skeptical_memory=False,
+        ),
     )
 
     assert output.content == "generated from prompt"
@@ -268,7 +367,7 @@ def test_generate_selects_absent_topic_from_unresolved_thread_before_llm(
     output = Generator(store).generate(
         GenerationPrompt(unresolved_thread_ids=["thread-1"]),
         {},
-        GeneratorConfig(llm_config=object()),
+        GeneratorConfig(llm_config=object(), skeptical_memory=False),
     )
 
     assert output.source_note_ids == ["personality-1", "thread-1"]
@@ -316,7 +415,7 @@ def test_generate_selects_absent_topic_from_high_importance_tier_two_pattern(
     output = Generator(store).generate(
         GenerationPrompt(),
         {},
-        GeneratorConfig(llm_config=object()),
+        GeneratorConfig(llm_config=object(), skeptical_memory=False),
     )
 
     assert output.source_note_ids == ["personality-1", "low-pattern", "high-pattern"]
@@ -360,7 +459,11 @@ def test_generate_absent_topic_without_bootstrap_material_still_requires_persona
     output = Generator(store).generate(
         GenerationPrompt(),
         {},
-        GeneratorConfig(llm_config=object(), include_tier2_patterns=False),
+        GeneratorConfig(
+            llm_config=object(),
+            include_tier2_patterns=False,
+            skeptical_memory=False,
+        ),
     )
 
     assert output.source_note_ids == ["personality-1"]
@@ -421,7 +524,11 @@ def test_respond_builds_response_context_calls_llm_and_preserves_threading(
     output = Generator(store).respond(
         inbound,
         {"hour": 12},
-        GeneratorConfig(llm_config="llm-config", generation_tier="quality"),
+        GeneratorConfig(
+            llm_config="llm-config",
+            generation_tier="quality",
+            skeptical_memory=False,
+        ),
     )
 
     assert output.content == "generated response"
@@ -505,7 +612,11 @@ def test_free_play_loads_triggers_calls_llm_and_marks_lateral(
             affordances=["surface_contradiction", "pose_question"],
         ),
         {"hour": 22},
-        GeneratorConfig(llm_config="llm-config", generation_tier="quality"),
+        GeneratorConfig(
+            llm_config="llm-config",
+            generation_tier="quality",
+            skeptical_memory=False,
+        ),
     )
 
     assert output.content == "generated lateral move"

@@ -6,9 +6,10 @@ import pytest
 from phosphene.generator import GeneratorConfig, LLMAPIError
 from phosphene.generator.generator import (
     _call_generation_llm,
+    _call_verification_llm,
     _parse_generator_output_payload,
 )
-from phosphene.generator.types import TokenUsage
+from phosphene.generator.types import Contradiction, TokenUsage
 
 
 @dataclass
@@ -70,6 +71,31 @@ def test_call_generation_llm_uses_generation_tier_and_preserves_token_usage() ->
     ]
 
 
+def test_call_verification_llm_uses_verification_tier_and_preserves_token_usage() -> None:
+    usage = TokenUsage(prompt_tokens=2, completion_tokens=3, total_tokens=5)
+    calls = []
+
+    def fake_complete(**kwargs: object) -> FakeLLMResponse:
+        calls.append(kwargs)
+        return FakeLLMResponse(content='{"claims": []}', token_usage=usage)
+
+    completion = _call_verification_llm(
+        [{"role": "user", "content": "{}"}],
+        GeneratorConfig(llm_config="config", verification_tier="commodity"),
+        llm_complete_callable=fake_complete,
+    )
+
+    assert completion.content == '{"claims": []}'
+    assert completion.token_usage == usage
+    assert calls == [
+        {
+            "messages": [{"role": "user", "content": "{}"}],
+            "config": "config",
+            "tier": "commodity",
+        }
+    ]
+
+
 def test_call_generation_llm_maps_provider_failures_to_llm_api_error() -> None:
     class ProviderFailure(Exception):
         pass
@@ -120,6 +146,26 @@ def test_parse_generator_output_payload_uses_fallback_source_notes_when_absent()
     assert output.output_mode == "free_play"
     assert output.is_lateral is True
     assert output.source_note_ids == ["personality-1", "trigger-1"]
+
+
+def test_parse_generator_output_payload_merges_snapshot_contradictions() -> None:
+    contradiction = Contradiction(
+        personality_note_id="personality-2",
+        claim_summary="stable preference",
+        counter_evidence_ids=["recent-1"],
+        counter_summary="recent evidence moved away from it",
+    )
+
+    output = _parse_generator_output_payload(
+        valid_payload(source_note_ids=[]),
+        token_usage=TokenUsage(),
+        default_output_mode="prompted",
+        default_is_lateral=False,
+        fallback_source_note_ids=["personality-1"],
+        fallback_contradictions=[contradiction],
+    )
+
+    assert output.contradictions_noted[-1] == contradiction
 
 
 @pytest.mark.parametrize(

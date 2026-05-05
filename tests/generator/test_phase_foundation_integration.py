@@ -95,7 +95,7 @@ class RecordingGateway:
 def output_from_snapshot(generator: Generator, content: str) -> GeneratorOutput:
     snapshot = generator._load_personality_snapshot(
         {"activation": "integration"},
-        GeneratorConfig(llm_config=object()),
+        GeneratorConfig(llm_config=object(), skeptical_memory=False),
     )
     return GeneratorOutput(
         content=content,
@@ -183,7 +183,7 @@ def test_public_generate_boundary_loads_context_without_live_credentials(
     output = Generator(store).generate(
         GenerationPrompt(topic="density"),
         {},
-        GeneratorConfig(llm_config=object()),
+        GeneratorConfig(llm_config=object(), skeptical_memory=False),
     )
 
     assert output.content == "generated"
