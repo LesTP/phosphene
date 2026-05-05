@@ -158,6 +158,17 @@ Added package-level Generator foundation integration coverage using fake Memory 
 
 Also covered the public `generate()` Phase 1 boundary: it loads personality context before stopping at the later-phase LLM placeholder without requiring live credentials or writing to Memory Store. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (24 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (420 passed).
 
+### Phase 5.1 Review: Contract and routing foundation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Generator Phase 1 against `ARCH_generator.md`. Must fix: none. Should fix: none. Optional: no optional changes deferred.
+
+The phase remains within the planned foundation boundary: public dataclasses/errors/exports match the ARCH contract, Memory Store context loading is stateless and read-only, empty Tier 3 context raises `EmptyPersonalityError`, Tier 2 enrichment stays behind Memory Store query/search boundaries, and Output Router behavior deterministically maps intent, length, and response threading into Gateway-compatible `OutboundMessage` values without live credentials. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (24 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
