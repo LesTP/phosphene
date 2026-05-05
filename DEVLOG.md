@@ -103,6 +103,17 @@ Log review: `logs/loop/summary.log` shows Module 4 Phase 1 iterations 83-89 comp
 DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary and set frontmatter to await human audit before Gateway Phase 2 planning.
 ARCHITECTURE.md: Gateway row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
 
+### Phase 4.2 Plan: Telegram adapter delivery and polling
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 4 Phase 2 as a Build phase over concrete Telegram Gateway behavior behind the existing internal adapter protocol. The plan starts by replacing the pending Telegram adapter with an injectable toolkit boundary, then implements outbound delivery, polling/inbound normalization, feedback normalization, and mixed-platform integration hardening.
+
+Scope decision recorded in D-38: Phase 2 must keep public Gateway dataclasses stable and use credential-free fake toolkit clients for tests. Live credential smoke tests remain outside the autonomous loop until credentials and an integration harness exist.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

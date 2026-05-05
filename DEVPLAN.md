@@ -1,9 +1,9 @@
 ---
 module: GATEWAY
-phase: null
-phase_title: Gateway Phase 1 complete — Gateway Phase 2 next
-step: null
-mode: Complete
+phase: 2
+phase_title: Gateway Phase 2 — Telegram adapter delivery and polling
+step: 4.2.1
+mode: Build
 blocked: null
 regime: Build
 review_done: false
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 4 Phase 1 complete; awaiting human audit before Gateway Phase 2 planning
-- **Focus** — Gateway contract and local/fake adapter foundation delivered
+- **Phase** — Module 4 Phase 2 in progress
+- **Focus** — Concrete Telegram Gateway adapter through the toolkit boundary
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -89,5 +89,15 @@ Planned phases follow `ARCH_gateway.md`: first stabilize the public Gateway cont
 ### Phase 1 (complete): Gateway contract and adapter foundation
 
 Delivered ARCH-aligned Gateway dataclasses/errors/exports, config validation, internal adapter registry/lifecycle, outbound routing, local log delivery, fake inbound/feedback dispatch, callback exception isolation, and bounded in-memory delivery tracking. Reviewed and completed. See DEVLOG "Phase 4.1 Completion" entry.
+
+### Phase 2 (in progress): Telegram adapter delivery and polling
+
+Build the concrete Telegram Gateway adapter behind the existing internal adapter protocol without changing public dataclasses. Keep Source Ingestion separate from human-facing Gateway behavior and keep tests credential-free with fake toolkit clients.
+
+- [ ] **Step 4.2.1 — Telegram adapter construction and toolkit boundary**: Replace the pending Telegram adapter with a concrete internal adapter, isolate toolkit client construction behind an injectable factory, validate missing toolkit/factory failures as `PlatformConfigError`, and cover construction without live credentials.
+- [ ] **Step 4.2.2 — Outbound Telegram delivery**: Route `text`, `markdown`, `thread`, and `telegraph` sends through the toolkit boundary, map platform message IDs into `DeliveryResult`, preserve reply and intent metadata, and convert toolkit/API failures into failed delivery results.
+- [ ] **Step 4.2.3 — Polling listener lifecycle and inbound normalization**: Add non-blocking Telegram polling start/stop behavior, normalize incoming updates to `InboundMessage`, honor `listen=False` and idempotent lifecycle semantics, and keep callback exception isolation in Gateway-owned dispatch.
+- [ ] **Step 4.2.4 — Telegram feedback signal normalization**: Detect supported Telegram feedback events from replies/reactions/edits exposed by the toolkit boundary, normalize them to `FeedbackSignal`, and preserve raw payload metadata for downstream attribution.
+- [ ] **Step 4.2.5 — Gateway Telegram integration hardening**: Add end-to-end fake-client coverage for mixed log/Telegram configs, listener stop cleanup, recent-delivery tracking with Telegram IDs, and full Gateway test-suite verification.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
