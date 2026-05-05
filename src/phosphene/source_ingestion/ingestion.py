@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from phosphene.source_ingestion.adapters import (
     AdapterFactory,
@@ -101,7 +104,10 @@ class SourceIngestion:
             )
             for adapter in config.adapters
         }
-        self._last_seen_markers: dict[str, LastSeenMarker] = {}
+        self._marker_store_path = _marker_store_path(config)
+        self._last_seen_markers: dict[str, LastSeenMarker] = _load_markers(
+            self._marker_store_path
+        )
 
     def poll(self, adapter_label: str | None = None) -> list[IngestionResult]:
         if adapter_label is not None:
@@ -142,6 +148,7 @@ class SourceIngestion:
             )
 
         self._last_seen_markers[adapter_config.source_label] = poll_result.next_marker
+        _save_markers(self._marker_store_path, self._last_seen_markers)
         return IngestionResult(
             items=poll_result.items,
             adapter_label=adapter_config.source_label,
@@ -252,3 +259,95 @@ def _create_adapter(
 
 def _to_ingestion_error(error: AdapterItemError, adapter_label: str) -> IngestionError:
     return IngestionError(url=error.url, error=error.error, adapter_label=adapter_label)
+
+
+def _marker_store_path(config: IngestionConfig) -> Path | None:
+    paths = {
+        str(adapter.params["marker_store_path"])
+        for adapter in config.adapters
+        if adapter.params.get("marker_store_path") is not None
+    }
+    if not paths:
+        return None
+    if len(paths) > 1:
+        raise AdapterConfigError("adapter marker_store_path values must match")
+    return Path(paths.pop())
+
+
+def _load_markers(path: Path | None) -> dict[str, LastSeenMarker]:
+    if path is None or not path.exists():
+        return {}
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise AdapterConfigError("marker store must contain a JSON object")
+
+    raw_markers = data.get("markers", data)
+    if not isinstance(raw_markers, dict):
+        raise AdapterConfigError("marker store markers must be a JSON object")
+
+    return {
+        str(label): _deserialize_marker(value)
+        for label, value in raw_markers.items()
+    }
+
+
+def _save_markers(
+    path: Path | None, markers: dict[str, LastSeenMarker]
+) -> None:
+    if path is None:
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "markers": {
+            label: _serialize_marker(marker)
+            for label, marker in sorted(markers.items())
+        }
+    }
+    with NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as tmp_file:
+        json.dump(payload, tmp_file, indent=2, sort_keys=True)
+        tmp_file.write("\n")
+        tmp_path = Path(tmp_file.name)
+    tmp_path.replace(path)
+
+
+def _serialize_marker(marker: LastSeenMarker) -> object:
+    if isinstance(marker, datetime):
+        return {"type": "datetime", "value": marker.isoformat()}
+    if isinstance(marker, bool):
+        return {"type": "bool", "value": marker}
+    if isinstance(marker, int):
+        return {"type": "int", "value": marker}
+    if isinstance(marker, float):
+        return {"type": "float", "value": marker}
+    if isinstance(marker, str):
+        return {"type": "str", "value": marker}
+    if marker is None:
+        return {"type": "none", "value": None}
+    raise AdapterConfigError(f"unsupported marker type: {type(marker).__name__}")
+
+
+def _deserialize_marker(value: object) -> LastSeenMarker:
+    if not isinstance(value, dict):
+        return str(value)
+
+    marker_type = value.get("type")
+    marker_value = value.get("value")
+    if marker_type == "datetime":
+        if not isinstance(marker_value, str):
+            raise AdapterConfigError("datetime marker value must be a string")
+        return datetime.fromisoformat(marker_value)
+    if marker_type == "bool":
+        return bool(marker_value)
+    if marker_type == "int":
+        return int(marker_value)
+    if marker_type == "float":
+        return float(marker_value)
+    if marker_type == "str":
+        return str(marker_value)
+    if marker_type == "none":
+        return None
+    raise AdapterConfigError(f"unsupported marker type: {marker_type}")

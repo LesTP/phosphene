@@ -3,7 +3,7 @@ module: SOURCE_INGESTION
 phase: 2
 phase_title: Concrete adapters, human-share, and corpus import
 step: 3.2.7
-mode: Build
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -32,7 +32,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 3 Phase 2 in progress
-- **Focus** — Step 3.2.7: Persistence and integration hardening
+- **Focus** — Phase 2 review
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -104,7 +104,7 @@ Build concrete Source Ingestion adapters behind the Phase 1 manager/registry con
   - Implement `telegram_channel` via `toolkit/telegram_client` and `reddit` via a small HTTP/API boundary.
   - Normalize message text/captions/forwarded content and Reddit self/link posts without ingesting comments.
   - Tests: fake toolkit/API clients, credential/param validation integration, sort handling, API failure conversion.
-- [ ] **Step 3.2.7 — Persistence and integration hardening**
+- [x] **Step 3.2.7 — Persistence and integration hardening**
   - Add durable last-seen marker handling only if it can remain Source Ingestion-owned and avoid a Memory Store import; otherwise record the contract issue for review instead of expanding dependencies.
   - Add cross-adapter manager tests that poll mixed adapter sets, preserve per-adapter markers, and verify full-suite coverage remains above the established threshold.
   - Tests: focused `tests/source_ingestion`, then full suite with coverage command from Cold Start Summary.

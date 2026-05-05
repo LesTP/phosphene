@@ -1,4 +1,5 @@
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -215,3 +216,138 @@ def test_adapter_error_from_exception_preserves_url_context() -> None:
 
     assert error.error == "bad fetch"
     assert error.url == "https://example.com/bad"
+
+
+def test_marker_store_persists_last_seen_across_manager_instances(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    adapters: dict[str, FakeAdapter] = {}
+
+    def factory(config: AdapterConfig) -> FakeAdapter:
+        adapter = FakeAdapter(
+            AdapterPollResult(
+                items=[
+                    ContentItem(
+                        content=config.source_label,
+                        source=config.adapter_type,
+                        timestamp=datetime(2026, 1, 1),
+                    )
+                ],
+                next_marker=f"{config.source_label}:marker",
+            )
+        )
+        adapters[config.source_label] = adapter
+        return adapter
+
+    monkeypatch.setitem(_ADAPTER_REGISTRY, "durable_source", factory)
+    marker_path = tmp_path / "source_ingestion_markers.json"
+    config = IngestionConfig(
+        adapters=[
+            AdapterConfig(
+                adapter_type="durable_source",
+                source_label="feed",
+                params={"marker_store_path": str(marker_path)},
+            ),
+        ]
+    )
+
+    SourceIngestion(config).poll_once("feed")
+    SourceIngestion(config).poll_once("feed")
+
+    assert adapters["feed"].seen_markers == ["feed:marker"]
+    assert json.loads(marker_path.read_text(encoding="utf-8")) == {
+        "markers": {
+            "feed": {"type": "str", "value": "feed:marker"},
+        }
+    }
+
+
+def test_marker_store_preserves_per_adapter_markers_for_mixed_poll(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    adapters: dict[str, FakeAdapter] = {}
+
+    def factory(config: AdapterConfig) -> FakeAdapter:
+        adapter = FakeAdapter(
+            AdapterPollResult(
+                items=[
+                    ContentItem(
+                        content=config.source_label,
+                        source=config.adapter_type,
+                        timestamp=datetime(2026, 1, 1),
+                    )
+                ],
+                next_marker=f"{config.source_label}:marker",
+            )
+        )
+        adapters[config.source_label] = adapter
+        return adapter
+
+    monkeypatch.setitem(_ADAPTER_REGISTRY, "mixed_source", factory)
+    marker_path = tmp_path / "mixed_markers.json"
+    config = IngestionConfig(
+        adapters=[
+            AdapterConfig(
+                adapter_type="mixed_source",
+                source_label="rss",
+                params={"marker_store_path": str(marker_path)},
+            ),
+            AdapterConfig(
+                adapter_type="mixed_source",
+                source_label="human",
+                params={"marker_store_path": str(marker_path)},
+            ),
+        ]
+    )
+
+    first_results = SourceIngestion(config).poll()
+    SourceIngestion(config).poll()
+
+    assert [result.adapter_label for result in first_results] == ["rss", "human"]
+    assert adapters["rss"].seen_markers == ["rss:marker"]
+    assert adapters["human"].seen_markers == ["human:marker"]
+    assert json.loads(marker_path.read_text(encoding="utf-8")) == {
+        "markers": {
+            "human": {"type": "str", "value": "human:marker"},
+            "rss": {"type": "str", "value": "rss:marker"},
+        }
+    }
+
+
+def test_marker_store_preserves_marker_types(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    marker = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    adapter = FakeAdapter(AdapterPollResult(next_marker=marker))
+    monkeypatch.setitem(_ADAPTER_REGISTRY, "datetime_source", lambda config: adapter)
+    marker_path = tmp_path / "markers.json"
+
+    SourceIngestion(
+        IngestionConfig(
+            adapters=[
+                AdapterConfig(
+                    adapter_type="datetime_source",
+                    source_label="archive",
+                    params={"marker_store_path": str(marker_path)},
+                ),
+            ]
+        )
+    ).poll_once("archive")
+
+    restored_adapter = FakeAdapter(AdapterPollResult(next_marker=marker))
+    monkeypatch.setitem(
+        _ADAPTER_REGISTRY, "datetime_source", lambda config: restored_adapter
+    )
+    SourceIngestion(
+        IngestionConfig(
+            adapters=[
+                AdapterConfig(
+                    adapter_type="datetime_source",
+                    source_label="archive",
+                    params={"marker_store_path": str(marker_path)},
+                ),
+            ]
+        )
+    ).poll_once("archive")
+
+    assert restored_adapter.seen_markers == [marker]

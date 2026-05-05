@@ -140,6 +140,17 @@ Added a small internal Reddit HTTP/API boundary that normalizes subreddit listin
 
 Focused tests cover fake Telegram and Reddit clients, marker advancement, caption/forwarded-content normalization, Reddit self/link post handling, sort propagation, and API failure conversion. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (66 passed).
 
+### Step 3.2.7: Persistence and integration hardening
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added optional durable last-seen marker persistence owned entirely by Source Ingestion. Managers now load and save per-adapter markers to a JSON marker store when adapters share a `params["marker_store_path"]`; without that setting, existing in-memory marker behavior is unchanged. Marker writes are atomic, marker types are preserved for datetime/string/numeric/bool/None values, and no Memory Store import or public dataclass/signature change was introduced.
+
+Added cross-adapter manager coverage for mixed adapter polling, per-adapter marker preservation across manager instances, and marker type restoration. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/source_ingestion` (69 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest --cov=phosphene --cov-report=term-missing` (346 passed, 94% total coverage; Source Ingestion modules remain above 80%).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
