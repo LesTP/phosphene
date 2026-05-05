@@ -512,6 +512,59 @@ class Generator:
             },
         ]
 
+    def _build_free_play_generation_messages(
+        self,
+        *,
+        trigger: FreePlayTrigger,
+        snapshot: PersonalitySnapshot,
+        trigger_notes: Sequence[MemoryNote],
+        config: GeneratorConfig,
+    ) -> list[Mapping[str, str]]:
+        payload = {
+            "task": "free_play_generation",
+            "trigger_note_ids": list(trigger.trigger_note_ids),
+            "budget_tokens": trigger.budget_tokens,
+            "affordances": list(trigger.affordances),
+            "max_output_tokens": config.max_output_tokens,
+            "ambient_context": _json_ready(snapshot.ambient_context),
+            "personality_files": [
+                _note_payload(note) for note in snapshot.personality_files
+            ],
+            "relevant_patterns": [
+                _note_payload(note) for note in snapshot.relevant_patterns
+            ],
+            "trigger_notes": [_note_payload(note) for note in trigger_notes],
+            "contradictions": [
+                {
+                    "personality_note_id": contradiction.personality_note_id,
+                    "claim_summary": contradiction.claim_summary,
+                    "counter_evidence_ids": list(contradiction.counter_evidence_ids),
+                    "counter_summary": contradiction.counter_summary,
+                }
+                for contradiction in snapshot.contradictions
+            ],
+            "required_output": {
+                "output_mode": "free_play",
+                "is_lateral": True,
+                "intent_tag_options": [
+                    "synthesis",
+                    "provocation",
+                    "question",
+                    "aesthetic",
+                    "internal_note",
+                    "log_surfacing",
+                    "subscription_proposal",
+                ],
+            },
+        }
+        return [
+            {"role": "system", "content": _system_message()},
+            {
+                "role": "user",
+                "content": json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            },
+        ]
+
     def _select_prompt_topic(
         self,
         prompt: GenerationPrompt,
@@ -588,8 +641,25 @@ class Generator:
         ambient: AmbientContext,
         config: GeneratorConfig,
     ) -> GeneratorOutput:
-        self._load_personality_snapshot(ambient, config)
-        raise NotImplementedError("LLM generation is implemented in a later phase")
+        snapshot = self._load_personality_snapshot(ambient, config)
+        trigger_notes = self._load_notes_by_id(trigger.trigger_note_ids)
+        completion = _call_generation_llm(
+            self._build_free_play_generation_messages(
+                trigger=trigger,
+                snapshot=snapshot,
+                trigger_notes=trigger_notes,
+                config=config,
+            ),
+            config,
+        )
+        return _parse_generator_output_payload(
+            completion.content,
+            token_usage=completion.token_usage,
+            default_output_mode="free_play",
+            default_is_lateral=True,
+            fallback_source_note_ids=self._source_note_ids_with(snapshot, trigger_notes),
+        )
+
 
     def respond(
         self,

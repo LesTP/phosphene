@@ -147,6 +147,17 @@ Implemented live `Generator.respond()` orchestration behind the existing public 
 
 Preserved router threading by setting `GeneratorOutput.originating_message_id` from `InboundMessage.message_id`, and kept the Generator stateless and read-only against Memory Store with no public API changes. Added fake-LLM/fake-store coverage for prompt contents, config and tier propagation, token usage preservation, source-note fallback across personality/pattern/relevant notes, no Memory Store writes, and response threading metadata. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (40 passed).
 
+### Step 5.2.5: Free-play generation
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented live `Generator.free_play()` orchestration behind the existing public contract. The free-play path loads a fresh personality snapshot, reads trigger notes by ID, builds a deterministic JSON prompt carrying trigger note IDs, lateral budget, affordances, ambient context, personality files, Tier 2 patterns, trigger notes, contradictions, and required free-play output metadata, then calls the generation LLM boundary and parses the generated output.
+
+Preserved lateral semantics by requiring `output_mode="free_play"` and `is_lateral=True`, preserved trigger/source note attribution fallback across personality, pattern, and trigger notes, and kept the Generator stateless and read-only against Memory Store with no public API changes. Added fake-LLM/fake-store coverage for prompt contents, config and tier propagation, token usage preservation, trigger-note loading, no Memory Store writes, lateral flags, and source attribution. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (437 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->

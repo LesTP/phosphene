@@ -6,7 +6,13 @@ import pytest
 
 import phosphene.generator.generator as generator_module
 from phosphene.gateway import InboundMessage
-from phosphene.generator import EmptyPersonalityError, GenerationPrompt, Generator, GeneratorConfig
+from phosphene.generator import (
+    EmptyPersonalityError,
+    FreePlayTrigger,
+    GenerationPrompt,
+    Generator,
+    GeneratorConfig,
+)
 from phosphene.generator.types import TokenUsage
 from phosphene.memory_store import MemoryNote, PersonalityContext
 
@@ -452,6 +458,91 @@ def test_respond_builds_response_context_calls_llm_and_preserves_threading(
     assert payload["required_output"] == {
         "output_mode": "response",
         "is_lateral": False,
+        "intent_tag_options": [
+            "synthesis",
+            "provocation",
+            "question",
+            "aesthetic",
+            "internal_note",
+            "log_surfacing",
+            "subscription_proposal",
+        ],
+    }
+
+
+def test_free_play_loads_triggers_calls_llm_and_marks_lateral(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    personality = make_note("personality-1", tier=3)
+    pattern = make_note("pattern-1", tier=2, importance=0.8)
+    store = FakeMemoryStore([personality], query_results=[pattern])
+    calls: list[dict[str, object]] = []
+    usage = TokenUsage(prompt_tokens=8, completion_tokens=14, total_tokens=22)
+
+    def fake_complete(**kwargs: object) -> object:
+        calls.append(dict(kwargs))
+        return generator_module._LLMCompletion(
+            content=json.dumps(
+                {
+                    "content": "generated lateral move",
+                    "intent_tag": "provocation",
+                    "output_mode": "free_play",
+                    "importance_score": 0.67,
+                    "is_lateral": True,
+                    "source_note_ids": [],
+                    "contradictions_noted": [],
+                }
+            ),
+            token_usage=usage,
+        )
+
+    monkeypatch.setattr(generator_module, "_toolkit_complete", fake_complete)
+
+    output = Generator(store).free_play(
+        FreePlayTrigger(
+            trigger_note_ids=["trigger-1", "trigger-2"],
+            budget_tokens=1200,
+            affordances=["surface_contradiction", "pose_question"],
+        ),
+        {"hour": 22},
+        GeneratorConfig(llm_config="llm-config", generation_tier="quality"),
+    )
+
+    assert output.content == "generated lateral move"
+    assert output.output_mode == "free_play"
+    assert output.is_lateral is True
+    assert output.source_note_ids == [
+        "personality-1",
+        "pattern-1",
+        "trigger-1",
+        "trigger-2",
+    ]
+    assert output.token_usage == usage
+    assert output.originating_message_id is None
+    assert store.context_calls == 1
+    assert len(store.query_calls) == 1
+    assert store.get_note_calls == ["trigger-1", "trigger-2"]
+    assert store.write_calls == 0
+    assert calls[0]["config"] == "llm-config"
+    assert calls[0]["tier"] == "quality"
+
+    messages = calls[0]["messages"]
+    assert messages[0]["role"] == "system"
+    payload = json.loads(messages[1]["content"])
+    assert payload["task"] == "free_play_generation"
+    assert payload["trigger_note_ids"] == ["trigger-1", "trigger-2"]
+    assert payload["budget_tokens"] == 1200
+    assert payload["affordances"] == ["surface_contradiction", "pose_question"]
+    assert payload["ambient_context"] == {"hour": 22}
+    assert payload["personality_files"][0]["note_id"] == "personality-1"
+    assert payload["relevant_patterns"][0]["note_id"] == "pattern-1"
+    assert [note["note_id"] for note in payload["trigger_notes"]] == [
+        "trigger-1",
+        "trigger-2",
+    ]
+    assert payload["required_output"] == {
+        "output_mode": "free_play",
+        "is_lateral": True,
         "intent_tag_options": [
             "synthesis",
             "provocation",
