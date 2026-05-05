@@ -103,6 +103,17 @@ Planned Module 5 Phase 2 as a Build phase over live Generator behavior behind th
 
 Scope decision recorded in D-40: Phase 2 keeps Generator stateless and read-only against Memory Store, uses fake LLM and fake Memory Store boundaries for deterministic coverage, preserves Phase 1 public dataclasses and Output Router behavior, and excludes new platform routing scope.
 
+### Step 5.2.1: LLM client boundary and response parsing
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added private Generator LLM boundary helpers that call `toolkit/llm_client.complete` at `GeneratorConfig.generation_tier`, normalize toolkit response content and `TokenUsage`, and translate provider/import/runtime failures to `LLMAPIError`. The helpers are injectable for deterministic tests and do not change the public Generator API or start prompted/response/free-play orchestration.
+
+Added JSON parsing for model output into bounded `GeneratorOutput` fields: non-empty content and intent tag, request-matching output mode, boolean lateral flag, probability-bounded importance, source-note attribution with fallback IDs, parsed contradiction objects, preserved token usage, and optional response threading metadata. Focused tests cover generation tier propagation, token usage preservation, provider failure wrapping, valid parsing, fallback attribution, and malformed/missing/invalid payload rejection. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/generator` (35 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (431 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 <!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
