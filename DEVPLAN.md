@@ -3,7 +3,7 @@ module: GATEWAY
 phase: 2
 phase_title: Gateway Phase 2 — Telegram adapter delivery and polling
 step: 4.2.5
-mode: Build
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 4 Phase 2 in progress
-- **Focus** — Concrete Telegram Gateway adapter through the toolkit boundary
+- **Phase** — Module 4 Phase 2 ready for review
+- **Focus** — Review concrete Telegram Gateway adapter delivery and polling
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -98,6 +98,6 @@ Build the concrete Telegram Gateway adapter behind the existing internal adapter
 - [x] **Step 4.2.2 — Outbound Telegram delivery**: Route `text`, `markdown`, `thread`, and `telegraph` sends through the toolkit boundary, map platform message IDs into `DeliveryResult`, preserve reply and intent metadata, and convert toolkit/API failures into failed delivery results.
 - [x] **Step 4.2.3 — Polling listener lifecycle and inbound normalization**: Add non-blocking Telegram polling start/stop behavior, normalize incoming updates to `InboundMessage`, honor `listen=False` and idempotent lifecycle semantics, and keep callback exception isolation in Gateway-owned dispatch.
 - [x] **Step 4.2.4 — Telegram feedback signal normalization**: Detect supported Telegram feedback events from replies/reactions/edits exposed by the toolkit boundary, normalize them to `FeedbackSignal`, and preserve raw payload metadata for downstream attribution.
-- [ ] **Step 4.2.5 — Gateway Telegram integration hardening**: Add end-to-end fake-client coverage for mixed log/Telegram configs, listener stop cleanup, recent-delivery tracking with Telegram IDs, and full Gateway test-suite verification.
+- [x] **Step 4.2.5 — Gateway Telegram integration hardening**: Add end-to-end fake-client coverage for mixed log/Telegram configs, listener stop cleanup, recent-delivery tracking with Telegram IDs, and full Gateway test-suite verification.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

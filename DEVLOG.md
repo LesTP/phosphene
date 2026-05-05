@@ -158,6 +158,17 @@ Extended the Telegram polling path to normalize feedback events alongside inboun
 
 The adapter now forwards `on_feedback` through the existing Gateway-owned dispatch wrapper, so feedback callback failures are isolated and recorded consistently with inbound callback failures. Raw update dictionaries are preserved on emitted feedback signals as adapter-owned metadata for downstream attribution while the public dataclass field list remains stable. Focused fake-client tests cover reactions, replies, edits, sender/timestamp normalization, raw metadata preservation, and feedback callback exception isolation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (393 passed).
 
+### Step 4.2.5: Gateway Telegram integration hardening
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added end-to-end fake-client Gateway coverage for mixed Telegram/log platform configs. The new tests verify Telegram default delivery through the injected toolkit boundary, local log delivery in the same Gateway instance, recent-delivery tracking keyed by Telegram platform message IDs, and log-adapter tracking without cross-platform interference.
+
+Added mixed-platform listener cleanup coverage showing Gateway starts both enabled adapters, stops the Telegram polling thread through the fake toolkit client's shutdown hook, clears all listening platform state, and leaves the output-only log adapter without file side effects. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (49 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

@@ -1,3 +1,4 @@
+import json
 import threading
 import time
 from datetime import datetime, timezone
@@ -337,6 +338,97 @@ def test_telegram_listener_respects_listen_false() -> None:
 
     assert adapter._listener_thread is None
     assert adapter.client.get_updates_calls == []
+
+
+def test_mixed_log_and_telegram_delivery_tracks_platform_message_ids(tmp_path) -> None:
+    log_path = tmp_path / "gateway.jsonl"
+    gateway = Gateway(
+        GatewayConfig(
+            platforms=[
+                _telegram_platform(),
+                PlatformConfig(
+                    name="log",
+                    adapter_type="log",
+                    credentials={},
+                    params={"log_path": str(log_path)},
+                ),
+            ],
+            default_platform="telegram",
+        ),
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=FakeTelegramClient,
+    )
+    telegram_adapter = gateway._adapters_by_platform["telegram"]
+
+    telegram_result = gateway.send_to_default(
+        "telegram thought",
+        intent_tag="free_play",
+    )
+    log_result = gateway.send(
+        OutboundMessage(
+            content="local trace",
+            platform="log",
+            metadata={"source": "integration-test"},
+        )
+    )
+
+    assert telegram_result == DeliveryResult(
+        success=True,
+        platform="telegram",
+        message_id="201",
+    )
+    assert log_result == DeliveryResult(
+        success=True,
+        platform="log",
+        message_id="log-1",
+    )
+    assert telegram_adapter.client.sent_messages == [
+        {"chat_id": 12345, "text": "telegram thought", "reply_to": None}
+    ]
+    assert gateway._recent_deliveries[
+        ("telegram", "201")
+    ].intent_tag == "free_play"
+    assert gateway._recent_deliveries[("log", "log-1")].metadata == {
+        "source": "integration-test"
+    }
+    assert (
+        json.loads(log_path.read_text(encoding="utf-8"))["content"]
+        == "local trace"
+    )
+
+
+def test_mixed_log_and_telegram_listener_stop_cleans_up_all_platforms(tmp_path) -> None:
+    log_path = tmp_path / "gateway.jsonl"
+    gateway = Gateway(
+        GatewayConfig(
+            platforms=[
+                _telegram_platform(),
+                PlatformConfig(
+                    name="log",
+                    adapter_type="log",
+                    credentials={},
+                    params={"log_path": str(log_path)},
+                ),
+            ],
+            default_platform="telegram",
+        ),
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=PollingTelegramClient,
+    )
+    telegram_adapter = gateway._adapters_by_platform["telegram"]
+
+    gateway.start_listener()
+    _wait_for(lambda: len(telegram_adapter.client.get_updates_calls) >= 1)
+    assert gateway._listening_platforms == {"telegram", "log"}
+
+    gateway.stop_listener()
+
+    assert gateway._listening_platforms == set()
+    assert telegram_adapter._listener_thread is None
+    assert telegram_adapter.client.stopped is True
+    assert not log_path.exists()
 
 
 def test_telegram_callback_exceptions_remain_gateway_owned() -> None:
