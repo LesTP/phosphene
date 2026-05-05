@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 
 from phosphene.gateway.adapters import (
@@ -37,6 +38,7 @@ _REQUIRED_PARAM_KEYS = {
     "telegram": (("chat_id",),),
     "log": (("log_path",),),
 }
+_RECENT_MESSAGE_LIMIT = 100
 
 
 class Gateway:
@@ -64,13 +66,17 @@ class Gateway:
         )
         self._adapters_by_platform = self._build_enabled_adapters()
         self._listening_platforms: set[str] = set()
+        self._recent_deliveries: OrderedDict[
+            tuple[str, str], OutboundMessage
+        ] = OrderedDict()
+        self._callback_errors: list[Exception] = []
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
         platform = self._get_enabled_platform(message.platform)
         _validate_message_format(message, platform)
         adapter = self._adapters_by_platform[platform.name]
         try:
-            return adapter.send(message)
+            result = adapter.send(message)
         except DeliveryError as exc:
             return DeliveryResult(
                 success=False,
@@ -85,6 +91,8 @@ class Gateway:
                 message_id=None,
                 error=str(exc),
             )
+        self._remember_delivery(result, message)
+        return result
 
     def send_to_default(
         self,
@@ -109,14 +117,19 @@ class Gateway:
             if platform_name in self._listening_platforms:
                 continue
             try:
-                adapter.start_listener(self.on_message, self.on_feedback)
+                self._listening_platforms.add(platform_name)
+                adapter.start_listener(
+                    self._message_dispatcher(platform_name),
+                    self._feedback_dispatcher(platform_name),
+                )
             except PlatformConnectionError:
+                self._listening_platforms.discard(platform_name)
                 raise
             except Exception as exc:
+                self._listening_platforms.discard(platform_name)
                 raise PlatformConnectionError(
                     f"failed to start listener for platform {platform_name}: {exc}"
                 ) from exc
-            self._listening_platforms.add(platform_name)
 
     def stop_listener(self) -> None:
         for platform_name in list(self._listening_platforms):
@@ -148,6 +161,48 @@ class Gateway:
         if not platform.enabled:
             raise PlatformNotFoundError(f"platform is disabled: {platform_name}")
         return platform
+
+    def _message_dispatcher(
+        self, platform_name: str
+    ) -> Callable[[InboundMessage], None]:
+        def dispatch(message: InboundMessage) -> None:
+            if platform_name not in self._listening_platforms:
+                return
+            try:
+                self.on_message(message)
+            except Exception as exc:
+                # Callback failures are isolated so adapter listener loops keep running.
+                self._callback_errors.append(exc)
+
+        return dispatch
+
+    def _feedback_dispatcher(
+        self, platform_name: str
+    ) -> Callable[[FeedbackSignal], None]:
+        def dispatch(signal: FeedbackSignal) -> None:
+            if platform_name not in self._listening_platforms:
+                return
+            try:
+                self.on_feedback(signal)
+            except Exception as exc:
+                # Callback failures are isolated so adapter listener loops keep running.
+                self._callback_errors.append(exc)
+
+        return dispatch
+
+    def _remember_delivery(
+        self,
+        result: DeliveryResult,
+        message: OutboundMessage,
+    ) -> None:
+        if not result.success or result.message_id is None:
+            return
+
+        key = (result.platform, result.message_id)
+        self._recent_deliveries[key] = message
+        self._recent_deliveries.move_to_end(key)
+        while len(self._recent_deliveries) > _RECENT_MESSAGE_LIMIT:
+            self._recent_deliveries.popitem(last=False)
 
 
 def _validate_and_index_platforms(

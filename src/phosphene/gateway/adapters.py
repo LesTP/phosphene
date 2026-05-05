@@ -75,6 +75,8 @@ class OutputOnlyAdapter:
         self.config = config
         self.listener_started = False
         self.sent_messages: list[OutboundMessage] = []
+        self._on_message: InboundCallback | None = None
+        self._on_feedback: FeedbackCallback | None = None
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
         self.sent_messages.append(message)
@@ -90,13 +92,25 @@ class OutputOnlyAdapter:
         on_feedback: FeedbackCallback,
     ) -> None:
         self.listener_started = True
+        self._on_message = on_message
+        self._on_feedback = on_feedback
 
     def stop_listener(self) -> None:
         self.listener_started = False
+        self._on_message = None
+        self._on_feedback = None
 
 
 class FakeGatewayAdapter(OutputOnlyAdapter):
     """Deterministic in-process adapter for Gateway lifecycle tests."""
+
+    def dispatch_inbound(self, message: InboundMessage) -> None:
+        if self.listener_started and self._on_message is not None:
+            self._on_message(message)
+
+    def dispatch_feedback(self, signal: FeedbackSignal) -> None:
+        if self.listener_started and self._on_feedback is not None:
+            self._on_feedback(signal)
 
 
 class LogGatewayAdapter:

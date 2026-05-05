@@ -2,8 +2,8 @@
 module: GATEWAY
 phase: 1
 phase_title: Gateway contract and adapter foundation
-step: 4.1.5
-mode: Build
+step: 4.1.review
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 4 Phase 1 in progress
-- **Focus** — Step 4.1.5: inbound and feedback callback dispatch harness
+- **Focus** — Phase 1 review: Gateway contract and adapter foundation
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -104,7 +104,7 @@ Build the Gateway public contract and internal adapter foundation without live e
 - [x] **Step 4.1.4 — Local log adapter**
   - Implement the `log` adapter for local development output with no credentials, `params["log_path"]`, timestamped records, content/format/intent metadata preservation, and no inbound listener behavior.
   - Tests: file creation/append behavior, metadata serialization, missing log-path validation, output-only listener no-op semantics.
-- [ ] **Step 4.1.5 — Inbound and feedback callback dispatch harness**
+- [x] **Step 4.1.5 — Inbound and feedback callback dispatch harness**
   - Add fake/listener adapter support for dispatching `InboundMessage` and `FeedbackSignal` callbacks through Gateway-owned wrappers while preserving platform/message metadata.
   - Keep message-id mapping in memory only and bounded enough for later feedback attribution tests, without adding persistent state.
   - Tests: inbound callback dispatch, feedback callback dispatch, callback exception isolation/propagation decision as documented in code, stop prevents further dispatch.

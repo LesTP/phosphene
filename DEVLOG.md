@@ -173,6 +173,17 @@ Implemented the concrete `log` Gateway adapter for local development output behi
 
 Kept the adapter output-only: listener start/stop hooks are no-ops and do not create inbound activity or persistent listener state beyond the Gateway lifecycle bookkeeping already established in Step 4.1.2. Focused tests cover log file creation, append ordering, metadata serialization, missing log-path validation through existing config coverage, and listener no-op behavior. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (375 passed).
 
+### Step 4.1.5: Inbound and feedback callback dispatch harness
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Gateway-owned inbound and feedback dispatch wrappers for listener adapters. The wrappers preserve adapter-provided `InboundMessage` and `FeedbackSignal` metadata, ignore dispatch after listener stop, and isolate callback exceptions by recording them on the Gateway so adapter listener loops can continue.
+
+Extended the fake Gateway adapter with deterministic in-process inbound and feedback dispatch helpers, and added bounded in-memory recent-delivery tracking keyed by platform/message ID for later feedback attribution work. No persistent state or public API surface was added. Focused tests cover inbound dispatch, feedback dispatch, callback exception isolation, stopped-listener suppression, and bounded recent message mapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (380 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ## Module 3 Phase 1 Plan
