@@ -114,6 +114,17 @@ Planned Module 4 Phase 2 as a Build phase over concrete Telegram Gateway behavio
 
 Scope decision recorded in D-38: Phase 2 must keep public Gateway dataclasses stable and use credential-free fake toolkit clients for tests. Live credential smoke tests remain outside the autonomous loop until credentials and an integration harness exist.
 
+### Step 4.2.1: Telegram adapter construction and toolkit boundary
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Replaced the pending Telegram placeholder with a concrete internal `TelegramGatewayAdapter` registered under the existing `telegram` adapter type. The adapter constructs and holds a toolkit-backed client through a private injectable factory while preserving the public Gateway dataclasses and existing adapter protocol.
+
+Added a default toolkit import boundary that raises `PlatformConfigError` when `toolkit.telegram_client` is unavailable, and normalized private factory failures through Gateway construction as `PlatformConfigError`. Focused tests cover credential-free construction with a fake client, non-callable factory rejection, factory failure wrapping, and valid Telegram/log config construction without live credentials. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (37 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (383 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

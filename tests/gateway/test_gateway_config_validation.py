@@ -13,8 +13,22 @@ def _gateway_config(*platforms: PlatformConfig, default: str = "log") -> Gateway
     return GatewayConfig(platforms=list(platforms), default_platform=default)
 
 
+class FakeTelegramClient:
+    def __init__(self, config: PlatformConfig) -> None:
+        self.config = config
+
+
+def _telegram_client_factory(config: PlatformConfig) -> FakeTelegramClient:
+    return FakeTelegramClient(config)
+
+
 def _gateway(config: GatewayConfig) -> Gateway:
-    return Gateway(config, lambda _: None, lambda _: None)
+    return Gateway(
+        config,
+        lambda _: None,
+        lambda _: None,
+        _telegram_client_factory=_telegram_client_factory,
+    )
 
 
 def test_gateway_accepts_valid_arch_platform_configs() -> None:

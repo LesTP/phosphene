@@ -10,6 +10,8 @@ from phosphene.gateway.adapters import (
     AdapterFactory,
     AdapterRegistry,
     GatewayAdapter,
+    TelegramClientFactory,
+    telegram_adapter_factory,
 )
 from phosphene.gateway.errors import (
     DeliveryError,
@@ -51,13 +53,20 @@ class Gateway:
         on_feedback: Callable[[FeedbackSignal], None],
         *,
         _adapter_factories: Mapping[str, AdapterFactory] | None = None,
+        _telegram_client_factory: TelegramClientFactory | None = None,
     ) -> None:
         self.config = config
         self.on_message = on_message
         self.on_feedback = on_feedback
+        adapter_factories = dict(_adapter_factories or {})
+        if _telegram_client_factory is not None:
+            adapter_factories["telegram"] = lambda platform: telegram_adapter_factory(
+                platform,
+                client_factory=_telegram_client_factory,
+            )
         try:
             self._adapter_registry = DEFAULT_ADAPTER_REGISTRY.with_factories(
-                _adapter_factories
+                adapter_factories
             )
         except (TypeError, ValueError) as exc:
             raise PlatformConfigError(f"invalid adapter registry: {exc}") from exc

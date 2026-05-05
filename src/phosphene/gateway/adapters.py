@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-from phosphene.gateway.errors import PlatformConnectionError
+from phosphene.gateway.errors import PlatformConfigError, PlatformConnectionError
 from phosphene.gateway.types import (
     DeliveryResult,
     FeedbackSignal,
@@ -39,6 +39,7 @@ class GatewayAdapter(Protocol):
 
 
 AdapterFactory = Callable[[PlatformConfig], GatewayAdapter]
+TelegramClientFactory = Callable[[PlatformConfig], object]
 
 
 class AdapterRegistry:
@@ -155,18 +156,27 @@ class LogGatewayAdapter:
         return None
 
 
-class PendingGatewayAdapter:
-    """Placeholder for ARCH adapter types implemented in later phases."""
+class TelegramGatewayAdapter:
+    """Telegram Gateway adapter backed by toolkit/telegram_client."""
 
-    def __init__(self, config: PlatformConfig) -> None:
+    def __init__(
+        self,
+        config: PlatformConfig,
+        client_factory: TelegramClientFactory | None = None,
+    ) -> None:
         self.config = config
+        self.chat_id = config.params["chat_id"]
+        factory = client_factory or default_telegram_client_factory
+        if not callable(factory):
+            raise PlatformConfigError("telegram client factory must be callable")
+        self.client = factory(config)
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
         return DeliveryResult(
             success=False,
             platform=self.config.name,
             message_id=None,
-            error=f"{self.config.adapter_type} adapter is not implemented",
+            error="telegram delivery is not implemented",
         )
 
     def start_listener(
@@ -174,9 +184,7 @@ class PendingGatewayAdapter:
         on_message: InboundCallback,
         on_feedback: FeedbackCallback,
     ) -> None:
-        raise PlatformConnectionError(
-            f"{self.config.adapter_type} adapter is not implemented"
-        )
+        raise PlatformConnectionError("telegram polling is not implemented")
 
     def stop_listener(self) -> None:
         return None
@@ -190,14 +198,33 @@ def log_adapter_factory(config: PlatformConfig) -> GatewayAdapter:
     return LogGatewayAdapter(config)
 
 
-def pending_adapter_factory(config: PlatformConfig) -> GatewayAdapter:
-    return PendingGatewayAdapter(config)
+def default_telegram_client_factory(config: PlatformConfig) -> object:
+    try:
+        from toolkit.telegram_client import TelegramClient
+    except ImportError as exc:
+        raise PlatformConfigError("toolkit telegram client is unavailable") from exc
+
+    bot_token = config.credentials["bot_token"]
+    chat_id = config.params["chat_id"]
+    allowed_chat_ids: list[int] | None = None
+    try:
+        allowed_chat_ids = [int(chat_id)]
+    except (TypeError, ValueError):
+        allowed_chat_ids = None
+    return TelegramClient(bot_token=bot_token, allowed_chat_ids=allowed_chat_ids)
+
+
+def telegram_adapter_factory(
+    config: PlatformConfig,
+    client_factory: TelegramClientFactory | None = None,
+) -> GatewayAdapter:
+    return TelegramGatewayAdapter(config, client_factory=client_factory)
 
 
 DEFAULT_ADAPTER_REGISTRY = AdapterRegistry(
     {
         "fake": fake_adapter_factory,
         "log": log_adapter_factory,
-        "telegram": pending_adapter_factory,
+        "telegram": telegram_adapter_factory,
     }
 )
