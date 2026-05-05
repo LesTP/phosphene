@@ -40,12 +40,14 @@ No external state, no session memory, no inter-iteration side channels.
 
 Execute **exactly one** of the following actions per iteration:
 
+> Phase completes with a review step (exit CONTINUE) and a complete step (exit ESCALATE).
+
 | Action | When | What to do |
 |--------|------|------------|
-| **Phase Plan** | No active phase for the current module | Break the phase into steps. Update DEVPLAN with the step breakdown. Commit. Exit. |
-| **Step Execution** | A phase is in progress with remaining steps | Pick the next step from DEVPLAN. Do all file read/write work. Run builds, tests, git operations. Mark the step done in DEVPLAN. Commit. Exit. |
-| **Phase Review** | All steps in the current phase are complete | Review the phase output against the architecture contract. Log decisions to DECISIONS.md. Update DEVPLAN "Next" pointer to Phase Complete. Commit review artifacts. Exit. |
-| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Update DEVPLAN frontmatter to completed state with `blocked: "awaiting-human-audit"` and `phase_title` indicating what was completed and what comes next. The `/close` bot command (or human) clears the gate. Commit. Exit. |
+| **Phase Plan** | No active phase for the current module | Break the phase into steps. Update DEVPLAN with the step breakdown. Commit. Exit CONTINUE. |
+| **Step Execution** | A phase is in progress with remaining steps | Pick the next step from DEVPLAN. Do all file read/write work. Run builds, tests, git operations. Mark the step done in DEVPLAN. Commit. Exit CONTINUE. |
+| **Phase Review** | All steps in the current phase are complete | Review the phase output against the architecture contract. Apply any must-fix items within this iter. Log decisions to DECISIONS.md. Mark `review_done: true` in DEVPLAN frontmatter. Update DEVPLAN "Next" pointer to Phase Complete. Commit review artifacts. Exit CONTINUE. |
+| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Update DEVPLAN frontmatter to completed state with `blocked: "awaiting-human-audit"` and `phase_title` indicating what was completed and what comes next. The `/close` bot command (or human) clears the gate. Commit. Exit ESCALATE. |
 
 ---
 
@@ -73,8 +75,8 @@ Every iteration that modifies project state must leave an auditable trail:
 - **DEVLOG.md** — add a dated entry describing what was done and why.
   DEVLOG.md uses a `<!-- HISTORY` fence. New entries go **above** the fence,
   below existing current-phase entries. Do not read or edit content below the
-  fence. During Phase Complete, move the **previous** phase's entries below
-  the fence into history — only the just-completed phase should remain above it.
+  fence. During Phase Complete, move the fence up so only the just-completed
+  phase's entries remain above it.
 - **DECISIONS.md** — log any non-trivial design or implementation decision
   with rationale.
 - **ARCHITECTURE.md** — update the implementation sequence table when a phase
@@ -96,7 +98,7 @@ If any of the following are true, do **not** attempt to continue. Exit with
 | Work regime shifts to Refine or Explore | These regimes require human judgment about scope and direction. |
 | Scope needs to expand beyond the defined phase | The worker must not unilaterally grow scope. |
 | Contract change would affect other modules | Cross-module changes require orchestrator-level coordination. |
-| Phase completion | Human audits the phase before the next one begins. |
+| Phase Complete action exits | Human audits the phase before the next one begins. (Phase Review exits CONTINUE — see §3.) |
 | All modules complete | No more work to dispatch. |
 | Unclear or contradictory spec | The worker must not guess at intent. |
 
