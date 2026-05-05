@@ -125,6 +125,17 @@ Replaced the pending Telegram placeholder with a concrete internal `TelegramGate
 
 Added a default toolkit import boundary that raises `PlatformConfigError` when `toolkit.telegram_client` is unavailable, and normalized private factory failures through Gateway construction as `PlatformConfigError`. Focused tests cover credential-free construction with a fake client, non-callable factory rejection, factory failure wrapping, and valid Telegram/log config construction without live credentials. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (37 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (383 passed).
 
+### Step 4.2.2: Outbound Telegram delivery
+
+**Date:** 2026-05-05
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented Telegram outbound delivery behind the existing internal adapter protocol. The adapter now routes `text` and `thread` messages through toolkit-style `send_message`, routes `markdown` through the toolkit API boundary with Telegram parse-mode payload support, and prefers supported long-message/Telegraph client helpers for `telegraph` before falling back to normal delivery.
+
+The delivery path maps platform message IDs into `DeliveryResult`, preserves reply metadata in Telegram payloads, keeps intent tags available through Gateway recent-delivery tracking, supports async toolkit methods, and converts client/API failures into failed delivery results. Focused fake-client tests cover text, thread, markdown, telegraph, metadata preservation, recent-delivery attribution, and failure conversion. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/gateway` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (387 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 3.2 Plan: Concrete adapters, human-share, and corpus import

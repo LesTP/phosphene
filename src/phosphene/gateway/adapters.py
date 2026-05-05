@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
+import inspect
 import json
 from pathlib import Path
 from typing import Protocol
@@ -172,11 +174,24 @@ class TelegramGatewayAdapter:
         self.client = factory(config)
 
     def send(self, message: OutboundMessage) -> DeliveryResult:
+        try:
+            message_id = _send_telegram_message(
+                self.client,
+                chat_id=self.chat_id,
+                message=message,
+            )
+        except Exception as exc:  # noqa: BLE001 - platform API failures are result data.
+            return DeliveryResult(
+                success=False,
+                platform=self.config.name,
+                message_id=None,
+                error=str(exc),
+            )
+
         return DeliveryResult(
-            success=False,
+            success=True,
             platform=self.config.name,
-            message_id=None,
-            error="telegram delivery is not implemented",
+            message_id=str(message_id),
         )
 
     def start_listener(
@@ -219,6 +234,179 @@ def telegram_adapter_factory(
     client_factory: TelegramClientFactory | None = None,
 ) -> GatewayAdapter:
     return TelegramGatewayAdapter(config, client_factory=client_factory)
+
+
+def _send_telegram_message(
+    client: object,
+    *,
+    chat_id: str,
+    message: OutboundMessage,
+) -> object:
+    chat_id_value = _coerce_optional_int(chat_id) or chat_id
+    reply_to = _coerce_optional_int(message.reply_to)
+
+    if message.format == "markdown":
+        return _send_telegram_api_message(
+            client,
+            chat_id=chat_id_value,
+            text=message.content,
+            reply_to=reply_to,
+            parse_mode=str(message.metadata.get("parse_mode") or "MarkdownV2"),
+            metadata=message.metadata,
+        )
+
+    if message.format == "telegraph":
+        for method_name in (
+            "send_telegraph",
+            "send_telegraph_message",
+            "send_long_message",
+        ):
+            method = getattr(client, method_name, None)
+            if method is not None:
+                return _extract_message_id(
+                    _resolve_awaitable(
+                        _invoke_flexible(
+                            method,
+                            {
+                                "chat_id": chat_id_value,
+                                "text": message.content,
+                                "content": message.content,
+                                "reply_to": reply_to,
+                                "reply_to_message_id": reply_to,
+                                **message.metadata,
+                            },
+                        )
+                    )
+                )
+
+    return _send_plain_telegram_message(
+        client,
+        chat_id=chat_id_value,
+        text=message.content,
+        reply_to=reply_to,
+        metadata=message.metadata,
+    )
+
+
+def _send_plain_telegram_message(
+    client: object,
+    *,
+    chat_id: object,
+    text: str,
+    reply_to: int | None,
+    metadata: dict,
+) -> object:
+    method = getattr(client, "send_message", None)
+    if method is not None:
+        return _extract_message_id(
+            _resolve_awaitable(
+                _invoke_flexible(
+                    method,
+                    {
+                        "chat_id": chat_id,
+                        "text": text,
+                        "reply_to": reply_to,
+                        "reply_to_message_id": reply_to,
+                        **metadata,
+                    },
+                )
+            )
+        )
+
+    return _send_telegram_api_message(
+        client,
+        chat_id=chat_id,
+        text=text,
+        reply_to=reply_to,
+        parse_mode=None,
+        metadata=metadata,
+    )
+
+
+def _send_telegram_api_message(
+    client: object,
+    *,
+    chat_id: object,
+    text: str,
+    reply_to: int | None,
+    parse_mode: str | None,
+    metadata: dict,
+) -> object:
+    method = getattr(client, "request_api", None)
+    if method is None:
+        raise RuntimeError("telegram client does not expose a supported send method")
+
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        **{
+            key: value
+            for key, value in metadata.items()
+            if key not in {"parse_mode", "intent_tag"} and value is not None
+        },
+    }
+    if reply_to is not None:
+        payload["reply_to_message_id"] = reply_to
+    if parse_mode is not None:
+        payload["parse_mode"] = parse_mode
+
+    return _extract_message_id(
+        _resolve_awaitable(
+            _invoke_flexible(
+                method,
+                {
+                    "method": "sendMessage",
+                    "payload": payload,
+                },
+            )
+        )
+    )
+
+
+def _invoke_flexible(method: object, kwargs: dict[str, object]) -> object:
+    assert callable(method)
+    signature = inspect.signature(method)
+    if any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    ):
+        return method(**kwargs)
+    supported_kwargs = {
+        key: value for key, value in kwargs.items() if key in signature.parameters
+    }
+    return method(**supported_kwargs)
+
+
+def _resolve_awaitable(value: object) -> object:
+    if not inspect.isawaitable(value):
+        return value
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(value)
+    raise RuntimeError("telegram client returned awaitable inside a running event loop")
+
+
+def _extract_message_id(result: object) -> object:
+    if isinstance(result, dict):
+        response_result = result.get("result")
+        if isinstance(response_result, dict) and "message_id" in response_result:
+            return response_result["message_id"]
+        if "message_id" in result:
+            return result["message_id"]
+    message_id = getattr(result, "message_id", None)
+    if message_id is not None:
+        return message_id
+    return result
+
+
+def _coerce_optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 DEFAULT_ADAPTER_REGISTRY = AdapterRegistry(
