@@ -10,6 +10,24 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.2.3: Integration and cross-module regression
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Completed the Phase B integration and regression check. The full test suite
+passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
+(546 passed), including the new `phosphene.scoring` package tests and existing
+module suites.
+
+Verified that `phosphene.scoring` imports cleanly and exports
+`UnresolvednessWeights` and `compute_unresolvedness`. Also verified the
+diagnostics tool runs as a standalone script against `/tmp/test_vault` with
+`PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`,
+producing the empty-vault diagnostic report without errors.
+
 ### Step REVIEW_HARDENING.2.2: Network diagnostics tool
 
 **Date:** 2026-05-06

@@ -2,8 +2,8 @@
 module: REVIEW_HARDENING
 phase: 2
 phase_title: "Pre-Module-7 Hardening Phase B: unresolvedness composite utility + network diagnostics"
-step: 3
-mode: Build
+step: null
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Pre-Module-7 Hardening: Phase B in progress.
-- **Focus** — Step 3: integration and cross-module regression.
+- **Focus** — All Phase B steps complete; phase review is next.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -64,11 +64,13 @@ RAPTOR-Louvain divergence, and Generator-log-dependent N/A stubs. Verification:
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/tools/test_network_diagnostics.py -q`
 (5 passed).
 
-**Step 3 (pending): Integration and cross-module regression**
+**Step 3 (complete): Integration and cross-module regression**
 
-- Run full test suite: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`.
-- Verify no import errors from the new `scoring` package.
-- Verify the diagnostics tool runs as a script: `PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`.
+Verified full-suite regression, new `scoring` package imports, and standalone
+diagnostics script execution. Verification:
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v` (546 passed);
+`PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`
+(completed successfully).
 
 ## Module 1: Memory Store (complete)
 
