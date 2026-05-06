@@ -1,12 +1,12 @@
 ---
 module: DISTILLATION
-phase: 2
-phase_title: T1->T2 RAPTOR promotion and assertion cache
-step: 6.2.complete
+phase: null
+phase_title: Phase 2 complete — Phase 3 (T2->T3 reflect-evolve) next
+step: null
 mode: Complete
-blocked: null
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 2 reviewed: T1->T2 RAPTOR promotion and assertion cache
-- **Focus** — Phase Complete cleanup for reviewed `distill_t1_to_t2(config)` delivery: DEVPLAN reduction, DEVLOG summary, architecture status update, and audit-gate handoff.
-- **Blocked/Broken** — None
+- **Phase** — Module 6 Phase 2 complete: T1->T2 RAPTOR promotion and assertion cache delivered. Awaiting human audit before Phase 3.
+- **Focus** — Phase 3 planning: `distill_t2_to_t3(config)` — T2->T3 reflect-evolve with personality supersession, version-count inertia, and criteria-adjustment output.
+- **Blocked/Broken** — Blocked: awaiting human audit (`/close` to proceed to Phase 3 planning)
 
 ## Module 1: Memory Store (complete)
 
@@ -112,16 +112,7 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 
 - **Phase 1 (complete)** — Delivered ARCH-aligned public dataclasses/errors/exports, config and Memory Store boundary validation, persisted run metadata, in-process locking, deterministic gate evaluation, deferred public distillation method stubs, and integration coverage proving no toolkit calls or Memory Store note writes outside metadata. Reviewed and completed. See DEVLOG "Phase 6.1 Review" and "Phase 6.1 Completion" entries.
 
-### Phase 2 (in progress): T1->T2 RAPTOR promotion and assertion cache
-
-Build phase. Scope is limited to replacing the `distill_t1_to_t2(config)` stub with ARCH-aligned Tier 1 to Tier 2 promotion. `distill_t2_to_t3(config)`, personality-file supersession, reflection/evolution prompts, and Attention Filter criteria-adjustment application remain deferred to Phase 3. Toolkit calls must stay behind private wrappers/import seams so the current no-toolkit test environment remains deterministic.
-
-- [x] **Step 6.2.1 — Toolkit boundary and prompt helpers**: Add private wrappers for embedding, RAPTOR clustering, LLM cluster summarization, and LLM assertion extraction; preserve import-time compatibility when `toolkit` is absent; add focused tests with injectable fakes/sentinels.
-- [x] **Step 6.2.2 — Tier 1 input selection and feedback preparation**: Implement the lock-protected `distill_t1_to_t2` entry guard, metadata-based Tier 1 query, `InsufficientDataError`, feedback-event query when enabled, and deterministic importance boost preparation without Memory Store writes yet.
-- [x] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
-- [x] **Step 6.2.4 — Tier 2 note writes and cluster links**: Create or update Tier 2 pattern notes through `store_note`/`update_note`, set `cluster_group`, preserve source Tier 1 links, wire related clusters through `add_links`, and leave noise/incoherent Tier 1 notes unmodified.
-- [x] **Step 6.2.5 — Assertion cache persistence**: Extract dominant assertions from every new/updated cluster summary and write JSON cache files under the Tier 2 assertion-cache location keyed by `cluster_group`, with malformed LLM payloads failing clearly and atomically.
-- [x] **Step 6.2.6 — Phase integration hardening**: Exercise `distill_t1_to_t2` end to end with fake Memory Store/toolkit services, verify lock release and run metadata update on success only, verify toolkit errors propagate, and confirm `distill_t2_to_t3` remains deferred.
+- **Phase 2 (complete)** — Delivered ARCH-aligned `distill_t1_to_t2(config)`: toolkit boundary seams, feedback-aware Tier 1 selection, RAPTOR coherence gating, Tier 2 Memory Store writes with cluster links, assertion-cache JSON persistence, and successful-run metadata updates. Reviewed and completed. See DEVLOG "Phase 6.2 Completion" entry.
 
 <!--
 HISTORY — Do not read past this marker.

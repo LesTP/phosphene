@@ -63,7 +63,7 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 | 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Complete |
 | 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Complete |
 | 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Complete |
-| 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Phase 1 complete |
+| 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Phase 2 complete |
 | 7 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Not started |
 | 8 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
 | 9 | Orchestrator | Full activation lifecycle: tension-responsive scheduling, lateral-freedom budget, ambient stream injection. Last because it requires all other modules. | Not started |

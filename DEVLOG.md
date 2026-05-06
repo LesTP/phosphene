@@ -202,6 +202,23 @@ Reviewed Distillation Phase 2 against `ARCH_distillation.md`. Must fix: assertio
 
 Should fix: tightened the malformed assertion-cache regression to assert no Tier 2 note writes, no cluster links, no cache directory, and lock release on failure. Optional: no optional changes deferred. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (490 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
 
+### Phase 6.2 Completion: T1->T2 RAPTOR promotion and assertion cache
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Module 6 Phase 2. Final verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (490 passed).
+
+Phase 2 delivered the `distill_t1_to_t2(config)` implementation behind the `ARCH_distillation.md` public contract: private toolkit boundary seams for embedding, RAPTOR clustering, and LLM calls with lazy imports for import-time compatibility; feedback-aware Tier 1 selection with importance boost preparation; RAPTOR coherence gating with mean pairwise similarity per cluster; Tier 2 Memory Store note creation and update with source Tier 1 links and related-cluster wiring; assertion-cache JSON persistence with atomic writes and pre-write extraction validation; and successful-run metadata updates only after all Memory Store writes and cache files complete.
+
+DEVLOG learning review: Phase 6.2 landed linearly across planning, six implementation steps, and review. Review found one must-fix ordering issue: assertion-cache LLM extraction was happening after Tier 2 Memory Store writes, so a malformed payload could leave cluster notes written while run metadata remained unadvanced. The fix was applied during review — move extraction before writes, keep cache-file writes after notes are materialized. No repeated trial-and-error patterns across steps; no new Gotchas to promote.
+Contract Changes scan: All Phase 6.2 step, review, and completion entries record "Contract changes: None"; D-44 documents the scope boundary without upstream contract propagation.
+Log review: Iteration 132 (review) ran 51 turns, which is high. No new repeated tool failures beyond the already-documented no-`rg` constraint. Iteration 133 exited immediately (exit=1, 0 turns) — that aborted run is the predecessor to this completion iteration; no pattern to promote.
+DEVPLAN cleanup: reduced Module 6 Phase 2 to a one-line completion summary and updated frontmatter to `blocked: "awaiting-human-audit"` before Phase 3 planning.
+ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
