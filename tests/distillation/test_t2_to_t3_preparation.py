@@ -11,7 +11,9 @@ from phosphene.distillation.engine import (
     _build_evolution_proposal_artifact,
     _build_evolution_request,
     _build_reflection_audit_artifact,
+    _criteria_adjustments_from_feedback_metrics,
     _criterion_feedback_metrics,
+    _DistillationRunMetadata,
     _effective_inertia,
     _parse_evolution_proposals,
     _parse_reflection_insights,
@@ -671,6 +673,145 @@ def test_distill_t2_to_t3_rejects_excessive_compression_before_writes(
     assert engine._is_consolidation_locked() is False
 
 
+def test_distill_t2_to_t3_returns_mixed_evolution_result_with_feedback_adjustments(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[EvolutionNote("pattern-a", content="first pattern")],
+        feedback_events=[
+            EvolutionNote(
+                "feedback-1",
+                source="feedback",
+                importance=0.9,
+                tags=["criterion:precision_surplus"],
+            ),
+            EvolutionNote(
+                "feedback-2",
+                source="feedback",
+                importance=0.8,
+                tags=["criterion:precision_surplus"],
+            ),
+            EvolutionNote(
+                "feedback-3",
+                source="feedback",
+                importance=0.1,
+                tags=["criterion:friction"],
+            ),
+            EvolutionNote(
+                "feedback-4",
+                source="feedback",
+                importance=0.2,
+                tags=["criterion:friction"],
+            ),
+        ],
+        personality_context=EvolutionPersonalityContext(
+            personality_files=[
+                EvolutionNote(
+                    "personality-a",
+                    title="Old stance",
+                    content="Old personality content with durable context.",
+                    version_count=2,
+                ),
+                EvolutionNote(
+                    "personality-b",
+                    title="Stable stance",
+                    content="Stable personality content.",
+                    version_count=4,
+                ),
+            ]
+        ),
+    )
+    engine = DistillationEngine(store)
+
+    def fake_complete(**kwargs: object) -> str:
+        if kwargs["tier"] == "reflect-tier":
+            return (
+                '{"insights": [{"content": "A contradiction is visible.", '
+                '"source_pattern_ids": ["pattern-a"], '
+                '"insight_type": "contradiction", "confidence": 0.8}]}'
+            )
+        return (
+            '{"personality_proposals": ['
+            '{"note_id": "personality-a", "action": "supersede", '
+            '"new_title": "New stance", '
+            '"new_content": "New personality content with durable context.", '
+            '"change_summary": "Resolved contradiction."},'
+            '{"note_id": "personality-b", "action": "unchanged"}], '
+            '"criteria_adjustments": [{"criterion_name": "llm_only", '
+            '"old_weight": 1.0, "new_weight": 2.0, "evidence": "ignored"}]}'
+        )
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
+
+    result = engine.distill_t2_to_t3(
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            reflection_tier="reflect-tier",
+            evolution_tier="evolve-tier",
+        )
+    )
+
+    assert [(call[0], call[1]) for call in store.write_calls] == [
+        ("supersede", "personality-a"),
+        ("update_note", "personality-b"),
+    ]
+    assert result.superseded[0].old_note_id == "personality-a"
+    assert result.superseded[0].new_note_id == "personality-a-v2"
+    assert result.unchanged_ids == ["personality-b"]
+    assert [
+        (adjustment.criterion_name, adjustment.old_weight, adjustment.new_weight)
+        for adjustment in result.criteria_adjustments
+    ] == [
+        ("friction", 1.0, 0.825),
+        ("precision_surplus", 1.0, 1.175),
+    ]
+    assert "15% mean engagement" in result.criteria_adjustments[0].evidence
+    assert store.personality_context.personality_files[1].tags == [
+        "version_count:5"
+    ]
+    assert engine._read_run_metadata().last_t2_to_t3_run is not None
+    assert engine._is_consolidation_locked() is False
+
+
+def test_distill_t2_to_t3_evolution_failure_releases_lock_without_metadata_update(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[EvolutionNote("pattern-a", content="first pattern")],
+    )
+    engine = DistillationEngine(store)
+
+    def fake_complete(**kwargs: object) -> str:
+        if kwargs["tier"] == "reflect-tier":
+            return (
+                '{"insights": [{"content": "A contradiction is visible.", '
+                '"source_pattern_ids": ["pattern-a"], '
+                '"insight_type": "contradiction", "confidence": 0.8}]}'
+            )
+        raise RuntimeError("evolution provider unavailable")
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
+
+    with pytest.raises(RuntimeError, match="evolution provider unavailable"):
+        engine.distill_t2_to_t3(
+            DistillationConfig(
+                llm_config=object(),
+                embedding_config=object(),
+                reflection_tier="reflect-tier",
+                evolution_tier="evolve-tier",
+            )
+        )
+
+    assert store.write_calls == []
+    assert engine._read_run_metadata() == _DistillationRunMetadata()
+    assert engine._is_consolidation_locked() is False
+
+
 def test_criterion_feedback_metrics_ignore_events_without_criteria() -> None:
     metrics = _criterion_feedback_metrics(
         [
@@ -680,3 +821,25 @@ def test_criterion_feedback_metrics_ignore_events_without_criteria() -> None:
     )
 
     assert [metric.criterion_name for metric in metrics] == ["friction"]
+
+
+def test_criteria_adjustments_are_derived_from_feedback_metric_evidence() -> None:
+    metrics = _criterion_feedback_metrics(
+        [
+            EvolutionNote("feedback-a", importance=0.9, tags=["criterion:precision"]),
+            EvolutionNote("feedback-b", importance=0.7, tags=["criterion:precision"]),
+            EvolutionNote("feedback-c", importance=0.2, tags=["criterion:friction"]),
+            EvolutionNote("feedback-d", importance=0.1, tags=["criterion:friction"]),
+            EvolutionNote("feedback-e", importance=0.95, tags=["criterion:novelty"]),
+        ]
+    )
+
+    adjustments = _criteria_adjustments_from_feedback_metrics(metrics)
+
+    assert [
+        (adjustment.criterion_name, adjustment.old_weight, adjustment.new_weight)
+        for adjustment in adjustments
+    ] == [
+        ("friction", 1.0, 0.838),
+        ("precision", 1.0, 1.163),
+    ]

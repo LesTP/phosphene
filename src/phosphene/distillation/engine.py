@@ -383,7 +383,9 @@ class DistillationEngine:
                 insights=reflection.insights,
                 superseded=write_result["superseded"],
                 unchanged_ids=proposal.unchanged_ids,
-                criteria_adjustments=proposal.criteria_adjustments,
+                criteria_adjustments=_criteria_adjustments_from_feedback_metrics(
+                    prepared.feedback_metrics
+                ),
                 compression_ratio=write_result["compression_ratio"],
             )
 
@@ -1701,6 +1703,52 @@ def _criterion_feedback_metrics(
         for criterion_name, scores in sorted(grouped.items())
         if scores
     ]
+
+
+def _criteria_adjustments_from_feedback_metrics(
+    feedback_metrics: Sequence[_CriterionFeedbackMetric],
+) -> list[CriteriaAdjustment]:
+    eligible_metrics = [
+        metric for metric in feedback_metrics if metric.feedback_count >= 2
+    ]
+    if not eligible_metrics:
+        return []
+
+    total_feedback = sum(metric.feedback_count for metric in eligible_metrics)
+    if total_feedback <= 0:
+        return []
+
+    baseline = _clamp_probability(
+        sum(
+            metric.mean_engagement * metric.feedback_count
+            for metric in eligible_metrics
+        )
+        / total_feedback
+    )
+    adjustments: list[CriteriaAdjustment] = []
+    for metric in eligible_metrics:
+        delta = metric.mean_engagement - baseline
+        if abs(delta) < 0.1:
+            continue
+
+        old_weight = 1.0
+        new_weight = old_weight + max(-0.25, min(0.25, delta * 0.5))
+        direction = "above" if delta > 0 else "below"
+        adjustments.append(
+            CriteriaAdjustment(
+                criterion_name=metric.criterion_name,
+                old_weight=old_weight,
+                new_weight=round(new_weight, 3),
+                evidence=(
+                    f"{metric.criterion_name} received "
+                    f"{metric.mean_engagement:.0%} mean engagement across "
+                    f"{metric.feedback_count} feedback events, {direction} "
+                    f"{baseline:.0%} baseline"
+                ),
+            )
+        )
+
+    return adjustments
 
 
 def _feedback_engagement_score(feedback_event: object) -> float:

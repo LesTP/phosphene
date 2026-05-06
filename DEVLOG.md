@@ -304,6 +304,30 @@ metadata updates. Verification passed with
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (75 passed) and
 `PYTHONPATH=src:.python_deps python3 -m pytest` (518 passed).
 
+### Step 6.3.5: Criteria adjustments and end-to-end integration
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Completed `EvolutionResult` assembly for the T2->T3 path by deriving returned
+`CriteriaAdjustment` records from deterministic feedback evidence instead of
+trusting criteria proposals from the evolution LLM response. Criteria with at
+least two feedback events are compared against the eligible feedback baseline;
+consistently above-baseline criteria receive bounded weight increases, and
+below-baseline criteria receive bounded decreases with evidence strings
+recording mean engagement, feedback count, and baseline.
+
+Added focused end-to-end coverage for mixed superseded/unchanged personality
+output, feedback-derived criteria adjustments, unchanged version-count
+increments, supersession audit records, success-only metadata updates, and lock
+release. Added failure coverage proving evolution provider errors propagate
+without Memory Store writes or T2->T3 metadata updates and release the
+consolidation lock. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (78 passed)
+and `PYTHONPATH=src:.python_deps python3 -m pytest` (521 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
