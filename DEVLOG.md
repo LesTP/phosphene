@@ -10,6 +10,27 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.2.2: Network diagnostics tool
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added `tools/network_diagnostics.py`, a standalone Memory Store diagnostic
+script with `--vault-path` and `--embedding-path` arguments and a formatted
+stdout report. The tool computes note/tier density summary, Tier 2 centroid
+cluster diversity, Tier 1 outlier ratio, bridge-node density, unresolvedness
+histogram, orphaned-link compression damage, and RAPTOR-vs-structural community
+divergence. Mirror index and free-play value ratio are reported as N/A until
+Generator output logs exist.
+
+The Louvain path uses `networkx` and `python-louvain` when available and falls
+back to deterministic connected structural communities in this environment,
+where those optional graph packages are not installed. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/tools/test_network_diagnostics.py -q`
+(5 passed).
+
 ### Step REVIEW_HARDENING.2.1: Unresolvedness composite utility
 
 **Date:** 2026-05-06
