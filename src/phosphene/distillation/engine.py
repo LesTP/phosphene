@@ -12,6 +12,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Protocol
 
+import numpy as np
+
 from phosphene.distillation.errors import (
     DistillationConfigError,
     DistillationLockError,
@@ -23,7 +25,7 @@ from phosphene.distillation.types import (
     GateStatus,
     TierPromotionResult,
 )
-from phosphene.memory_store import NoteQuery
+from phosphene.memory_store import NoteInput, NotePatch, NoteQuery
 
 _REQUIRED_MEMORY_STORE_METHODS = (
     "query_notes",
@@ -104,6 +106,17 @@ class _NormalizedClusterResult:
     clusters: list[_NormalizedCluster]
     noise_indices: set[int]
     tree_depth: int
+
+
+@dataclass(frozen=True)
+class _CoherentClusterPromotion:
+    cluster: _NormalizedCluster
+    coherence: float
+    summary: str
+    source_note_ids: list[str]
+    importance: float
+    unresolvedness: float
+    centroid: object
 
 
 class DistillationEngine:
@@ -197,8 +210,8 @@ class DistillationEngine:
         """Promote Tier 1 notes into Tier 2 clusters.
 
         Phase 2 currently performs Tier 1 selection, feedback preparation,
-        RAPTOR clustering, and coherence gating. Tier 2 Memory Store writes
-        and assertion-cache persistence are deferred to later Phase 2 steps.
+        RAPTOR clustering, coherence gating, and Tier 2 cluster note writes.
+        Assertion-cache persistence is deferred to a later Phase 2 step.
         """
         with self._acquire_consolidation_lock():
             prepared = self._prepare_tier1_distillation_input(config)
@@ -213,6 +226,7 @@ class DistillationEngine:
             )
 
             coherent_member_indices: set[int] = set()
+            coherent_promotions: list[_CoherentClusterPromotion] = []
             incoherent_cluster_count = 0
             for cluster in cluster_result.clusters:
                 coherence = _mean_pairwise_similarity(
@@ -220,6 +234,15 @@ class DistillationEngine:
                 )
                 if coherence >= config.min_cluster_coherence:
                     coherent_member_indices.update(cluster.member_indices)
+                    coherent_promotions.append(
+                        _build_coherent_cluster_promotion(
+                            cluster,
+                            prepared=prepared,
+                            texts=texts,
+                            embeddings=embeddings,
+                            coherence=coherence,
+                        )
+                    )
                 else:
                     incoherent_cluster_count += 1
 
@@ -230,10 +253,11 @@ class DistillationEngine:
             }
             noise_indices = set(cluster_result.noise_indices)
             noise_indices.update(set(range(len(prepared.notes))) - clustered_indices)
+            write_result = self._write_tier2_cluster_notes(coherent_promotions)
 
             return TierPromotionResult(
-                new_cluster_ids=[],
-                updated_cluster_ids=[],
+                new_cluster_ids=write_result["new_cluster_ids"],
+                updated_cluster_ids=write_result["updated_cluster_ids"],
                 promoted_count=len(coherent_member_indices),
                 noise_count=len(noise_indices),
                 incoherent_cluster_count=incoherent_cluster_count,
@@ -341,6 +365,85 @@ class DistillationEngine:
             feedback_events=feedback_events,
             since=since,
         )
+
+    def _write_tier2_cluster_notes(
+        self,
+        promotions: Sequence[_CoherentClusterPromotion],
+    ) -> dict[str, list[str]]:
+        existing_by_group = {
+            str(note.cluster_group): note
+            for note in self.memory_store.query_notes(
+                NoteQuery(tier=2, limit=_UNBOUNDED_QUERY_LIMIT)
+            )
+            if getattr(note, "cluster_group", None)
+        }
+
+        new_cluster_ids: list[str] = []
+        updated_cluster_ids: list[str] = []
+        note_ids_by_group: dict[str, str] = {}
+
+        for promotion in promotions:
+            existing = existing_by_group.get(promotion.cluster.cluster_id)
+            if existing is None:
+                note_id = self.memory_store.store_note(
+                    NoteInput(
+                        tier=2,
+                        content=promotion.summary,
+                        title=_cluster_title(promotion.cluster.cluster_id, promotion.summary),
+                        importance=promotion.importance,
+                        unresolvedness=promotion.unresolvedness,
+                        links=promotion.source_note_ids,
+                        tags=["distilled-pattern"],
+                        embedding=promotion.centroid,
+                        attractor_relevance=promotion.coherence,
+                        cluster_group=promotion.cluster.cluster_id,
+                    )
+                )
+                new_cluster_ids.append(str(note_id))
+                note_ids_by_group[promotion.cluster.cluster_id] = str(note_id)
+            else:
+                existing_links = [str(note_id) for note_id in getattr(existing, "links", [])]
+                merged_links = _dedupe_preserving_order(
+                    existing_links + promotion.source_note_ids
+                )
+                updated_note = self.memory_store.update_note(
+                    str(existing.note_id),
+                    NotePatch(
+                        content=_merged_cluster_content(existing.content, promotion.summary),
+                        title=_cluster_title(
+                            promotion.cluster.cluster_id,
+                            promotion.summary,
+                            existing_title=getattr(existing, "title", None),
+                        ),
+                        importance=max(
+                            float(getattr(existing, "importance", 0.0)),
+                            promotion.importance,
+                        ),
+                        unresolvedness=max(
+                            float(getattr(existing, "unresolvedness", 0.0)),
+                            promotion.unresolvedness,
+                        ),
+                        links=merged_links,
+                        tags=_dedupe_preserving_order(
+                            [str(tag) for tag in getattr(existing, "tags", [])]
+                            + ["distilled-pattern"]
+                        ),
+                        embedding=promotion.centroid,
+                        attractor_relevance=promotion.coherence,
+                    ),
+                )
+                updated_cluster_ids.append(str(updated_note.note_id))
+                note_ids_by_group[promotion.cluster.cluster_id] = str(updated_note.note_id)
+
+        cluster_note_ids = list(note_ids_by_group.values())
+        for note_id in cluster_note_ids:
+            related_ids = [related_id for related_id in cluster_note_ids if related_id != note_id]
+            self.memory_store.add_links(note_id, related_ids)
+
+        return {
+            "new_cluster_ids": new_cluster_ids,
+            "updated_cluster_ids": updated_cluster_ids,
+        }
 
 
 def _toolkit_embed(texts: list[str], config: object) -> Any:
@@ -479,6 +582,43 @@ def _build_raptor_cluster_config(config: DistillationConfig) -> object:
         except (AttributeError, TypeError):
             pass
     return config.clustering_config
+
+
+def _build_coherent_cluster_promotion(
+    cluster: _NormalizedCluster,
+    *,
+    prepared: _Tier1DistillationInput,
+    texts: Sequence[str],
+    embeddings: object,
+    coherence: float,
+) -> _CoherentClusterPromotion:
+    member_texts = [texts[index] for index in cluster.member_indices]
+    summary = cluster.summary or _fallback_cluster_summary(member_texts)
+    member_items = [prepared.notes[index] for index in cluster.member_indices]
+    source_note_ids = [
+        str(getattr(item.note, "note_id"))
+        for item in member_items
+        if getattr(item.note, "note_id", None)
+    ]
+    return _CoherentClusterPromotion(
+        cluster=cluster,
+        coherence=coherence,
+        summary=summary,
+        source_note_ids=_dedupe_preserving_order(source_note_ids),
+        importance=_mean_probability(
+            [item.effective_importance for item in member_items]
+        ),
+        unresolvedness=_mean_probability(
+            [float(getattr(item.note, "unresolvedness", 0.0)) for item in member_items]
+        ),
+        centroid=_centroid(
+            [_vector_at(embeddings, index) for index in cluster.member_indices]
+        ),
+    )
+
+
+def _fallback_cluster_summary(texts: Sequence[str]) -> str:
+    return "\n\n".join(str(text) for text in texts)
 
 
 def _normalize_cluster_result(
@@ -627,6 +767,12 @@ def _vector_at(vectors: object, index: int) -> object:
     return vectors[index]
 
 
+def _centroid(vectors: Sequence[object]) -> object:
+    if not vectors:
+        return None
+    return np.asarray(vectors, dtype=float).mean(axis=0)
+
+
 def _note_content(note: object) -> str:
     content = getattr(note, "content", None)
     if content is not None:
@@ -717,3 +863,43 @@ def _feedback_referenced_note_ids(feedback_event: object) -> set[str]:
 
 def _clamp_probability(value: float) -> float:
     return min(1.0, max(0.0, value))
+
+
+def _mean_probability(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    return _clamp_probability(sum(float(value) for value in values) / len(values))
+
+
+def _dedupe_preserving_order(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+def _cluster_title(
+    cluster_group: str,
+    summary: str,
+    *,
+    existing_title: str | None = None,
+) -> str:
+    if existing_title:
+        return existing_title
+    first_line = next((line.strip() for line in summary.splitlines() if line.strip()), "")
+    title = first_line or f"Distilled pattern {cluster_group}"
+    if len(title) > 140:
+        title = title[:137].rstrip() + "..."
+    return title
+
+
+def _merged_cluster_content(existing_content: str, new_summary: str) -> str:
+    if not existing_content:
+        return new_summary
+    if new_summary in existing_content:
+        return existing_content
+    return f"{existing_content.rstrip()}\n\n---\n\n{new_summary}"

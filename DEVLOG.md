@@ -158,6 +158,17 @@ Implemented the T1->T2 clustering path through the scoped Step 6.2.3 boundary. `
 
 Kept Tier 2 Memory Store writes, cluster links, assertion-cache persistence, and run metadata updates deferred to later Phase 2 steps. Added focused clustering tests for callback wiring, coherent versus incoherent split behavior, noise labels, and no-write behavior, while updating preparation tests now that the public method advances past the previous deferred stub. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (42 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (485 passed).
 
+### Step 6.2.4: Tier 2 note writes and cluster links
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented Tier 2 Memory Store writes for coherent T1->T2 clusters. `distill_t1_to_t2(config)` now builds promotion records with source Tier 1 note ids, summary text, mean importance/unresolvedness, coherence-derived attractor relevance, and centroid embeddings. New clusters are written with `NoteInput(tier=2)`, `cluster_group`, source links, and a distilled-pattern tag; existing Tier 2 notes with the same `cluster_group` are updated through `NotePatch` while preserving existing title, links, and tags.
+
+Added related-cluster wiring after all coherent clusters are materialized by calling `add_links` between promoted Tier 2 note ids. Noise and incoherent Tier 1 notes remain unmodified, and assertion-cache persistence and run metadata updates remain deferred to later Phase 2 steps. Updated clustering/preparation tests to cover new cluster creation, existing cluster updates, source-link preservation, related-cluster links, label-result fallback summaries, and the new Tier 2 query. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (43 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (486 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

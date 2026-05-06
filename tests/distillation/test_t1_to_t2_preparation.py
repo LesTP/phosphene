@@ -13,9 +13,13 @@ class PrepNote:
     note_id: str
     content: str = ""
     importance: float = 0.0
+    unresolvedness: float = 0.0
     source: str | None = None
     links: list[str] = field(default_factory=list)
     friction_target: str | None = None
+    tags: list[str] = field(default_factory=list)
+    cluster_group: str | None = None
+    title: str = ""
 
 
 class PrepMemoryStore:
@@ -27,25 +31,27 @@ class PrepMemoryStore:
 
     def query_notes(self, query):
         self.queries.append(query)
-        notes = [
-            note
-            for note in self.notes
-            if (query.tier is None or query.tier == 1)
-            and (query.source is None or note.source == query.source)
-        ]
+        if query.tier == 2:
+            notes = []
+        else:
+            notes = [
+                note
+                for note in self.notes
+                if (query.tier is None or query.tier == 1)
+                and (query.source is None or note.source == query.source)
+            ]
         return notes[: query.limit]
 
     def store_note(self, *_args: object, **_kwargs: object) -> str:
         self.write_calls.append("store_note")
-        raise AssertionError("preparation must not store Memory Store notes")
+        return "stored-cluster"
 
     def update_note(self, *_args: object, **_kwargs: object) -> object:
         self.write_calls.append("update_note")
-        raise AssertionError("preparation must not update Memory Store notes")
+        raise AssertionError("preparation tests should not update Tier 2 notes")
 
     def add_links(self, *_args: object, **_kwargs: object) -> None:
         self.write_calls.append("add_links")
-        raise AssertionError("preparation must not add Memory Store links")
 
     def get_personality_context(self) -> object:
         self.write_calls.append("get_personality_context")
@@ -119,7 +125,7 @@ def test_distill_t1_to_t2_guard_queries_since_metadata_and_prepares_feedback_boo
     assert result.incoherent_cluster_count == 0
     assert result.cluster_tree_depth == 2
     assert result.feedback_processed == 2
-    assert store.write_calls == []
+    assert store.write_calls == ["store_note", "add_links"]
     assert engine._is_consolidation_locked() is False
 
 
@@ -180,10 +186,11 @@ def test_distill_t1_to_t2_respects_disabled_feedback_preparation(
         )
     )
 
-    assert len(store.queries) == 1
+    assert len(store.queries) == 2
     assert store.queries[0].source is None
+    assert store.queries[1].tier == 2
     assert result.feedback_processed == 0
-    assert store.write_calls == []
+    assert store.write_calls == ["store_note", "add_links"]
 
 
 def test_distill_t1_to_t2_lock_rejects_concurrent_run_before_queries(tmp_path) -> None:
