@@ -322,3 +322,10 @@ Priority: Important
 Decision: Module 6 Phase 3 will implement `DistillationEngine.distill_t2_to_t3(config)` in five Build steps: deterministic Tier 2/feedback preparation, reflection LLM prompt and `ReflectionInsight` parsing, evolution prompt/proposal parsing with version-count inertia, Memory Store supersession and unchanged-version writeback, then criteria-adjustment assembly and end-to-end integration coverage. Reflection output remains an audit artifact and no Tier 3 writes occur until evolution proposals have parsed and passed compression checks.
 Rationale: `ARCH_distillation.md` makes T2->T3 the highest-risk Distillation path because it mutates personality files, not just pattern clusters. Splitting reflection, evolution proposal parsing, and writeback keeps LLM synthesis diagnosable, preserves the supersession audit trail, and lets tests prove that provider or parse failures do not update metadata or partially modify Tier 3 state.
 Revisit if: Memory Store personality context lacks stable note IDs or `version_count` metadata in practice, or if toolkit/llm_client exposes structured-output support that materially simplifies the prompt/parse boundary.
+
+D-46: T2->T3 evolution proposals must cover every personality file
+Date: 2026-05-06 | Status: Closed
+Priority: Important
+Decision: Reject T2->T3 evolution LLM responses that omit any current personality file from `personality_proposals`. Every file must be explicitly marked `supersede` or `unchanged` before Memory Store writeback.
+Rationale: `ARCH_distillation.md` requires unchanged personality files that survive a T2->T3 cycle to receive a `version_count` increment, which drives future inertia. Silent omission would skip both supersession and unchanged writeback, making inertia state dependent on an incomplete LLM response instead of the completed cycle.
+Revisit if: The public EvolutionResult contract grows a third explicit action for deferring a personality file without treating it as a survived cycle.

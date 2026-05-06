@@ -2,11 +2,11 @@
 module: DISTILLATION
 phase: 3
 phase_title: "Phase 3: T2->T3 reflect-evolve"
-step: 6.3.review
-mode: Review
+step: 6.3.complete
+mode: Complete
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan

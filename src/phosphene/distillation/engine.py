@@ -1113,6 +1113,14 @@ def _parse_evolution_proposals(
                 "LLM evolution proposal action must be supersede or unchanged"
             )
 
+    if valid_personality_ids is not None:
+        missing_ids = sorted(valid_personality_ids - seen_ids)
+        if missing_ids:
+            raise DistillationError(
+                "LLM evolution response omitted personality proposal ids: "
+                + ", ".join(missing_ids)
+            )
+
     raw_adjustments = payload.get("criteria_adjustments", [])
     if not isinstance(raw_adjustments, Sequence) or isinstance(
         raw_adjustments, str | bytes

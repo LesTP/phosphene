@@ -454,6 +454,14 @@ def test_parse_evolution_proposals_rejects_malformed_responses(
         )
 
 
+def test_parse_evolution_proposals_rejects_omitted_personality_files() -> None:
+    with pytest.raises(DistillationError, match="omitted personality proposal ids"):
+        _parse_evolution_proposals(
+            '{"personality_proposals": [{"note_id": "personality-a", "action": "unchanged"}]}',
+            valid_personality_ids={"personality-a", "personality-b"},
+        )
+
+
 @pytest.mark.parametrize(
     ("response", "message"),
     [

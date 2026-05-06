@@ -328,6 +328,27 @@ consolidation lock. Verification passed with
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (78 passed)
 and `PYTHONPATH=src:.python_deps python3 -m pytest` (521 passed).
 
+### Phase 6.3 Review: T2->T3 reflect-evolve
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Distillation Phase 3 against `ARCH_distillation.md`. Must fix: the
+evolution proposal parser allowed an LLM response to omit an existing
+personality file, which meant omitted files would neither supersede nor receive
+the unchanged `version_count` increment required by the T2->T3 cycle. Added
+strict coverage validation so every current personality file must appear as
+`supersede` or `unchanged` before any writeback can proceed.
+
+Should fix: none beyond the required parser hardening. Optional: no optional
+changes deferred. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (79 passed)
+and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (522 passed).
+DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next
+action.
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
