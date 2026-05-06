@@ -338,6 +338,8 @@ def test_distill_t1_to_t2_malformed_assertion_cache_payload_fails_atomically(
             )
         )
 
-    assert not (tmp_path / "vault" / "tier2" / "first.json").exists()
-    assert not (tmp_path / "vault" / "tier2" / "second.json").exists()
+    assert store.stored_notes == []
+    assert store.updated_notes == []
+    assert store.link_calls == []
+    assert not (tmp_path / "vault" / "tier2").exists()
     assert engine._is_consolidation_locked() is False

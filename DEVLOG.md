@@ -191,6 +191,17 @@ Added phase-level T1->T2 integration coverage using fake Memory Store, embedding
 
 Hardened success-only metadata behavior by updating `last_t1_to_t2_run` only after Memory Store writes and assertion-cache persistence complete. Added regression coverage that toolkit embedding failures propagate unchanged, do not write Tier 2 notes or links, do not advance T1->T2 run metadata, and release the consolidation lock. Added explicit coverage that `distill_t2_to_t3(config)` remains deferred to Phase 3. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (490 passed).
 
+### Phase 6.2 Review: T1->T2 RAPTOR promotion and assertion cache
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Distillation Phase 2 against `ARCH_distillation.md`. Must fix: assertion extraction happened after Tier 2 Memory Store writes, so a malformed assertion-cache LLM payload could leave cluster notes written while run metadata remained unadvanced. Moved assertion-cache payload extraction before Tier 2 note writes so the synthesis phase fails before Memory Store mutation, then kept cache-file writes after notes are materialized.
+
+Should fix: tightened the malformed assertion-cache regression to assert no Tier 2 note writes, no cluster links, no cache directory, and lock release on failure. Optional: no optional changes deferred. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (490 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

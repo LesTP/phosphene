@@ -268,10 +268,13 @@ class DistillationEngine:
             }
             noise_indices = set(cluster_result.noise_indices)
             noise_indices.update(set(range(len(prepared.notes))) - clustered_indices)
-            write_result = self._write_tier2_cluster_notes(coherent_promotions)
-            assertion_cache_updated = self._write_assertion_caches(
+            assertion_cache_payloads = _build_assertion_cache_payloads(
                 coherent_promotions,
                 config,
+            )
+            write_result = self._write_tier2_cluster_notes(coherent_promotions)
+            assertion_cache_updated = self._write_assertion_caches(
+                assertion_cache_payloads
             )
             metadata = self._read_run_metadata()
             self._write_run_metadata(
@@ -473,21 +476,8 @@ class DistillationEngine:
 
     def _write_assertion_caches(
         self,
-        promotions: Sequence[_CoherentClusterPromotion],
-        config: DistillationConfig,
+        payloads: Sequence[_AssertionCachePayload],
     ) -> list[str]:
-        payloads = [
-            _AssertionCachePayload(
-                cluster_group=promotion.cluster.cluster_id,
-                summary=promotion.summary,
-                assertions=_extract_cluster_assertions(
-                    promotion.summary,
-                    config,
-                ),
-            )
-            for promotion in promotions
-        ]
-
         cache_dir = Path(self.memory_store.vault_path) / _ASSERTION_CACHE_DIRECTORY
         cache_dir.mkdir(parents=True, exist_ok=True)
         for payload in payloads:
@@ -505,6 +495,23 @@ class DistillationEngine:
             temp_path.replace(cache_path)
 
         return [payload.cluster_group for payload in payloads]
+
+
+def _build_assertion_cache_payloads(
+    promotions: Sequence[_CoherentClusterPromotion],
+    config: DistillationConfig,
+) -> list[_AssertionCachePayload]:
+    return [
+        _AssertionCachePayload(
+            cluster_group=promotion.cluster.cluster_id,
+            summary=promotion.summary,
+            assertions=_extract_cluster_assertions(
+                promotion.summary,
+                config,
+            ),
+        )
+        for promotion in promotions
+    ]
 
 
 def _toolkit_embed(texts: list[str], config: object) -> Any:
