@@ -180,6 +180,17 @@ Added a private in-process consolidation lock helper to `DistillationEngine` for
 
 Focused tests cover acquire/release behavior, nested acquisition rejection, exception-safe release, and the no-Memory-Store-note-API boundary. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (465 passed).
 
+### Step 6.1.5: Gate evaluation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented public `DistillationEngine.check_gates(config) -> GateStatus` using persisted run metadata, Memory Store `NoteQuery` reads, and the in-process lock state. Gate evaluation now reports never-run behavior, elapsed time since the latest distillation run, pending Tier 1 volume since the last T1->T2 run, monthly T2->T3 readiness when Tier 2 patterns exist, aggregate volume readiness, and lock-gate blocking without acquiring the run lock.
+
+Kept the boundary credential-free and read-only against Memory Store note state: `check_gates` performs only tier queries and metadata reads, with no toolkit calls or Memory Store writes. Focused tests cover never-run T1 readiness, Tier 1 since-filtering, recent-run time blocking, monthly T2->T3 readiness, and lock-gate reporting. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (470 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation

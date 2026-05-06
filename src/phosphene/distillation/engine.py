@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from phosphene.distillation.errors import DistillationConfigError, DistillationLockError
+from phosphene.distillation.types import DistillationConfig, GateStatus
+from phosphene.memory_store import NoteQuery
 
 _REQUIRED_MEMORY_STORE_METHODS = (
     "query_notes",
@@ -25,6 +27,7 @@ _METADATA_DIRECTORY = ".phosphene"
 _RUN_METADATA_FILENAME = "distillation_runs.json"
 _LAST_T1_TO_T2_KEY = "last_t1_to_t2_run"
 _LAST_T2_TO_T3_KEY = "last_t2_to_t3_run"
+_UNBOUNDED_QUERY_LIMIT = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -65,6 +68,57 @@ class DistillationEngine:
             self._consolidation_lock.release()
             return False
         return True
+
+    def check_gates(self, config: DistillationConfig) -> GateStatus:
+        """Report whether either distillation path is eligible to run."""
+        metadata = self._read_run_metadata()
+        now = datetime.now(timezone.utc)
+        last_run = _latest_datetime(
+            metadata.last_t1_to_t2_run,
+            metadata.last_t2_to_t3_run,
+        )
+
+        time_since_last_run = _elapsed_since(last_run, now)
+        time_gate = (
+            time_since_last_run is None
+            or time_since_last_run >= config.min_time_between_runs
+        )
+        lock_gate = not self._is_consolidation_locked()
+
+        tier1_pending = len(
+            self.memory_store.query_notes(
+                NoteQuery(
+                    tier=1,
+                    since=metadata.last_t1_to_t2_run,
+                    limit=_UNBOUNDED_QUERY_LIMIT,
+                )
+            )
+        )
+        tier2_notes = self.memory_store.query_notes(NoteQuery(tier=2, limit=1))
+        days_since_last_t3 = _days_since(metadata.last_t2_to_t3_run, now)
+
+        t1_volume_gate = tier1_pending >= config.min_tier1_volume
+        t3_cycle_gate = (
+            days_since_last_t3 is None
+            or days_since_last_t3 >= config.t2_to_t3_cycle_days
+        )
+        t2_volume_gate = bool(tier2_notes) and t3_cycle_gate
+        volume_gate = t1_volume_gate or t2_volume_gate
+
+        t1_to_t2_ready = time_gate and lock_gate and t1_volume_gate
+        t2_to_t3_ready = time_gate and lock_gate and t2_volume_gate
+
+        return GateStatus(
+            ready=t1_to_t2_ready or t2_to_t3_ready,
+            time_gate=time_gate,
+            volume_gate=volume_gate,
+            lock_gate=lock_gate,
+            t1_to_t2_ready=t1_to_t2_ready,
+            t2_to_t3_ready=t2_to_t3_ready,
+            time_since_last_run=time_since_last_run,
+            tier1_pending=tier1_pending,
+            days_since_last_t3=days_since_last_t3,
+        )
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
         if not self._run_metadata_path.exists():
@@ -108,6 +162,32 @@ def _validate_memory_store(memory_store: object) -> None:
 
     if getattr(memory_store, "vault_path", None) is None:
         raise DistillationConfigError("memory_store must expose vault_path")
+
+
+def _latest_datetime(*values: datetime | None) -> datetime | None:
+    datetimes = [_ensure_aware(value) for value in values if value is not None]
+    if not datetimes:
+        return None
+    return max(datetimes)
+
+
+def _elapsed_since(value: datetime | None, now: datetime) -> timedelta | None:
+    if value is None:
+        return None
+    return now - _ensure_aware(value)
+
+
+def _days_since(value: datetime | None, now: datetime) -> int | None:
+    elapsed = _elapsed_since(value, now)
+    if elapsed is None:
+        return None
+    return elapsed.days
+
+
+def _ensure_aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 def _parse_metadata_datetime(value: Any) -> datetime | None:
