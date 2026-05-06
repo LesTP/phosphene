@@ -1,10 +1,10 @@
 ---
-module: GENERATOR
-phase: null
-phase_title: Module 5 complete — Module 6 next
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+module: DISTILLATION
+phase: 1
+phase_title: Distillation contract, gates, and metadata foundation
+step: 6.1.1
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -33,9 +33,9 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 5 complete: Generator + Output Router
-- **Focus** — Await human audit before Module 6 Distillation planning
-- **Blocked/Broken** — `awaiting-human-audit`
+- **Phase** — Module 6 Phase 1: Distillation contract, gates, and metadata foundation
+- **Focus** — Implement the public Distillation API surface, config validation, lock/run metadata, and deterministic gate evaluation before live RAPTOR clustering, embedding, LLM synthesis, assertion-cache writes, or personality evolution.
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
@@ -105,5 +105,20 @@ Delivered ARCH-aligned public dataclasses/errors/exports, stateless Memory Store
 ### Phase 2 (complete): LLM generation modes and skeptical memory
 
 Delivered prompted, response, and free-play generation behind fakeable toolkit/llm_client boundaries; skeptical memory verification with read-only recent Tier 1 checks; provider-failure rotation fallback; parse hard stops; source attribution and response threading preservation; and cross-mode integration coverage. Reviewed and completed. See DEVLOG "Phase 5.2 Review" and "Phase 5.2 Completion" entries.
+
+## Module 6: Distillation
+
+Planned phases follow `ARCH_distillation.md`: first stabilize the public contract, validation, Memory Store read/write boundary helpers, in-process lock, persisted run metadata, and deterministic gate evaluation without live clustering or LLM synthesis; then add T1->T2 RAPTOR promotion and assertion cache; then add T2->T3 reflect-evolve with supersession and criteria-adjustment output.
+
+### Phase 1 (in progress): Distillation contract, gates, and metadata foundation
+
+Build the credential-free foundation for the Distillation engine while preserving the ARCH public API and keeping all synthesis behavior deferred.
+
+- **Step 6.1.1** — Public dataclasses, errors, and exports: add `src/phosphene/distillation/` with ARCH-aligned result/config types, package exports, and focused constructor/export tests.
+- **Step 6.1.2** — Config validation and engine construction: validate gate thresholds, inertia/compression bounds, toolkit config presence, and Memory Store dependency shape without calling toolkit services.
+- **Step 6.1.3** — Distillation metadata persistence: add private helpers for reading/writing last T1->T2 and T2->T3 run timestamps in the Memory Store vault with malformed/missing metadata handling.
+- **Step 6.1.4** — Lock boundary: add an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
+- **Step 6.1.5** — Gate evaluation: implement `check_gates(config) -> GateStatus` from Memory Store tier queries plus persisted metadata, including never-run behavior, time/volume/monthly gates, and lock-gate reporting.
+- **Step 6.1.6** — Foundation integration hardening: add phase-level integration tests for no-toolkit-call behavior, no Memory Store writes outside metadata, public error exports, and compatibility with the existing full test suite.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

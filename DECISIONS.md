@@ -301,3 +301,10 @@ Priority: Important
 Decision: Accept Module 5 Phase 2 as architecturally aligned after one documentation cleanup. The reviewed output implements prompted, response, and free-play generation; skeptical memory contradiction reporting; prompt/parse hardening; token-usage preservation; response threading metadata; source-note attribution fallback; and provider-failure rotation fallback while preserving the Phase 1 public Generator and Output Router contracts.
 Rationale: The implementation keeps Generator stateless and read-only against Memory Store, uses deterministic fake LLM and fake Memory Store boundaries for coverage, avoids live credentials, and leaves Output Router behavior unchanged. Full-suite tests pass, and malformed/schema-invalid model responses remain terminal parse failures rather than rotating across configs.
 Revisit if: Later embedding ownership or runtime model-router work requires public Generator configuration changes for topic relevance, claim relevance, or provider retry taxonomy.
+
+D-43: Distillation starts with gates and metadata before synthesis
+Date: 2026-05-06 | Status: Closed
+Priority: Important
+Decision: Module 6 Phase 1 will implement the Distillation public dataclasses, errors, exports, config validation, in-process lock, persisted run metadata, and deterministic `check_gates` behavior before adding live RAPTOR clustering, embedding calls, LLM reflection/evolution, assertion-cache writes, or Tier 2/Tier 3 Memory Store mutations.
+Rationale: `ARCH_distillation.md` combines gate checks, toolkit/clustering callback wiring, feedback incorporation, assertion-cache maintenance, Tier 2 promotion, and Tier 3 personality evolution in one module. Building the gate and metadata foundation first gives the module a credential-free test surface and makes future synthesis phases depend on a stable run-control boundary instead of mixing scheduling state with LLM and clustering failures.
+Revisit if: toolkit/clustering or Memory Store query semantics require public Distillation configuration changes, or if Orchestrator integration needs persistent locking rather than the ARCH-defined in-memory lock.

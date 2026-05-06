@@ -125,6 +125,17 @@ Log review: Recent iterations repeatedly tried `rg` before loading the existing 
 DEVPLAN cleanup: reduced Module 5 Phase 2 to a one-line completion summary and set frontmatter to await human audit before Module 6 planning.
 ARCHITECTURE.md: Generator + Output Router row in the Implementation Sequence table updated from "Phase 1 complete" to "Complete".
 
+### Phase 6.1 Plan: Distillation contract, gates, and metadata foundation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 6 Phase 1 as a Build phase over the Distillation control-plane foundation: public dataclasses, errors, exports, config validation, Memory Store boundary checks, in-process consolidation lock, persisted run metadata, deterministic gate evaluation, and no-toolkit-call integration hardening.
+
+Scope decision recorded in D-43: Phase 1 keeps RAPTOR clustering, embedding calls, LLM reflection/evolution, assertion-cache writes, and Tier 2/Tier 3 Memory Store mutations out of scope so later synthesis phases build on a credential-free, tested run-control boundary.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation
