@@ -1,9 +1,13 @@
+import builtins
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from phosphene.memory_store import MemoryStore, MemoryStoreConfig, NoteInput
 from tools.network_diagnostics import compute_report, format_report, main
+import tools.network_diagnostics as network_diagnostics
 
 
 def make_store(tmp_path: Path, *, embeddings: bool = True) -> MemoryStore:
@@ -169,3 +173,27 @@ def test_louvain_divergence_below_threshold_reports_na(tmp_path: Path) -> None:
     report = compute_report(store)
 
     assert report.raptor_louvain_divergence.reason == "N/A - insufficient link density"
+
+
+def test_louvain_partition_falls_back_when_community_package_lacks_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "community":
+            return SimpleNamespace()
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    partition = network_diagnostics._louvain_partition(
+        {
+            "a": {"b"},
+            "b": {"a"},
+            "c": set(),
+        }
+    )
+
+    assert partition["a"] == partition["b"]
+    assert partition["c"] != partition["a"]

@@ -23,7 +23,7 @@ SimilarNote = MemoryNote | tuple[MemoryNote, float]
 def compute_unresolvedness(
     note: MemoryNote,
     density_metrics: DensityMetrics,
-    similar_notes: list[MemoryNote],
+    similar_notes: Sequence[SimilarNote],
     *,
     weights: UnresolvednessWeights | None = None,
     tier1_base_retention_days: int = 30,

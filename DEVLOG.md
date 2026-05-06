@@ -10,6 +10,28 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase REVIEW_HARDENING.2 Review: Unresolvedness composite utility + network diagnostics
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Pre-Module-7 Hardening Phase B against phosphene.md Sections 7.3,
+7.7, and 7.10. Must fix: none. Should fix: align the unresolvedness helper's
+public type annotation with its supported Memory Store search-result tuple
+inputs, and make the diagnostics Louvain path fall back cleanly when an
+installed `community` package lacks `best_partition`. Optional: no optional
+changes deferred.
+
+Applied the should-fix cleanup in `src/phosphene/scoring/unresolvedness.py`,
+`tools/network_diagnostics.py`, and
+`tests/tools/test_network_diagnostics.py`. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/scoring/test_unresolvedness.py tests/tools/test_network_diagnostics.py -q`
+(14 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q`
+(547 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase
+Complete is the next action.
+
 ### Step REVIEW_HARDENING.2.3: Integration and cross-module regression
 
 **Date:** 2026-05-06

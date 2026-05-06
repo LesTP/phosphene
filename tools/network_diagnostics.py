@@ -314,7 +314,8 @@ def _louvain_partition(adjacency: dict[str, set[str]]) -> dict[str, int]:
     try:
         import community  # type: ignore[import-untyped]
         import networkx as nx  # type: ignore[import-untyped]
-    except ModuleNotFoundError:
+        best_partition = community.best_partition
+    except (AttributeError, ModuleNotFoundError):
         return _component_partition(adjacency)
 
     graph = nx.Graph()
@@ -324,7 +325,7 @@ def _louvain_partition(adjacency: dict[str, set[str]]) -> dict[str, int]:
             graph.add_edge(note_id, neighbor_id)
     if graph.number_of_edges() == 0:
         return {note_id: index for index, note_id in enumerate(sorted(adjacency))}
-    return community.best_partition(graph)
+    return best_partition(graph)
 
 
 def _component_partition(adjacency: dict[str, set[str]]) -> dict[str, int]:

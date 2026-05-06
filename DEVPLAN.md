@@ -6,7 +6,7 @@ step: null
 mode: Review
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Pre-Module-7 Hardening: Phase B in progress.
-- **Focus** — All Phase B steps complete; phase review is next.
+- **Focus** — Phase B review complete; phase completion is next.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -45,7 +45,7 @@ review_done: false
 
 Delivered ARCH-specified wild-card accepts and near-miss recording for the Attention Filter, with config/type validation, filter partitioning, export coverage, review, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.1 Completion" entry.
 
-### Phase B (in progress): Unresolvedness composite utility + network diagnostics tool
+### Phase B (reviewed): Unresolvedness composite utility + network diagnostics tool
 
 Adds the unresolvedness composite scorer (phosphene.md Section 7.3) and the network diagnostics tool (phosphene.md Section 7.7). These are new code — no existing module modifications.
 
