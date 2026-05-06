@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from phosphene.distillation.engine import (
     _build_assertion_cache_request,
     _build_cluster_summary_request,
+    _build_reflection_request,
+    _CriterionFeedbackMetric,
+    _Tier2EvolutionInput,
     _make_raptor_embedder,
     _make_raptor_summarizer,
     _toolkit_cluster,
@@ -90,3 +93,47 @@ def test_assertion_cache_prompt_requests_strict_json_payload() -> None:
     assert payload["cluster_summary"] == "A cluster summary."
     assert '"assertions"' in payload["instructions"]
     assert "Return only JSON" in payload["instructions"]
+
+
+def test_reflection_prompt_requests_strict_json_audit_payload() -> None:
+    @dataclass
+    class PatternNote:
+        note_id: str
+        content: str
+        cluster_group: str
+        importance: float
+        unresolvedness: float
+        tags: list[str]
+
+    messages = _build_reflection_request(
+        _Tier2EvolutionInput(
+            pattern_notes=[
+                PatternNote(
+                    note_id="pattern-a",
+                    content="A pattern summary.",
+                    cluster_group="cluster-a",
+                    importance=0.7,
+                    unresolvedness=0.4,
+                    tags=["distilled-pattern"],
+                )
+            ],
+            feedback_events=[],
+            feedback_metrics=[
+                _CriterionFeedbackMetric(
+                    criterion_name="friction",
+                    feedback_count=3,
+                    engaged_count=2,
+                    engagement_rate=2 / 3,
+                    mean_engagement=0.6,
+                )
+            ],
+        )
+    )
+
+    assert messages[0]["role"] == "user"
+    payload = json.loads(messages[0]["content"])
+    assert payload["task"] == "distill_t2_to_t3_reflection"
+    assert payload["patterns"][0]["note_id"] == "pattern-a"
+    assert payload["feedback_metrics"][0]["criterion_name"] == "friction"
+    assert '"insights"' in payload["instructions"]
+    assert "Do not prescribe file edits" in payload["instructions"]

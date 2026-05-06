@@ -244,6 +244,17 @@ release, no-write behavior, and criterion metric normalization. Verification
 passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation`
 (53 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (496 passed).
 
+### Step 6.3.2: Reflection LLM prompt and parsing
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the reflection LLM boundary for the T2->T3 path. `distill_t2_to_t3(config)` now prepares Tier 2 patterns and feedback metrics under the consolidation lock, builds a strict JSON reflection request, calls the private fakeable LLM completion seam at `config.reflection_tier`, and captures request messages, raw response, and parsed `ReflectionInsight` records as a private audit artifact before the later evolution/writeback steps.
+
+Added strict reflection parsing for the ARCH insight shape: non-empty content, known `source_pattern_ids`, allowed insight types (`recurring_tension`, `new_pattern`, `evolution`, `contradiction`), and probability-bounded confidence. Malformed reflection payloads fail with `DistillationError`; provider failures propagate from the LLM seam; no Memory Store writes, personality context reads, supersession, cache writes, or T2->T3 metadata updates occur in this step. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (62 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

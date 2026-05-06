@@ -3,8 +3,16 @@ from dataclasses import dataclass, field
 import pytest
 
 from phosphene.distillation import DistillationConfig, DistillationEngine
-from phosphene.distillation.engine import _criterion_feedback_metrics
-from phosphene.distillation.errors import DistillationLockError, NoPatternDataError
+from phosphene.distillation.engine import (
+    _build_reflection_audit_artifact,
+    _criterion_feedback_metrics,
+    _parse_reflection_insights,
+)
+from phosphene.distillation.errors import (
+    DistillationError,
+    DistillationLockError,
+    NoPatternDataError,
+)
 
 
 @dataclass
@@ -153,6 +161,86 @@ def test_prepare_tier2_evolution_input_respects_disabled_feedback(tmp_path) -> N
     assert store.write_calls == []
 
 
+def test_reflection_audit_artifact_calls_llm_and_parses_validated_insights(tmp_path) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[
+            EvolutionNote(
+                "pattern-a",
+                content="first pattern",
+                importance=0.8,
+                cluster_group="cluster-a",
+                tags=["distilled-pattern"],
+            )
+        ],
+        feedback_events=[
+            EvolutionNote(
+                "feedback-1",
+                source="feedback",
+                importance=0.9,
+                tags=["criterion:friction"],
+            )
+        ],
+    )
+    prepared = DistillationEngine(store)._prepare_tier2_evolution_input(
+        DistillationConfig(llm_config=object(), embedding_config=object())
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> str:
+        calls.append(dict(kwargs))
+        return (
+            '{"insights": [{"content": "A recurring tension is emerging.", '
+            '"source_pattern_ids": ["pattern-a"], '
+            '"insight_type": "recurring_tension", "confidence": 0.75}]}'
+        )
+
+    artifact = _build_reflection_audit_artifact(
+        prepared,
+        DistillationConfig(
+            llm_config="llm-config",
+            embedding_config=object(),
+            reflection_tier="reflect-tier",
+        ),
+        llm_complete_callable=fake_complete,
+    )
+
+    assert calls == [
+        {
+            "messages": artifact.request_messages,
+            "config": "llm-config",
+            "tier": "reflect-tier",
+        }
+    ]
+    assert artifact.raw_response.startswith('{"insights"')
+    assert len(artifact.insights) == 1
+    assert artifact.insights[0].content == "A recurring tension is emerging."
+    assert artifact.insights[0].source_pattern_ids == ["pattern-a"]
+    assert artifact.insights[0].insight_type == "recurring_tension"
+    assert artifact.insights[0].confidence == pytest.approx(0.75)
+    assert store.write_calls == []
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        ("not json", "valid JSON"),
+        ('{"insights": "nope"}', "insights list"),
+        ('{"insights": [{"content": "", "source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", "confidence": 0.2}]}', "content cannot be empty"),
+        ('{"insights": [{"content": "x", "source_pattern_ids": [], "insight_type": "new_pattern", "confidence": 0.2}]}', "source_pattern_ids cannot be empty"),
+        ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-x"], "insight_type": "new_pattern", "confidence": 0.2}]}', "unknown pattern ids"),
+        ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-a"], "insight_type": "mood", "confidence": 0.2}]}', "insight_type"),
+        ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", "confidence": 2}]}', r"confidence must be in \[0.0, 1.0\]"),
+    ],
+)
+def test_parse_reflection_insights_rejects_malformed_responses(
+    response: str,
+    message: str,
+) -> None:
+    with pytest.raises(DistillationError, match=message):
+        _parse_reflection_insights(response, valid_pattern_ids={"pattern-a"})
+
+
 def test_distill_t2_to_t3_raises_no_pattern_data_before_feedback_or_writes(tmp_path) -> None:
     store = EvolutionMemoryStore(
         tmp_path / "vault",
@@ -190,12 +278,26 @@ def test_distill_t2_to_t3_lock_rejects_concurrent_run_before_queries(tmp_path) -
     assert store.write_calls == []
 
 
-def test_distill_t2_to_t3_preparation_releases_lock_without_writes(tmp_path) -> None:
+def test_distill_t2_to_t3_preparation_releases_lock_without_writes(
+    tmp_path,
+    monkeypatch,
+) -> None:
     store = EvolutionMemoryStore(
         tmp_path / "vault",
         tier2_notes=[EvolutionNote("pattern-a", content="first pattern")],
     )
     engine = DistillationEngine(store)
+    calls: list[dict[str, object]] = []
+
+    def fake_complete(**kwargs: object) -> str:
+        calls.append(dict(kwargs))
+        return (
+            '{"insights": [{"content": "A new pattern is visible.", '
+            '"source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", '
+            '"confidence": 0.8}]}'
+        )
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
 
     with pytest.raises(NotImplementedError, match="Phase 3"):
         engine.distill_t2_to_t3(
@@ -203,6 +305,7 @@ def test_distill_t2_to_t3_preparation_releases_lock_without_writes(tmp_path) -> 
         )
 
     assert [query.tier for query in store.queries] == [2, 1]
+    assert len(calls) == 1
     assert store.write_calls == []
     assert engine._read_run_metadata().last_t2_to_t3_run is None
     assert engine._is_consolidation_locked() is False

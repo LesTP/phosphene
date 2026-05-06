@@ -25,6 +25,7 @@ from phosphene.distillation.types import (
     DistillationConfig,
     EvolutionResult,
     GateStatus,
+    ReflectionInsight,
     TierPromotionResult,
 )
 from phosphene.memory_store import NoteInput, NotePatch, NoteQuery
@@ -43,6 +44,12 @@ _LAST_T1_TO_T2_KEY = "last_t1_to_t2_run"
 _LAST_T2_TO_T3_KEY = "last_t2_to_t3_run"
 _UNBOUNDED_QUERY_LIMIT = 1_000_000
 _ASSERTION_CACHE_DIRECTORY = "tier2"
+_REFLECTION_INSIGHT_TYPES = {
+    "recurring_tension",
+    "new_pattern",
+    "evolution",
+    "contradiction",
+}
 
 
 class _EmbeddingCallable(Protocol):
@@ -149,6 +156,13 @@ class _Tier2EvolutionInput:
     pattern_notes: list[object]
     feedback_events: list[object]
     feedback_metrics: list[_CriterionFeedbackMetric]
+
+
+@dataclass(frozen=True)
+class _ReflectionAuditArtifact:
+    request_messages: list[Mapping[str, str]]
+    raw_response: str
+    insights: list[ReflectionInsight]
 
 
 class DistillationEngine:
@@ -319,11 +333,12 @@ class DistillationEngine:
         """Evolve Tier 2 patterns into Tier 3 personality files.
 
         Phase 3 currently prepares pattern and feedback inputs under the
-        distillation lock. Reflection, evolution, and writeback are implemented
-        in later Phase 3 steps.
+        distillation lock and captures reflection output as an audit artifact.
+        Evolution and writeback are implemented in later Phase 3 steps.
         """
         with self._acquire_consolidation_lock():
-            self._prepare_tier2_evolution_input(config)
+            prepared = self._prepare_tier2_evolution_input(config)
+            self._reflect_tier2_patterns(prepared, config)
         raise NotImplementedError("T2 to T3 distillation is implemented in Phase 3")
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
@@ -449,6 +464,19 @@ class DistillationEngine:
             pattern_notes=list(pattern_notes),
             feedback_events=feedback_events,
             feedback_metrics=_criterion_feedback_metrics(feedback_events),
+        )
+
+    def _reflect_tier2_patterns(
+        self,
+        prepared: _Tier2EvolutionInput,
+        config: DistillationConfig,
+        *,
+        llm_complete_callable: _LLMCompleteCallable | None = None,
+    ) -> _ReflectionAuditArtifact:
+        return _build_reflection_audit_artifact(
+            prepared,
+            config,
+            llm_complete_callable=llm_complete_callable,
         )
 
     def _write_tier2_cluster_notes(
@@ -644,6 +672,155 @@ def _build_assertion_cache_request(cluster_summary: str) -> list[Mapping[str, st
             "content": json.dumps(payload, sort_keys=True),
         }
     ]
+
+
+def _build_reflection_request(
+    prepared: _Tier2EvolutionInput,
+) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "distill_t2_to_t3_reflection",
+        "instructions": (
+            "Reflect on the Tier 2 pattern layer before any personality-file "
+            "changes are proposed. Synthesize recurring tensions, unresolved "
+            "threads, new associative connections, contradictions, and possible "
+            "evolution pressure. Do not prescribe file edits. Return only JSON "
+            "with shape "
+            '{"insights": [{"content": "...", "source_pattern_ids": ["..."], '
+            '"insight_type": "recurring_tension|new_pattern|evolution|'
+            'contradiction", "confidence": 0.0}]}. Confidence must be in '
+            "[0.0, 1.0]."
+        ),
+        "patterns": [_pattern_note_payload(note) for note in prepared.pattern_notes],
+        "feedback_metrics": [
+            {
+                "criterion_name": metric.criterion_name,
+                "feedback_count": metric.feedback_count,
+                "engaged_count": metric.engaged_count,
+                "engagement_rate": metric.engagement_rate,
+                "mean_engagement": metric.mean_engagement,
+            }
+            for metric in prepared.feedback_metrics
+        ],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _build_reflection_audit_artifact(
+    prepared: _Tier2EvolutionInput,
+    config: DistillationConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> _ReflectionAuditArtifact:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    request_messages = _build_reflection_request(prepared)
+    raw_response = llm_complete_callable(
+        messages=request_messages,
+        config=config.llm_config,
+        tier=config.reflection_tier,
+    )
+    return _ReflectionAuditArtifact(
+        request_messages=request_messages,
+        raw_response=raw_response,
+        insights=_parse_reflection_insights(
+            raw_response,
+            valid_pattern_ids={
+                str(getattr(note, "note_id"))
+                for note in prepared.pattern_notes
+                if getattr(note, "note_id", None) is not None
+            },
+        ),
+    )
+
+
+def _parse_reflection_insights(
+    response_text: str,
+    *,
+    valid_pattern_ids: set[str] | None = None,
+) -> list[ReflectionInsight]:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM reflection response",
+    )
+    raw_insights = payload.get("insights")
+    if not isinstance(raw_insights, Sequence) or isinstance(raw_insights, str | bytes):
+        raise DistillationError("LLM reflection response must contain insights list")
+
+    insights: list[ReflectionInsight] = []
+    for raw_insight in raw_insights:
+        if not isinstance(raw_insight, Mapping):
+            raise DistillationError("LLM reflection insight entries must be objects")
+
+        raw_content = raw_insight.get("content", raw_insight.get("text"))
+        if not isinstance(raw_content, str):
+            raise DistillationError("LLM reflection insight content must be a string")
+        content = raw_content.strip()
+        if not content:
+            raise DistillationError("LLM reflection insight content cannot be empty")
+
+        raw_source_ids = raw_insight.get(
+            "source_pattern_ids",
+            raw_insight.get("pattern_ids"),
+        )
+        if not isinstance(raw_source_ids, Sequence) or isinstance(
+            raw_source_ids, str | bytes
+        ):
+            raise DistillationError(
+                "LLM reflection insight source_pattern_ids must be a list"
+            )
+        source_pattern_ids = _dedupe_preserving_order(
+            [str(note_id).strip() for note_id in raw_source_ids if str(note_id).strip()]
+        )
+        if not source_pattern_ids:
+            raise DistillationError(
+                "LLM reflection insight source_pattern_ids cannot be empty"
+            )
+        if valid_pattern_ids is not None:
+            unknown_ids = [
+                note_id for note_id in source_pattern_ids if note_id not in valid_pattern_ids
+            ]
+            if unknown_ids:
+                raise DistillationError(
+                    "LLM reflection insight source_pattern_ids include unknown "
+                    f"pattern ids: {', '.join(unknown_ids)}"
+                )
+
+        raw_insight_type = raw_insight.get("insight_type", raw_insight.get("type"))
+        if not isinstance(raw_insight_type, str):
+            raise DistillationError("LLM reflection insight_type must be a string")
+        insight_type = raw_insight_type.strip()
+        if insight_type not in _REFLECTION_INSIGHT_TYPES:
+            raise DistillationError(
+                "LLM reflection insight_type must be one of "
+                f"{', '.join(sorted(_REFLECTION_INSIGHT_TYPES))}"
+            )
+
+        raw_confidence = raw_insight.get("confidence", 1.0)
+        if isinstance(raw_confidence, bool) or not isinstance(
+            raw_confidence, int | float
+        ):
+            raise DistillationError("LLM reflection confidence must be numeric")
+        if raw_confidence < 0.0 or raw_confidence > 1.0:
+            raise DistillationError(
+                "LLM reflection confidence must be in [0.0, 1.0]"
+            )
+
+        insights.append(
+            ReflectionInsight(
+                content=content,
+                source_pattern_ids=source_pattern_ids,
+                insight_type=insight_type,
+                confidence=float(raw_confidence),
+            )
+        )
+
+    return insights
 
 
 def _extract_cluster_assertions(
@@ -981,6 +1158,18 @@ def _note_content(note: object) -> str:
     if title is not None:
         return str(title)
     return str(getattr(note, "note_id", ""))
+
+
+def _pattern_note_payload(note: object) -> Mapping[str, object]:
+    return {
+        "note_id": str(getattr(note, "note_id")),
+        "cluster_group": _optional_string(getattr(note, "cluster_group", None)),
+        "title": _optional_string(getattr(note, "title", None)),
+        "content": _note_content(note),
+        "importance": _numeric_score(getattr(note, "importance", 0.0)),
+        "unresolvedness": _numeric_score(getattr(note, "unresolvedness", 0.0)),
+        "tags": [str(tag) for tag in getattr(note, "tags", []) or []],
+    }
 
 
 def _validate_memory_store(memory_store: object) -> None:
