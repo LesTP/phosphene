@@ -1,10 +1,10 @@
 ---
-module: DISTILLATION
-phase: null
-phase_title: "Module 6 complete — Module 7 next"
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+module: REVIEW_HARDENING
+phase: 1
+phase_title: "Pre-Module-7 Hardening Phase A — Attention Filter additions"
+step: 2
+mode: Build
+blocked: false
 regime: Build
 review_done: false
 ---
@@ -33,9 +33,114 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 6 complete: Distillation.
-- **Focus** — Awaiting human audit before Module 7 (Feedback Collector) planning.
-- **Blocked/Broken** — `awaiting-human-audit`
+- **Phase** — Pre-Module-7 Hardening: Phase A (Attention Filter additions from external review).
+- **Focus** — Add wild-card accepts and near-discard recording to the Attention Filter.
+- **Blocked/Broken** — none
+
+## Pre-Module-7 Hardening
+
+*These two phases implement the "Now" items from the external review (phosphene.md Section 7.10). They harden the existing codebase before Module 7 (Feedback Collector) begins.*
+
+### Phase A: Attention Filter additions (wild-card accepts + near-discard recording)
+
+Adds two anti-overfitting mechanisms to the Attention Filter (phosphene.md Section 7.4). Both are ARCH-specified: `wild_card_ratio` and `near_miss_margin` on `AttentionFilterConfig`; `near_misses` and `wild_cards` on `FilterResult`. See ARCH_attention_filter.md Steps 9–10 and the Design Decisions section.
+
+**Step 1 (complete): Config and types**
+
+Added ARCH-specified config/type fields: `wild_card_ratio`, `near_miss_margin`, `near_misses`, and `wild_cards`. Added config validation coverage and updated public contract tests. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v` (130 passed).
+
+**Step 2: Filter logic**
+
+Modify `src/phosphene/attention_filter/filter.py` `filter_content` method:
+- After scoring and before the accept/reject decision, partition below-threshold items into three buckets:
+  1. **Wild cards:** randomly select `wild_card_ratio` fraction of below-threshold items (use `random.sample` or equivalent). Tag with `retention_criteria=["wild_card"]`. Generate full annotation for these (same LLM call as accepted items).
+  2. **Near misses:** from remaining below-threshold items, select those scoring within `near_miss_margin` below `acceptance_threshold`. Generate full annotation for these (same format as accepted, for human review). Do NOT store these in Memory Store — they are informational only.
+  3. **Rejected:** everything else. Count only.
+- Update `FilterResult` construction to populate `near_misses` and `wild_cards`.
+- When `wild_card_ratio == 0.0`, skip wild-card logic entirely (no random selection, no annotation). When `near_miss_margin == 0.0`, skip near-miss logic.
+
+Tests:
+- `wild_card_ratio=0.0` produces empty wild_cards list.
+- `wild_card_ratio=1.0` admits all below-threshold items as wild cards.
+- Wild cards are tagged with `retention_criteria=["wild_card"]`.
+- Near misses are populated only for items scoring within margin.
+- `near_miss_margin=0.0` produces empty near_misses list.
+- Wild cards and near misses receive full annotation (non-empty annotation field).
+- `rejected_count` excludes wild cards and near misses.
+- Existing acceptance and auto-accept logic unchanged (regression).
+
+**Step 3: Export and integration check**
+
+- Verify `__init__.py` exports include `wild_card_ratio` and `near_miss_margin` in the config surface.
+- Run full test suite: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`.
+- Run cross-module regression: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v` (ensure no breakage in other modules that construct `FilterResult`).
+
+### Phase B: Unresolvedness composite utility + network diagnostics tool
+
+Adds the unresolvedness composite scorer (phosphene.md Section 7.3) and the network diagnostics tool (phosphene.md Section 7.7). These are new code — no existing module modifications.
+
+**Step 1: Unresolvedness composite utility**
+
+Create `src/phosphene/scoring/__init__.py` and `src/phosphene/scoring/unresolvedness.py`:
+
+```python
+def compute_unresolvedness(
+    note: MemoryNote,
+    density_metrics: DensityMetrics,
+    similar_notes: list[MemoryNote],  # from search_by_embedding
+) -> float:
+```
+
+The function computes a composite [0.0, 1.0] from the following subcomponents:
+- **Rising links without promotion:** `min(1.0, note.link_count / 5.0)` when `note.tier == 1`. A Tier 1 note with 5+ links that hasn't been clustered is strongly unresolved. Zero contribution if promoted.
+- **Reappearance signal:** count of `similar_notes` with high similarity (>0.7) that are themselves unresolved (unresolvedness > 0.3). Normalized to [0.0, 1.0].
+- **Conflicting alignments:** count of `similar_notes` where the note is linked to notes that have friction targets pointing at each other. Requires checking `friction_target` on connected notes. Normalized.
+- **Survival signal:** `min(1.0, days_since_creation / tier1_base_retention_days)` — how close to decay deadline without promotion. Higher = more unresolved.
+
+Composite: weighted average with configurable weights, default equal. Output clamped to [0.0, 1.0].
+
+This is a pure function with no side effects. It does not call Memory Store — the caller passes in the data. This keeps it testable without any store fixture.
+
+Tests (`tests/scoring/test_unresolvedness.py`):
+- Zero inputs → 0.0.
+- High link count on Tier 1 note → high subcomponent.
+- Promoted note (Tier 2) → zero link-without-promotion contribution.
+- Similar unresolved notes present → high reappearance signal.
+- Near-decay-deadline note → high survival signal.
+- Composite is clamped to [0.0, 1.0].
+- Custom weights shift the composite.
+
+**Step 2: Network diagnostics tool**
+
+Create `tools/network_diagnostics.py` — a standalone script that reads Memory Store and computes health metrics. Not a module — no ARCH file, no exports, no module dependencies beyond Memory Store.
+
+Input: `MemoryStoreConfig` (vault path). Output: printed report to stdout.
+
+Metrics to compute (from phosphene.md Section 7.7):
+
+| Metric | Computation |
+|--------|-------------|
+| **Cluster diversity** | Load all Tier 2 notes, group by `cluster_group`, compute mean pairwise embedding distance between cluster centroids. Report: count of clusters, mean inter-cluster distance. |
+| **Outlier ratio** | For each Tier 1 note with an embedding, compute max similarity to all Tier 2 cluster centroids. Report: fraction with max_sim < 0.3. |
+| **Bridge-node density** | Notes with similarity > 0.4 to 2+ clusters where those clusters have low mutual similarity (< 0.5). Report: count and fraction. |
+| **Unresolvedness distribution** | Load all notes, histogram unresolvedness in 5 bins: [0, 0.2), [0.2, 0.4), [0.4, 0.6), [0.6, 0.8), [0.8, 1.0]. Report counts per bin. |
+| **Compression damage** | Count notes with links pointing to note_ids that no longer exist in the store (orphaned links). Report: count and fraction. |
+| **Note/tier summary** | Tier counts, mean link degree, total notes — wraps `get_density_metrics()`. |
+
+The script uses `argparse` with `--vault-path` and `--embedding-path` arguments. It instantiates a `MemoryStore`, calls the read API, computes metrics, and prints a formatted report.
+
+Mirror index and free-play value ratio require Generator output logs which don't exist yet — these are stubbed with "N/A — requires Generator output logs" in the report.
+
+Tests (`tests/tools/test_network_diagnostics.py`):
+- Smoke test: runs against an empty vault, produces a report without crashing.
+- Populated vault: create a small Memory Store fixture with known structure, verify metric values.
+- Orphaned link detection: store notes with links to non-existent IDs, verify compression damage count.
+
+**Step 3: Integration and cross-module regression**
+
+- Run full test suite: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`.
+- Verify no import errors from the new `scoring` package.
+- Verify the diagnostics tool runs as a script: `PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`.
 
 ## Module 1: Memory Store (complete)
 

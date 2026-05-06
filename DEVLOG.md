@@ -10,6 +10,24 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.1.1: Config and types
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** Attention Filter public dataclasses now match the ARCH-specified hardening fields.
+
+Added `wild_card_ratio` and `near_miss_margin` to `AttentionFilterConfig` with
+unit-interval and non-negative validation respectively. Added `near_misses` and
+`wild_cards` to `FilterResult`, and updated the current `filter_content` return
+paths to populate empty lists until the Step 2 partitioning logic is
+implemented.
+
+Updated Attention Filter config/export tests for the new dataclass fields,
+defaults, and validation boundaries. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(130 passed).
+
 ### Step 6.3.1: Reflection input preparation and feedback metrics
 
 **Date:** 2026-05-06

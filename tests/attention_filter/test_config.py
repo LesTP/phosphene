@@ -40,6 +40,8 @@ def test_attention_filter_config_defaults_to_precision_surplus_only() -> None:
     config = make_config()
 
     assert [criterion.name for criterion in config.prompt_criteria] == ["precision_surplus"]
+    assert config.wild_card_ratio == 0.05
+    assert config.near_miss_margin == 0.05
 
 
 @pytest.mark.parametrize("acceptance_threshold", [0.0, 1.0])
@@ -57,6 +59,37 @@ def test_attention_filter_config_rejects_acceptance_threshold_outside_unit_inter
 ) -> None:
     with pytest.raises(InvalidScoreError):
         make_config(acceptance_threshold=acceptance_threshold)
+
+
+@pytest.mark.parametrize("wild_card_ratio", [0.0, 1.0])
+def test_attention_filter_config_accepts_wild_card_ratio_boundaries(
+    wild_card_ratio: float,
+) -> None:
+    config = make_config(wild_card_ratio=wild_card_ratio)
+
+    assert config.wild_card_ratio == wild_card_ratio
+
+
+@pytest.mark.parametrize("wild_card_ratio", [-0.1, 1.1])
+def test_attention_filter_config_rejects_wild_card_ratio_outside_unit_interval(
+    wild_card_ratio: float,
+) -> None:
+    with pytest.raises(InvalidScoreError):
+        make_config(wild_card_ratio=wild_card_ratio)
+
+
+@pytest.mark.parametrize("near_miss_margin", [0.0, 0.2])
+def test_attention_filter_config_accepts_non_negative_near_miss_margin(
+    near_miss_margin: float,
+) -> None:
+    config = make_config(near_miss_margin=near_miss_margin)
+
+    assert config.near_miss_margin == near_miss_margin
+
+
+def test_attention_filter_config_rejects_negative_near_miss_margin() -> None:
+    with pytest.raises(InvalidScoreError):
+        make_config(near_miss_margin=-0.1)
 
 
 @pytest.mark.parametrize("density_crossover", [0.0, -0.1])

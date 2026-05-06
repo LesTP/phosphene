@@ -1061,6 +1061,8 @@ class AttentionFilter:
         if not items:
             return FilterResult(
                 accepted=[],
+                near_misses=[],
+                wild_cards=[],
                 rejected_count=0,
                 total_count=0,
                 prompt_weight=prompt_weight,
@@ -1085,6 +1087,8 @@ class AttentionFilter:
         )
         return FilterResult(
             accepted=accepted_fragments,
+            near_misses=[],
+            wild_cards=[],
             rejected_count=_rejected_count(decisions),
             total_count=len(items),
             prompt_weight=prompt_weight,

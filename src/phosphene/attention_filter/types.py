@@ -114,6 +114,8 @@ class AttentionFilterConfig:
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     acceptance_threshold: float = 0.3
     auto_accept_sources: list[str] = field(default_factory=list)
+    wild_card_ratio: float = 0.05
+    near_miss_margin: float = 0.05
     density_crossover: float = 3.0
     similarity_candidates: int = 20
     llm_config: LLMConfig
@@ -123,6 +125,8 @@ class AttentionFilterConfig:
 
     def __post_init__(self) -> None:
         _require_probability(self.acceptance_threshold, "acceptance_threshold")
+        _require_probability(self.wild_card_ratio, "wild_card_ratio")
+        _require_non_negative(self.near_miss_margin, "near_miss_margin")
 
         if self.density_crossover <= 0.0:
             raise InvalidScoreError("density_crossover must be positive")
@@ -149,6 +153,8 @@ class AnnotatedFragment:
 @dataclass
 class FilterResult:
     accepted: list[AnnotatedFragment]
+    near_misses: list[AnnotatedFragment]
+    wild_cards: list[AnnotatedFragment]
     rejected_count: int
     total_count: int
     prompt_weight: float

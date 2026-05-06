@@ -81,6 +81,8 @@ def test_arch_dataclass_field_names_match_contract() -> None:
         "scoring",
         "acceptance_threshold",
         "auto_accept_sources",
+        "wild_card_ratio",
+        "near_miss_margin",
         "density_crossover",
         "similarity_candidates",
         "llm_config",
@@ -106,6 +108,8 @@ def test_arch_dataclass_field_names_match_contract() -> None:
     ]
     assert [field.name for field in fields(FilterResult)] == [
         "accepted",
+        "near_misses",
+        "wild_cards",
         "rejected_count",
         "total_count",
         "prompt_weight",
@@ -136,6 +140,8 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     )
     result = FilterResult(
         accepted=[fragment],
+        near_misses=[],
+        wild_cards=[],
         rejected_count=0,
         total_count=1,
         prompt_weight=1.0,
@@ -154,5 +160,7 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     assert item.linked_urls == []
     assert criterion.weight == 1.0
     assert result.accepted == [fragment]
+    assert result.near_misses == []
+    assert result.wild_cards == []
     assert isinstance(AttentionFilter(memory_store=object()), AttentionFilter)
     assert issubclass(InvalidScoreError, AttentionFilterError)
