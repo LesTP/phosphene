@@ -10,6 +10,39 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase REVIEW_HARDENING.2 Completion: Unresolvedness composite utility + network diagnostics
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Pre-Module-7 Hardening Phase B. Final verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q` (547 passed).
+
+Phase B delivered the pure caller-fed `phosphene.scoring.compute_unresolvedness()`
+utility, configurable `UnresolvednessWeights`, and `tools/network_diagnostics.py`
+as a standalone Memory Store diagnostic report for density, cluster diversity,
+outlier ratio, bridge-node density, unresolvedness distribution, compression
+damage, and RAPTOR-vs-structural divergence.
+
+DEVLOG learning review: Phase B landed linearly through planning, three
+implementation steps, and review. The review found two small should-fix cleanups
+that were resolved in the review iteration; no repeated trial-and-error pattern
+needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase B entries recorded no contract changes. D-47 keeps
+the scorer and diagnostics outside existing module contracts; no upstream
+document or built-consumer propagation remains.
+Log review: loop summary entries for iterations 148-152 show successful Phase B
+planning, steps, and review. No repeated tool failures or wasted-turn patterns
+were found beyond the already documented no-`rg` environment constraint.
+DEVPLAN cleanup: reduced Phase B to a one-line completion summary and set
+frontmatter to await human audit before Module 7 planning.
+ARCHITECTURE.md: no Implementation Sequence status change was needed; this was
+pre-module hardening, and Module 7 remains Not started.
+DECISIONS.md and PROJECT.md: no open decisions or project risks were resolved by
+this phase.
+
 ### Phase REVIEW_HARDENING.2 Review: Unresolvedness composite utility + network diagnostics
 
 **Date:** 2026-05-06
@@ -108,6 +141,11 @@ The scorer stays caller-fed and side-effect-free, and the diagnostics script
 remains an operator tool rather than a new ARCH module or exported runtime
 dependency. Logged scope decision D-47. No tests were run because this was a
 planning-only action.
+
+<!--
+HISTORY — Do not read past this marker.
+Completed entries kept for audit.
+-->
 
 ### Phase REVIEW_HARDENING.1 Completion: Attention Filter additions
 
@@ -221,11 +259,6 @@ Updated Attention Filter config/export tests for the new dataclass fields,
 defaults, and validation boundaries. Verification passed with
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
 (130 passed).
-
-<!--
-HISTORY — Do not read past this marker.
-Completed entries kept for audit.
--->
 
 ### Step 6.3.1: Reflection input preparation and feedback metrics
 

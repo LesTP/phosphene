@@ -1,12 +1,12 @@
 ---
 module: REVIEW_HARDENING
-phase: 2
-phase_title: "Pre-Module-7 Hardening Phase B: unresolvedness composite utility + network diagnostics"
+phase: null
+phase_title: "Pre-Module-7 hardening complete — Module 7 Feedback Collector next"
 step: null
-mode: Review
-blocked: null
+mode: Complete
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Pre-Module-7 Hardening: Phase B in progress.
-- **Focus** — Phase B review complete; phase completion is next.
-- **Blocked/Broken** — None
+- **Phase** — Pre-Module-7 Hardening complete.
+- **Focus** — Awaiting human audit before Module 7 (Feedback Collector) planning.
+- **Blocked/Broken** — `awaiting-human-audit`
 
 ## Pre-Module-7 Hardening
 
@@ -45,32 +45,9 @@ review_done: true
 
 Delivered ARCH-specified wild-card accepts and near-miss recording for the Attention Filter, with config/type validation, filter partitioning, export coverage, review, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.1 Completion" entry.
 
-### Phase B (reviewed): Unresolvedness composite utility + network diagnostics tool
+### Phase B (complete): Unresolvedness composite utility + network diagnostics tool
 
-Adds the unresolvedness composite scorer (phosphene.md Section 7.3) and the network diagnostics tool (phosphene.md Section 7.7). These are new code — no existing module modifications.
-
-**Step 1 (complete): Unresolvedness composite utility**
-
-Created `phosphene.scoring.compute_unresolvedness()` as a pure, caller-fed
-composite utility with configurable weights and focused tests. Verification:
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q` (541 passed).
-
-**Step 2 (complete): Network diagnostics tool**
-
-Created `tools/network_diagnostics.py` as a standalone Memory Store reader with
-formatted stdout reporting for note/tier summary, cluster diversity, outlier
-ratio, bridge-node density, unresolvedness histogram, compression damage,
-RAPTOR-Louvain divergence, and Generator-log-dependent N/A stubs. Verification:
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/tools/test_network_diagnostics.py -q`
-(5 passed).
-
-**Step 3 (complete): Integration and cross-module regression**
-
-Verified full-suite regression, new `scoring` package imports, and standalone
-diagnostics script execution. Verification:
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v` (546 passed);
-`PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`
-(completed successfully).
+Delivered the pure `phosphene.scoring.compute_unresolvedness()` utility, the standalone `tools/network_diagnostics.py` Memory Store report, review cleanups, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.2 Completion" entry.
 
 ## Module 1: Memory Store (complete)
 
