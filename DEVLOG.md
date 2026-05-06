@@ -125,6 +125,17 @@ Planned Module 6 Phase 2 as a Build phase over `DistillationEngine.distill_t1_to
 
 Scope decision recorded in D-44: Phase 2 is limited to T1->T2 promotion. T2->T3 reflect-evolve behavior, personality supersession, version-count inertia, compression caps, and criteria-adjustment output remain deferred to Phase 3 so cluster formation and assertion-cache ownership can stabilize first.
 
+### Step 6.2.1: Toolkit boundary and prompt helpers
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added private Distillation toolkit seams for embedding, RAPTOR clustering, and LLM completion with lazy imports so `phosphene.distillation` remains import-compatible when `toolkit` is absent. Added RAPTOR callback factories for cluster summarization and summary re-embedding, plus JSON prompt builders for Tier 1 cluster summaries and Tier 2 assertion-cache extraction.
+
+Focused tests cover the private import seams, fakeable LLM and embedding callback wiring, vector extraction from embedding results, and strict assertion-cache prompt shape without making live toolkit calls. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (37 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

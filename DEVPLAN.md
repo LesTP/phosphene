@@ -2,7 +2,7 @@
 module: DISTILLATION
 phase: 2
 phase_title: T1->T2 RAPTOR promotion and assertion cache
-step: 6.2.1
+step: 6.2.2
 mode: Build
 blocked: null
 regime: Build
@@ -116,7 +116,7 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 
 Build phase. Scope is limited to replacing the `distill_t1_to_t2(config)` stub with ARCH-aligned Tier 1 to Tier 2 promotion. `distill_t2_to_t3(config)`, personality-file supersession, reflection/evolution prompts, and Attention Filter criteria-adjustment application remain deferred to Phase 3. Toolkit calls must stay behind private wrappers/import seams so the current no-toolkit test environment remains deterministic.
 
-- [ ] **Step 6.2.1 — Toolkit boundary and prompt helpers**: Add private wrappers for embedding, RAPTOR clustering, LLM cluster summarization, and LLM assertion extraction; preserve import-time compatibility when `toolkit` is absent; add focused tests with injectable fakes/sentinels.
+- [x] **Step 6.2.1 — Toolkit boundary and prompt helpers**: Add private wrappers for embedding, RAPTOR clustering, LLM cluster summarization, and LLM assertion extraction; preserve import-time compatibility when `toolkit` is absent; add focused tests with injectable fakes/sentinels.
 - [ ] **Step 6.2.2 — Tier 1 input selection and feedback preparation**: Implement the lock-protected `distill_t1_to_t2` entry guard, metadata-based Tier 1 query, `InsufficientDataError`, feedback-event query when enabled, and deterministic importance boost preparation without Memory Store writes yet.
 - [ ] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
 - [ ] **Step 6.2.4 — Tier 2 note writes and cluster links**: Create or update Tier 2 pattern notes through `store_note`/`update_note`, set `cluster_group`, preserve source Tier 1 links, wire related clusters through `add_links`, and leave noise/incoherent Tier 1 notes unmodified.

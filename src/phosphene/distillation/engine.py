@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Protocol
 
 from phosphene.distillation.errors import DistillationConfigError, DistillationLockError
 from phosphene.distillation.types import (
@@ -33,6 +33,30 @@ _RUN_METADATA_FILENAME = "distillation_runs.json"
 _LAST_T1_TO_T2_KEY = "last_t1_to_t2_run"
 _LAST_T2_TO_T3_KEY = "last_t2_to_t3_run"
 _UNBOUNDED_QUERY_LIMIT = 1_000_000
+
+
+class _EmbeddingCallable(Protocol):
+    def __call__(self, texts: list[str], config: object) -> Any: ...
+
+
+class _ClusterCallable(Protocol):
+    def __call__(
+        self,
+        embeddings: object,
+        config: object,
+        *,
+        texts: list[str],
+    ) -> Any: ...
+
+
+class _LLMCompleteCallable(Protocol):
+    def __call__(
+        self,
+        *,
+        messages: list[Mapping[str, str]],
+        config: object,
+        tier: object,
+    ) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -174,6 +198,115 @@ class DistillationEngine:
             encoding="utf-8",
         )
         temp_path.replace(self._run_metadata_path)
+
+
+def _toolkit_embed(texts: list[str], config: object) -> Any:
+    from toolkit.embedding import embed
+
+    return embed(texts, config)
+
+
+def _embedding_vectors(result: object) -> object:
+    return getattr(result, "vectors", result)
+
+
+def _toolkit_complete(
+    *,
+    messages: list[Mapping[str, str]],
+    config: object,
+    tier: object,
+) -> str:
+    from toolkit.llm_client import Message, complete
+
+    toolkit_messages = [
+        Message(role=message["role"], content=message["content"]) for message in messages
+    ]
+    response = complete(messages=toolkit_messages, config=config, tier=tier)
+    return str(response.content)
+
+
+def _toolkit_cluster(
+    embeddings: object,
+    config: object,
+    *,
+    texts: list[str],
+) -> Any:
+    from toolkit.clustering import cluster
+
+    return cluster(embeddings, config, texts=texts)
+
+
+def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "distill_tier1_cluster_summary",
+        "instructions": (
+            "Synthesize these Tier 1 observations into one coherent Tier 2 "
+            "pattern description. Preserve concrete tensions, recurring "
+            "friction, and unresolved questions. Avoid inventing context not "
+            "supported by the observations. Return plain text only."
+        ),
+        "observations": [str(text) for text in texts],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _build_assertion_cache_request(cluster_summary: str) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "extract_distillation_cluster_assertions",
+        "instructions": (
+            "Extract dominant factual, causal, evaluative, or interpretive "
+            "assertions supported or contested by this Tier 2 pattern summary. "
+            "Return only JSON with shape "
+            '{"assertions": [{"text": "...", "confidence": 0.0}]}. '
+            "Use an empty assertions list when no clear claims are present. "
+            "Confidence must be a number between 0.0 and 1.0."
+        ),
+        "cluster_summary": cluster_summary,
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _make_raptor_summarizer(
+    llm_config: object,
+    tier: object,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> Callable[[list[str]], str]:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    def summarizer(texts: list[str]) -> str:
+        return llm_complete_callable(
+            messages=_build_cluster_summary_request(texts),
+            config=llm_config,
+            tier=tier,
+        )
+
+    return summarizer
+
+
+def _make_raptor_embedder(
+    embedding_config: object,
+    *,
+    embedding_callable: _EmbeddingCallable | None = None,
+) -> Callable[[list[str]], object]:
+    if embedding_callable is None:
+        embedding_callable = _toolkit_embed
+
+    def embedder(texts: list[str]) -> object:
+        return _embedding_vectors(embedding_callable(texts, embedding_config))
+
+    return embedder
 
 
 def _validate_memory_store(memory_store: object) -> None:
