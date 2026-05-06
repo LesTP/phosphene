@@ -329,3 +329,10 @@ Priority: Important
 Decision: Reject T2->T3 evolution LLM responses that omit any current personality file from `personality_proposals`. Every file must be explicitly marked `supersede` or `unchanged` before Memory Store writeback.
 Rationale: `ARCH_distillation.md` requires unchanged personality files that survive a T2->T3 cycle to receive a `version_count` increment, which drives future inertia. Silent omission would skip both supersession and unchanged writeback, making inertia state dependent on an incomplete LLM response instead of the completed cycle.
 Revisit if: The public EvolutionResult contract grows a third explicit action for deferring a personality file without treating it as a survived cycle.
+
+D-47: Pre-Module-7 Hardening Phase B stays outside existing module contracts
+Date: 2026-05-06 | Status: Closed
+Priority: Important
+Decision: Phase REVIEW_HARDENING.2 will add a standalone `phosphene.scoring` unresolvedness helper and a `tools/network_diagnostics.py` script without modifying existing ARCH module contracts or introducing Memory Store writes inside the scorer.
+Rationale: The hardening work comes from the external review's "Now" items and is intentionally preparatory before Feedback Collector begins. Keeping unresolvedness as a pure caller-fed utility makes it testable without a store fixture and avoids expanding Memory Store ownership into scoring policy. Keeping network diagnostics as a standalone tool lets it inspect Memory Store health without becoming a new runtime module or public export surface.
+Revisit if: Module 7 or Orchestrator needs unresolvedness computation as a stable cross-module API beyond the utility package, or if diagnostics results become runtime scheduling inputs rather than an operator report.

@@ -10,6 +10,22 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase REVIEW_HARDENING.2 Plan: Unresolvedness composite utility + network diagnostics
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Activated Pre-Module-7 Hardening Phase B as a Build phase. The phase is scoped
+to a pure `phosphene.scoring` unresolvedness composite utility, a standalone
+Memory Store network diagnostics tool, and one integration/regression step.
+
+The scorer stays caller-fed and side-effect-free, and the diagnostics script
+remains an operator tool rather than a new ARCH module or exported runtime
+dependency. Logged scope decision D-47. No tests were run because this was a
+planning-only action.
+
 ### Phase REVIEW_HARDENING.1 Completion: Attention Filter additions
 
 **Date:** 2026-05-06

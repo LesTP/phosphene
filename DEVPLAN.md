@@ -1,10 +1,10 @@
 ---
 module: REVIEW_HARDENING
-phase: null
-phase_title: "Pre-Module-7 Hardening Phase A complete — Phase B planned next"
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+phase: 2
+phase_title: "Pre-Module-7 Hardening Phase B: unresolvedness composite utility + network diagnostics"
+step: 1
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -33,9 +33,9 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Pre-Module-7 Hardening: Phase A complete.
-- **Focus** — Awaiting human audit before Phase B (unresolvedness utility + network diagnostics).
-- **Blocked/Broken** — awaiting-human-audit
+- **Phase** — Pre-Module-7 Hardening: Phase B in progress.
+- **Focus** — Step 1: unresolvedness composite utility.
+- **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
 
@@ -45,11 +45,11 @@ review_done: false
 
 Delivered ARCH-specified wild-card accepts and near-miss recording for the Attention Filter, with config/type validation, filter partitioning, export coverage, review, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.1 Completion" entry.
 
-### Phase B: Unresolvedness composite utility + network diagnostics tool
+### Phase B (in progress): Unresolvedness composite utility + network diagnostics tool
 
 Adds the unresolvedness composite scorer (phosphene.md Section 7.3) and the network diagnostics tool (phosphene.md Section 7.7). These are new code — no existing module modifications.
 
-**Step 1: Unresolvedness composite utility**
+**Step 1 (next): Unresolvedness composite utility**
 
 Create `src/phosphene/scoring/__init__.py` and `src/phosphene/scoring/unresolvedness.py`:
 
@@ -80,7 +80,7 @@ Tests (`tests/scoring/test_unresolvedness.py`):
 - Composite is clamped to [0.0, 1.0].
 - Custom weights shift the composite.
 
-**Step 2: Network diagnostics tool**
+**Step 2 (pending): Network diagnostics tool**
 
 Create `tools/network_diagnostics.py` — a standalone script that reads Memory Store and computes health metrics. Not a module — no ARCH file, no exports, no module dependencies beyond Memory Store.
 
@@ -95,6 +95,7 @@ Metrics to compute (from phosphene.md Section 7.7):
 | **Bridge-node density** | Notes with similarity > 0.4 to 2+ clusters where those clusters have low mutual similarity (< 0.5). Report: count and fraction. |
 | **Unresolvedness distribution** | Load all notes, histogram unresolvedness in 5 bins: [0, 0.2), [0.2, 0.4), [0.4, 0.6), [0.6, 0.8), [0.8, 1.0]. Report counts per bin. |
 | **Compression damage** | Count notes with links pointing to note_ids that no longer exist in the store (orphaned links). Report: count and fraction. |
+| **RAPTOR-Louvain divergence** | Build a graph from Memory Store wikilinks, run Louvain community detection (`networkx` + `community` / `python-louvain`), compare resulting communities against RAPTOR's embedding-based `cluster_group` assignments on Tier 2 notes. Report: fraction of notes whose Louvain community differs from their nearest RAPTOR cluster. High divergence = the link structure is saying something the embeddings aren't capturing (bridge notes, cross-topic structural clusters). Requires ≥10 linked notes to produce meaningful output; below that threshold report "N/A — insufficient link density". |
 | **Note/tier summary** | Tier counts, mean link degree, total notes — wraps `get_density_metrics()`. |
 
 The script uses `argparse` with `--vault-path` and `--embedding-path` arguments. It instantiates a `MemoryStore`, calls the read API, computes metrics, and prints a formatted report.
@@ -105,8 +106,9 @@ Tests (`tests/tools/test_network_diagnostics.py`):
 - Smoke test: runs against an empty vault, produces a report without crashing.
 - Populated vault: create a small Memory Store fixture with known structure, verify metric values.
 - Orphaned link detection: store notes with links to non-existent IDs, verify compression damage count.
+- Louvain divergence: create a fixture with two RAPTOR clusters and cross-cluster links forming a different Louvain community; verify divergence fraction is non-zero. Below-threshold fixture (< 10 linked notes) reports N/A.
 
-**Step 3: Integration and cross-module regression**
+**Step 3 (pending): Integration and cross-module regression**
 
 - Run full test suite: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`.
 - Verify no import errors from the new `scoring` package.
