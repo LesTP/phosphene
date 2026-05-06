@@ -1,12 +1,12 @@
 ---
 module: DISTILLATION
-phase: 3
-phase_title: "Phase 3: T2->T3 reflect-evolve"
-step: 6.3.complete
+phase: null
+phase_title: "Module 6 complete — Module 7 next"
+step: null
 mode: Complete
-blocked: null
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 3 in progress: T2->T3 reflect-evolve.
-- **Focus** — Phase review: verify the completed T2->T3 reflect-evolve implementation against `ARCH_distillation.md`.
-- **Blocked/Broken** — None
+- **Phase** — Module 6 complete: Distillation.
+- **Focus** — Awaiting human audit before Module 7 (Feedback Collector) planning.
+- **Blocked/Broken** — `awaiting-human-audit`
 
 ## Module 1: Memory Store (complete)
 
@@ -106,7 +106,7 @@ Delivered ARCH-aligned public dataclasses/errors/exports, stateless Memory Store
 
 Delivered prompted, response, and free-play generation behind fakeable toolkit/llm_client boundaries; skeptical memory verification with read-only recent Tier 1 checks; provider-failure rotation fallback; parse hard stops; source attribution and response threading preservation; and cross-mode integration coverage. Reviewed and completed. See DEVLOG "Phase 5.2 Review" and "Phase 5.2 Completion" entries.
 
-## Module 6: Distillation
+## Module 6: Distillation (complete)
 
 Planned phases follow `ARCH_distillation.md`: first stabilize the public contract, validation, Memory Store read/write boundary helpers, in-process lock, persisted run metadata, and deterministic gate evaluation without live clustering or LLM synthesis; then add T1->T2 RAPTOR promotion and assertion cache; then add T2->T3 reflect-evolve with supersession and criteria-adjustment output.
 
@@ -114,12 +114,7 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 
 - **Phase 2 (complete)** — Delivered ARCH-aligned `distill_t1_to_t2(config)`: toolkit boundary seams, feedback-aware Tier 1 selection, RAPTOR coherence gating, Tier 2 Memory Store writes with cluster links, assertion-cache JSON persistence, and successful-run metadata updates. Reviewed and completed. See DEVLOG "Phase 6.2 Completion" entry.
 
-- **Phase 3 (in progress)** — Build `distill_t2_to_t3(config)` as a two-step reflect-evolve path with audited reflection output, personality supersession, version-count inertia, compression limits, and criteria-adjustment output.
-  - [x] **Step 6.3.1 — Reflection input preparation and feedback metrics**: Query Tier 2 patterns, raise `NoPatternDataError` when absent, collect feedback events when enabled, compute deterministic per-criterion engagement metrics, and cover the lock/no-write boundary with tests.
-  - [x] **Step 6.3.2 — Reflection LLM prompt and parsing**: Add fakeable reflection LLM boundary helpers, build the Tier 2 reflection request, parse validated `ReflectionInsight` records, propagate provider/parse failures, and keep the output as an audit artifact only.
-  - [x] **Step 6.3.3 — Evolution request, inertia, and proposal parsing**: Load current personality context, compute effective version-count inertia, build the evolution request with reflection insights and personality files, parse supersession/unchanged/criteria proposals, and enforce malformed-response errors before writes.
-  - [x] **Step 6.3.4 — Personality writeback and metadata**: Apply accepted personality changes through `memory_store.supersede`, increment `version_count` on unchanged personality notes with `update_note`, enforce `max_compression_ratio`, preserve supersession audit records, and update only the T2->T3 run timestamp after success.
-  - [x] **Step 6.3.5 — Criteria adjustments and end-to-end integration**: Assemble `EvolutionResult`, derive criteria adjustments from feedback evidence, verify lock release and no metadata update on failures, and add focused end-to-end integration coverage for mixed superseded/unchanged output.
+- **Phase 3 (complete)** — Delivered ARCH-aligned `distill_t2_to_t3(config)`: audited reflection output, evolution proposal parsing with version-count inertia, personality supersession and unchanged-version writeback, compression limits, feedback-derived criteria adjustments, success-only metadata updates, and end-to-end integration coverage. Reviewed and completed. See DEVLOG "Phase 6.3 Completion" entry.
 
 <!--
 HISTORY — Do not read past this marker.
