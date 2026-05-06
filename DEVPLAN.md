@@ -2,7 +2,7 @@
 module: DISTILLATION
 phase: 3
 phase_title: "Phase 3: T2->T3 reflect-evolve"
-step: 6.3.4
+step: 6.3.5
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Module 6 Phase 3 in progress: T2->T3 reflect-evolve.
-- **Focus** — Step 6.3.4: apply accepted personality changes, enforce compression limits, preserve supersession audit records, and update T2->T3 run metadata after success.
+- **Focus** — Step 6.3.5: assemble `EvolutionResult`, derive criteria adjustments from feedback evidence, verify lock release and no metadata update on failures, and add focused end-to-end integration coverage for mixed superseded/unchanged output.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -118,7 +118,7 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
   - [x] **Step 6.3.1 — Reflection input preparation and feedback metrics**: Query Tier 2 patterns, raise `NoPatternDataError` when absent, collect feedback events when enabled, compute deterministic per-criterion engagement metrics, and cover the lock/no-write boundary with tests.
   - [x] **Step 6.3.2 — Reflection LLM prompt and parsing**: Add fakeable reflection LLM boundary helpers, build the Tier 2 reflection request, parse validated `ReflectionInsight` records, propagate provider/parse failures, and keep the output as an audit artifact only.
   - [x] **Step 6.3.3 — Evolution request, inertia, and proposal parsing**: Load current personality context, compute effective version-count inertia, build the evolution request with reflection insights and personality files, parse supersession/unchanged/criteria proposals, and enforce malformed-response errors before writes.
-  - [ ] **Step 6.3.4 — Personality writeback and metadata**: Apply accepted personality changes through `memory_store.supersede`, increment `version_count` on unchanged personality notes with `update_note`, enforce `max_compression_ratio`, preserve supersession audit records, and update only the T2->T3 run timestamp after success.
+  - [x] **Step 6.3.4 — Personality writeback and metadata**: Apply accepted personality changes through `memory_store.supersede`, increment `version_count` on unchanged personality notes with `update_note`, enforce `max_compression_ratio`, preserve supersession audit records, and update only the T2->T3 run timestamp after success.
   - [ ] **Step 6.3.5 — Criteria adjustments and end-to-end integration**: Assemble `EvolutionResult`, derive criteria adjustments from feedback evidence, verify lock release and no metadata update on failures, and add focused end-to-end integration coverage for mixed superseded/unchanged output.
 
 <!--

@@ -280,6 +280,30 @@ wiring, proposal parsing, malformed-response rejection, lock release, and the
 no-write/no-metadata-update boundary. Verification passed with
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (73 passed).
 
+### Step 6.3.4: Personality writeback and metadata
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the T2->T3 personality writeback path. `distill_t2_to_t3(config)` now
+applies accepted supersession proposals through `memory_store.supersede`, returns
+`SupersessionRecord` audit records with old ids, new ids, and change summaries,
+increments unchanged personality files by updating `version_count:<n>` tags
+through `memory_store.update_note`, and advances only the T2->T3 run timestamp
+after all writes succeed.
+
+Added pre-write compression validation for supersession proposals. The engine
+computes the reduction across superseded personality content and raises
+`DistillationError` before any Memory Store write when the reduction exceeds
+`config.max_compression_ratio`, preserving the existing metadata timestamp and
+releasing the consolidation lock. Focused tests cover unchanged writeback,
+supersession audit records, compression rejection before writes, and successful
+metadata updates. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (75 passed) and
+`PYTHONPATH=src:.python_deps python3 -m pytest` (518 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

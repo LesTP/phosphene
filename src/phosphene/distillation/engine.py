@@ -27,6 +27,7 @@ from phosphene.distillation.types import (
     EvolutionResult,
     GateStatus,
     ReflectionInsight,
+    SupersessionRecord,
     TierPromotionResult,
 )
 from phosphene.memory_store import NoteInput, NotePatch, NoteQuery
@@ -360,15 +361,31 @@ class DistillationEngine:
     ) -> EvolutionResult:
         """Evolve Tier 2 patterns into Tier 3 personality files.
 
-        Phase 3 currently prepares pattern and feedback inputs under the
-        distillation lock and captures reflection output as an audit artifact.
-        Evolution and writeback are implemented in later Phase 3 steps.
+        The T2 to T3 path reflects on pattern notes, asks the LLM for
+        personality evolution proposals, validates write safety, writes
+        accepted personality changes, and advances T2 to T3 run metadata only
+        after all writes succeed.
         """
         with self._acquire_consolidation_lock():
             prepared = self._prepare_tier2_evolution_input(config)
             reflection = self._reflect_tier2_patterns(prepared, config)
-            self._propose_personality_evolution(reflection, config)
-        raise NotImplementedError("T2 to T3 distillation is implemented in Phase 3")
+            proposal = self._propose_personality_evolution(reflection, config)
+            write_result = self._write_personality_evolution(proposal, config)
+            metadata = self._read_run_metadata()
+            self._write_run_metadata(
+                _DistillationRunMetadata(
+                    last_t1_to_t2_run=metadata.last_t1_to_t2_run,
+                    last_t2_to_t3_run=datetime.now(timezone.utc),
+                )
+            )
+
+            return EvolutionResult(
+                insights=reflection.insights,
+                superseded=write_result["superseded"],
+                unchanged_ids=proposal.unchanged_ids,
+                criteria_adjustments=proposal.criteria_adjustments,
+                compression_ratio=write_result["compression_ratio"],
+            )
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
         if not self._run_metadata_path.exists():
@@ -626,6 +643,58 @@ class DistillationEngine:
 
         return [payload.cluster_group for payload in payloads]
 
+    def _write_personality_evolution(
+        self,
+        proposal: _EvolutionProposalArtifact,
+        config: DistillationConfig,
+    ) -> dict[str, object]:
+        personality_context = self.memory_store.get_personality_context()
+        personality_files = _prepare_personality_files(personality_context, config)
+        files_by_id = {personality_file.note_id: personality_file for personality_file in personality_files}
+        compression_ratio = _personality_compression_ratio(
+            proposal.supersession_proposals,
+            files_by_id,
+        )
+        if compression_ratio > config.max_compression_ratio:
+            raise DistillationError(
+                "T2 to T3 personality compression ratio "
+                f"{compression_ratio:.3f} exceeds max_compression_ratio "
+                f"{config.max_compression_ratio:.3f}"
+            )
+
+        superseded: list[SupersessionRecord] = []
+        for supersession in proposal.supersession_proposals:
+            new_note = self.memory_store.supersede(
+                supersession.old_note_id,
+                supersession.new_content,
+                supersession.new_title,
+                supersession.change_summary,
+            )
+            superseded.append(
+                SupersessionRecord(
+                    old_note_id=supersession.old_note_id,
+                    new_note_id=str(getattr(new_note, "note_id")),
+                    change_summary=supersession.change_summary,
+                )
+            )
+
+        for note_id in proposal.unchanged_ids:
+            personality_file = files_by_id[note_id]
+            self.memory_store.update_note(
+                note_id,
+                NotePatch(
+                    tags=_tags_with_version_count(
+                        getattr(personality_file.note, "tags", []) or [],
+                        personality_file.version_count + 1,
+                    )
+                ),
+            )
+
+        return {
+            "superseded": superseded,
+            "compression_ratio": compression_ratio,
+        }
+
 
 def _build_assertion_cache_payloads(
     promotions: Sequence[_CoherentClusterPromotion],
@@ -826,6 +895,37 @@ def _effective_inertia(version_count: int, config: DistillationConfig) -> float:
         config.max_inertia,
         1.0 + (normalized_count - 1) * config.inertia_per_cycle,
     )
+
+
+def _personality_compression_ratio(
+    supersession_proposals: Sequence[_SupersessionProposal],
+    files_by_id: Mapping[str, _PreparedPersonalityFile],
+) -> float:
+    old_length = 0
+    new_length = 0
+    for proposal in supersession_proposals:
+        personality_file = files_by_id.get(proposal.old_note_id)
+        if personality_file is None:
+            raise DistillationError(
+                "T2 to T3 supersession proposal references unknown personality "
+                f"file: {proposal.old_note_id}"
+            )
+        old_length += len(personality_file.content)
+        new_length += len(proposal.new_content.strip())
+
+    if old_length <= 0:
+        return 0.0
+    return max(0.0, (old_length - new_length) / old_length)
+
+
+def _tags_with_version_count(tags: Sequence[object], version_count: int) -> list[str]:
+    next_tag = f"version_count:{max(1, int(version_count))}"
+    preserved = [
+        str(tag)
+        for tag in tags
+        if not str(tag).strip().startswith(("version_count:", "version_count="))
+    ]
+    return _dedupe_preserving_order(preserved + [next_tag])
 
 
 def _personality_version_count(note: object) -> int:

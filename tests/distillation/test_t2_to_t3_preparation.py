@@ -37,6 +37,7 @@ class EvolutionNote:
     friction_target: str | None = None
     cluster_group: str | None = None
     version_count: int | None = None
+    supersedes: str | None = None
 
 
 @dataclass
@@ -68,7 +69,7 @@ class EvolutionMemoryStore:
             ]
         )
         self.queries = []
-        self.write_calls: list[str] = []
+        self.write_calls: list[tuple[str, object, object | None]] = []
         self.personality_context_calls = 0
 
     def query_notes(self, query):
@@ -82,24 +83,50 @@ class EvolutionMemoryStore:
         return notes[: query.limit]
 
     def store_note(self, *_args: object, **_kwargs: object) -> str:
-        self.write_calls.append("store_note")
+        self.write_calls.append(("store_note", None, None))
         raise AssertionError("T2 to T3 preparation must not store notes")
 
-    def update_note(self, *_args: object, **_kwargs: object) -> object:
-        self.write_calls.append("update_note")
-        raise AssertionError("T2 to T3 preparation must not update notes")
+    def update_note(self, note_id: str, patch) -> object:
+        self.write_calls.append(("update_note", note_id, patch))
+        for note in self.personality_context.personality_files:
+            if note.note_id == note_id:
+                if patch.tags is not None:
+                    note.tags = list(patch.tags)
+                    version_tags = [
+                        tag
+                        for tag in note.tags
+                        if tag.startswith("version_count:")
+                    ]
+                    if version_tags:
+                        note.version_count = int(version_tags[-1].split(":", 1)[1])
+                return note
+        raise AssertionError(f"unknown note for update: {note_id}")
 
     def add_links(self, *_args: object, **_kwargs: object) -> None:
-        self.write_calls.append("add_links")
+        self.write_calls.append(("add_links", None, None))
         raise AssertionError("T2 to T3 preparation must not add links")
 
     def get_personality_context(self) -> object:
         self.personality_context_calls += 1
         return self.personality_context
 
-    def supersede(self, *_args: object, **_kwargs: object) -> object:
-        self.write_calls.append("supersede")
-        raise AssertionError("T2 to T3 preparation must not supersede notes")
+    def supersede(
+        self,
+        note_id: str,
+        new_content: str,
+        new_title: str,
+        change_summary: str,
+    ) -> object:
+        self.write_calls.append(("supersede", note_id, change_summary))
+        new_note = EvolutionNote(
+            note_id=f"{note_id}-v2",
+            title=new_title,
+            content=new_content,
+            version_count=1,
+            supersedes=note_id,
+        )
+        self.personality_context.personality_files.append(new_note)
+        return new_note
 
 
 def test_prepare_tier2_evolution_input_queries_patterns_and_feedback_metrics(tmp_path) -> None:
@@ -482,7 +509,7 @@ def test_distill_t2_to_t3_lock_rejects_concurrent_run_before_queries(tmp_path) -
     assert store.write_calls == []
 
 
-def test_distill_t2_to_t3_preparation_releases_lock_without_writes(
+def test_distill_t2_to_t3_writes_unchanged_version_count_and_metadata(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -509,10 +536,9 @@ def test_distill_t2_to_t3_preparation_releases_lock_without_writes(
 
     monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
 
-    with pytest.raises(NotImplementedError, match="Phase 3"):
-        engine.distill_t2_to_t3(
-            DistillationConfig(llm_config=object(), embedding_config=object())
-        )
+    result = engine.distill_t2_to_t3(
+        DistillationConfig(llm_config=object(), embedding_config=object())
+    )
 
     assert [query.tier for query in store.queries] == [2, 1]
     assert len(calls) == 2
@@ -520,7 +546,126 @@ def test_distill_t2_to_t3_preparation_releases_lock_without_writes(
         llm_config=object(),
         embedding_config=object(),
     ).evolution_tier
-    assert store.personality_context_calls == 1
+    assert store.personality_context_calls == 2
+    assert [(call[0], call[1]) for call in store.write_calls] == [
+        ("update_note", "personality-a")
+    ]
+    assert store.personality_context.personality_files[0].tags == ["version_count:3"]
+    assert result.unchanged_ids == ["personality-a"]
+    assert result.superseded == []
+    assert result.compression_ratio == 0.0
+    assert engine._read_run_metadata().last_t2_to_t3_run is not None
+    assert engine._is_consolidation_locked() is False
+
+
+def test_distill_t2_to_t3_supersedes_personality_and_preserves_audit_record(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[EvolutionNote("pattern-a", content="first pattern")],
+        personality_context=EvolutionPersonalityContext(
+            personality_files=[
+                EvolutionNote(
+                    "personality-a",
+                    title="Old stance",
+                    content="Old personality content.",
+                    version_count=4,
+                )
+            ]
+        ),
+    )
+    engine = DistillationEngine(store)
+
+    def fake_complete(**kwargs: object) -> str:
+        if kwargs["tier"] == "reflect-tier":
+            return (
+                '{"insights": [{"content": "A contradiction is visible.", '
+                '"source_pattern_ids": ["pattern-a"], '
+                '"insight_type": "contradiction", "confidence": 0.8}]}'
+            )
+        return (
+            '{"personality_proposals": ['
+            '{"note_id": "personality-a", "action": "supersede", '
+            '"new_title": "New stance", '
+            '"new_content": "New personality content with enough detail.", '
+            '"change_summary": "Resolved contradiction."}], '
+            '"criteria_adjustments": []}'
+        )
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
+
+    result = engine.distill_t2_to_t3(
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            reflection_tier="reflect-tier",
+            evolution_tier="evolve-tier",
+        )
+    )
+
+    assert [(call[0], call[1], call[2]) for call in store.write_calls] == [
+        ("supersede", "personality-a", "Resolved contradiction.")
+    ]
+    assert result.superseded[0].old_note_id == "personality-a"
+    assert result.superseded[0].new_note_id == "personality-a-v2"
+    assert result.superseded[0].change_summary == "Resolved contradiction."
+    assert result.unchanged_ids == []
+    assert result.compression_ratio == 0.0
+    assert engine._read_run_metadata().last_t2_to_t3_run is not None
+
+
+def test_distill_t2_to_t3_rejects_excessive_compression_before_writes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[EvolutionNote("pattern-a", content="first pattern")],
+        personality_context=EvolutionPersonalityContext(
+            personality_files=[
+                EvolutionNote(
+                    "personality-a",
+                    title="Old stance",
+                    content="This personality content is intentionally long.",
+                    version_count=1,
+                )
+            ]
+        ),
+    )
+    engine = DistillationEngine(store)
+
+    def fake_complete(**kwargs: object) -> str:
+        if len(store.write_calls) > 0:
+            raise AssertionError("compression validation must happen before writes")
+        if kwargs["tier"] == "reflect-tier":
+            return (
+                '{"insights": [{"content": "A contradiction is visible.", '
+                '"source_pattern_ids": ["pattern-a"], '
+                '"insight_type": "contradiction", "confidence": 0.8}]}'
+            )
+        return (
+            '{"personality_proposals": ['
+            '{"note_id": "personality-a", "action": "supersede", '
+            '"new_title": "Tiny stance", "new_content": "Tiny.", '
+            '"change_summary": "Too compressed."}], '
+            '"criteria_adjustments": []}'
+        )
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
+
+    with pytest.raises(DistillationError, match="compression ratio"):
+        engine.distill_t2_to_t3(
+            DistillationConfig(
+                llm_config=object(),
+                embedding_config=object(),
+                reflection_tier="reflect-tier",
+                evolution_tier="evolve-tier",
+                max_compression_ratio=0.1,
+            )
+        )
+
     assert store.write_calls == []
     assert engine._read_run_metadata().last_t2_to_t3_run is None
     assert engine._is_consolidation_locked() is False
