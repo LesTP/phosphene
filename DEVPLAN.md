@@ -2,7 +2,7 @@
 module: DISTILLATION
 phase: 1
 phase_title: Distillation contract, gates, and metadata foundation
-step: 6.1.4
+step: 6.1.5
 mode: Build
 blocked: null
 regime: Build
@@ -117,7 +117,7 @@ Build the credential-free foundation for the Distillation engine while preservin
 - **Step 6.1.1 (complete)** — Public dataclasses, errors, and exports: added `src/phosphene/distillation/` with ARCH-aligned result/config types, package exports, and focused constructor/export tests.
 - **Step 6.1.2 (complete)** — Config validation and engine construction: validated gate thresholds, inertia/compression bounds, toolkit config presence, and Memory Store dependency shape without calling toolkit services.
 - **Step 6.1.3 (complete)** — Distillation metadata persistence: added private helpers for reading/writing last T1->T2 and T2->T3 run timestamps in the Memory Store vault with malformed/missing metadata handling.
-- **Step 6.1.4** — Lock boundary: add an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
+- **Step 6.1.4 (complete)** — Lock boundary: added an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
 - **Step 6.1.5** — Gate evaluation: implement `check_gates(config) -> GateStatus` from Memory Store tier queries plus persisted metadata, including never-run behavior, time/volume/monthly gates, and lock-gate reporting.
 - **Step 6.1.6** — Foundation integration hardening: add phase-level integration tests for no-toolkit-call behavior, no Memory Store writes outside metadata, public error exports, and compatibility with the existing full test suite.
 

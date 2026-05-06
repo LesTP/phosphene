@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
-from phosphene.distillation.errors import DistillationConfigError
+from phosphene.distillation.errors import DistillationConfigError, DistillationLockError
 
 _REQUIRED_MEMORY_STORE_METHODS = (
     "query_notes",
@@ -44,6 +46,25 @@ class DistillationEngine:
         self._run_metadata_path = (
             Path(memory_store.vault_path) / _METADATA_DIRECTORY / _RUN_METADATA_FILENAME
         )
+        self._consolidation_lock = Lock()
+
+    @contextmanager
+    def _acquire_consolidation_lock(self):
+        acquired = self._consolidation_lock.acquire(blocking=False)
+        if not acquired:
+            raise DistillationLockError("another distillation run is already active")
+
+        try:
+            yield
+        finally:
+            self._consolidation_lock.release()
+
+    def _is_consolidation_locked(self) -> bool:
+        acquired = self._consolidation_lock.acquire(blocking=False)
+        if acquired:
+            self._consolidation_lock.release()
+            return False
+        return True
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
         if not self._run_metadata_path.exists():

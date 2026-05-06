@@ -169,6 +169,17 @@ Added private Distillation run metadata helpers backed by a JSON file at `.phosp
 
 Focused tests cover missing metadata, round-trip persistence, malformed file handling, independent malformed field handling, and the boundary that metadata helpers do not call Memory Store note APIs. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (19 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (462 passed).
 
+### Step 6.1.4: Lock boundary
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added a private in-process consolidation lock helper to `DistillationEngine` for future T1->T2 and T2->T3 operations. The helper acquires non-blocking, raises `DistillationLockError` when another run is active, releases deterministically through a context manager, and exposes a private lock-state check for next-step gate reporting without touching Memory Store notes or toolkit services.
+
+Focused tests cover acquire/release behavior, nested acquisition rejection, exception-safe release, and the no-Memory-Store-note-API boundary. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (465 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation
