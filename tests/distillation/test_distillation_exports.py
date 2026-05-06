@@ -263,18 +263,12 @@ def test_engine_requires_memory_store_vault_path_for_distillation_metadata() -> 
         DistillationEngine(memory_store=MissingVaultPath())
 
 
-@pytest.mark.parametrize(
-    ("method_name", "message"),
-    [
-        ("distill_t2_to_t3", "T2 to T3 distillation is implemented in Phase 3"),
-    ],
-)
-def test_deferred_distillation_methods_fail_explicitly_without_side_effects(
-    method_name: str,
-    message: str,
-) -> None:
+def test_distill_t2_to_t3_requires_pattern_data_without_side_effects() -> None:
     engine = DistillationEngine(memory_store=FakeMemoryStore())
     config = DistillationConfig(llm_config=object(), embedding_config=object())
 
-    with pytest.raises(NotImplementedError, match=message):
-        getattr(engine, method_name)(config)
+    with pytest.raises(
+        NoPatternDataError,
+        match="requires at least one Tier 2 pattern note",
+    ):
+        engine.distill_t2_to_t3(config)

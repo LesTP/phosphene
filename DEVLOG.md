@@ -219,6 +219,31 @@ Log review: Iteration 132 (review) ran 51 turns, which is high. No new repeated 
 DEVPLAN cleanup: reduced Module 6 Phase 2 to a one-line completion summary and updated frontmatter to `blocked: "awaiting-human-audit"` before Phase 3 planning.
 ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated from "Phase 1 complete" to "Phase 2 complete".
 
+### Step 6.3.1: Reflection input preparation and feedback metrics
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the first T2->T3 preparation boundary inside `DistillationEngine`.
+`distill_t2_to_t3(config)` now acquires the consolidation lock, queries Tier 2
+pattern notes in chronological order, raises `NoPatternDataError` before
+feedback work when no patterns exist, and prepares optional Tier 1
+`source="feedback"` events without LLM calls, Memory Store writes, personality
+context reads, supersession, or run-metadata updates.
+
+Added deterministic per-criterion feedback metrics for the later
+criteria-adjustment path. Feedback tags of the form `criterion:<name>` or
+`criterion=<name>` are normalized into criterion names, `friction_target`
+events contribute to the `friction` criterion, and each metric records feedback
+count, engaged count, engagement rate, and mean engagement from bounded
+importance/unresolvedness scores. Focused tests cover pattern querying,
+disabled feedback, absent-pattern errors, concurrent lock rejection, lock
+release, no-write behavior, and criterion metric normalization. Verification
+passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation`
+(53 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (496 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

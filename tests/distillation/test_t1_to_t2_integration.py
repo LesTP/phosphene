@@ -6,6 +6,7 @@ import pytest
 
 from phosphene.distillation import DistillationConfig, DistillationEngine
 from phosphene.distillation.engine import _DistillationRunMetadata
+from phosphene.distillation.errors import NoPatternDataError
 
 
 @dataclass
@@ -203,10 +204,13 @@ def test_distill_t1_to_t2_toolkit_error_propagates_without_metadata_update(
     assert engine._is_consolidation_locked() is False
 
 
-def test_distill_t2_to_t3_remains_deferred(tmp_path) -> None:
+def test_distill_t2_to_t3_requires_pattern_data(tmp_path) -> None:
     engine = DistillationEngine(IntegrationMemoryStore(tmp_path / "vault", []))
 
-    with pytest.raises(NotImplementedError, match="Phase 3"):
+    with pytest.raises(
+        NoPatternDataError,
+        match="requires at least one Tier 2 pattern note",
+    ):
         engine.distill_t2_to_t3(
             DistillationConfig(llm_config=object(), embedding_config=object())
         )

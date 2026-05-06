@@ -19,6 +19,7 @@ from phosphene.distillation.errors import (
     DistillationError,
     DistillationLockError,
     InsufficientDataError,
+    NoPatternDataError,
 )
 from phosphene.distillation.types import (
     DistillationConfig,
@@ -132,6 +133,22 @@ class _AssertionCachePayload:
     cluster_group: str
     summary: str
     assertions: tuple[_ClusterAssertion, ...]
+
+
+@dataclass(frozen=True)
+class _CriterionFeedbackMetric:
+    criterion_name: str
+    feedback_count: int
+    engaged_count: int
+    engagement_rate: float
+    mean_engagement: float
+
+
+@dataclass(frozen=True)
+class _Tier2EvolutionInput:
+    pattern_notes: list[object]
+    feedback_events: list[object]
+    feedback_metrics: list[_CriterionFeedbackMetric]
 
 
 class DistillationEngine:
@@ -301,8 +318,12 @@ class DistillationEngine:
     ) -> EvolutionResult:
         """Evolve Tier 2 patterns into Tier 3 personality files.
 
-        Reflect-evolve synthesis and supersession are deferred to Phase 3.
+        Phase 3 currently prepares pattern and feedback inputs under the
+        distillation lock. Reflection, evolution, and writeback are implemented
+        in later Phase 3 steps.
         """
+        with self._acquire_consolidation_lock():
+            self._prepare_tier2_evolution_input(config)
         raise NotImplementedError("T2 to T3 distillation is implemented in Phase 3")
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
@@ -393,6 +414,41 @@ class DistillationEngine:
             notes=prepared_notes,
             feedback_events=feedback_events,
             since=since,
+        )
+
+    def _prepare_tier2_evolution_input(
+        self,
+        config: DistillationConfig,
+    ) -> _Tier2EvolutionInput:
+        pattern_notes = self.memory_store.query_notes(
+            NoteQuery(
+                tier=2,
+                limit=_UNBOUNDED_QUERY_LIMIT,
+                order_by="created_at",
+                descending=False,
+            )
+        )
+        if not pattern_notes:
+            raise NoPatternDataError(
+                "distill_t2_to_t3 requires at least one Tier 2 pattern note"
+            )
+
+        feedback_events: list[object] = []
+        if config.incorporate_feedback:
+            feedback_events = self.memory_store.query_notes(
+                NoteQuery(
+                    tier=1,
+                    source="feedback",
+                    limit=_UNBOUNDED_QUERY_LIMIT,
+                    order_by="created_at",
+                    descending=False,
+                )
+            )
+
+        return _Tier2EvolutionInput(
+            pattern_notes=list(pattern_notes),
+            feedback_events=feedback_events,
+            feedback_metrics=_criterion_feedback_metrics(feedback_events),
         )
 
     def _write_tier2_cluster_notes(
@@ -1003,6 +1059,70 @@ def _feedback_referenced_note_ids(feedback_event: object) -> set[str]:
     if friction_target:
         note_ids.add(str(friction_target))
     return note_ids
+
+
+def _criterion_feedback_metrics(
+    feedback_events: Sequence[object],
+) -> list[_CriterionFeedbackMetric]:
+    grouped: dict[str, list[float]] = {}
+    for event in feedback_events:
+        engagement = _feedback_engagement_score(event)
+        for criterion_name in _feedback_criterion_names(event):
+            grouped.setdefault(criterion_name, []).append(engagement)
+
+    return [
+        _CriterionFeedbackMetric(
+            criterion_name=criterion_name,
+            feedback_count=len(scores),
+            engaged_count=sum(1 for score in scores if score >= 0.5),
+            engagement_rate=_clamp_probability(
+                sum(1 for score in scores if score >= 0.5) / len(scores)
+            ),
+            mean_engagement=_mean_probability(scores),
+        )
+        for criterion_name, scores in sorted(grouped.items())
+        if scores
+    ]
+
+
+def _feedback_engagement_score(feedback_event: object) -> float:
+    return _clamp_probability(
+        max(
+            _numeric_score(getattr(feedback_event, "importance", 0.0)),
+            _numeric_score(getattr(feedback_event, "unresolvedness", 0.0)),
+        )
+    )
+
+
+def _numeric_score(value: object) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _feedback_criterion_names(feedback_event: object) -> list[str]:
+    names: list[str] = []
+    for tag in getattr(feedback_event, "tags", []) or []:
+        tag_text = str(tag).strip()
+        for separator in (":", "="):
+            prefix = f"criterion{separator}"
+            if tag_text.startswith(prefix):
+                name = _normalize_criterion_name(tag_text[len(prefix) :])
+                if name is not None:
+                    names.append(name)
+
+    if getattr(feedback_event, "friction_target", None):
+        names.append("friction")
+
+    return _dedupe_preserving_order(names)
+
+
+def _normalize_criterion_name(value: str) -> str | None:
+    normalized = value.strip().lower().replace(" ", "_")
+    if not normalized:
+        return None
+    return normalized
 
 
 def _clamp_probability(value: float) -> float:
