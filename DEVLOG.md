@@ -10,6 +10,29 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase REVIEW_HARDENING.1 Review: Attention Filter additions
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Pre-Module-7 Hardening Phase A against `ARCH_attention_filter.md`.
+Must fix: none. Should fix: none. Optional: no optional changes deferred.
+
+The implemented contract surface includes `wild_card_ratio` and
+`near_miss_margin` on `AttentionFilterConfig`, `near_misses` and `wild_cards`
+on `FilterResult`, below-threshold wild-card sampling tagged with
+`retention_criteria=["wild_card"]`, near-miss annotation for remaining
+within-margin candidates, and `rejected_count` exclusion for both buckets.
+Attention Filter remains read-only against Memory Store.
+
+Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
+(533 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete
+is the next action.
+
 ### Step REVIEW_HARDENING.1.3: Export and integration check
 
 **Date:** 2026-05-06
