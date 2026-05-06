@@ -1,12 +1,12 @@
 ---
 module: REVIEW_HARDENING
-phase: 1
-phase_title: "Pre-Module-7 Hardening Phase A — Attention Filter additions"
-step: 3
-mode: Review
-blocked: false
+phase: null
+phase_title: "Pre-Module-7 Hardening Phase A complete — Phase B planned next"
+step: null
+mode: Complete
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,48 +33,17 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Pre-Module-7 Hardening: Phase A (Attention Filter additions from external review).
-- **Focus** — Add wild-card accepts and near-discard recording to the Attention Filter.
-- **Blocked/Broken** — none
+- **Phase** — Pre-Module-7 Hardening: Phase A complete.
+- **Focus** — Awaiting human audit before Phase B (unresolvedness utility + network diagnostics).
+- **Blocked/Broken** — awaiting-human-audit
 
 ## Pre-Module-7 Hardening
 
 *These two phases implement the "Now" items from the external review (phosphene.md Section 7.10). They harden the existing codebase before Module 7 (Feedback Collector) begins.*
 
-### Phase A: Attention Filter additions (wild-card accepts + near-discard recording)
+### Phase A (complete): Attention Filter additions
 
-Adds two anti-overfitting mechanisms to the Attention Filter (phosphene.md Section 7.4). Both are ARCH-specified: `wild_card_ratio` and `near_miss_margin` on `AttentionFilterConfig`; `near_misses` and `wild_cards` on `FilterResult`. See ARCH_attention_filter.md Steps 9–10 and the Design Decisions section.
-
-**Step 1 (complete): Config and types**
-
-Added ARCH-specified config/type fields: `wild_card_ratio`, `near_miss_margin`, `near_misses`, and `wild_cards`. Added config validation coverage and updated public contract tests. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v` (130 passed).
-
-**Step 2 (complete): Filter logic**
-
-Implemented below-threshold partitioning in `filter_content`: deterministic accepts
-remain unchanged, wild cards are randomly sampled from rejected candidates and
-tagged `retention_criteria=["wild_card"]`, near misses are annotated from the
-remaining within-margin candidates, and `rejected_count` excludes both buckets.
-Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
-(134 passed).
-
-**Step 3 (complete): Export and integration check**
-
-Verified the Attention Filter public export/dataclass surface includes
-`wild_card_ratio` and `near_miss_margin` on `AttentionFilterConfig` and the
-new `FilterResult` buckets remain contract-covered. Verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
-(134 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
-(533 passed).
-
-**Review (complete): Phase A review**
-
-Reviewed the Attention Filter hardening additions against
-`ARCH_attention_filter.md`. Must fix: none. Should fix: none. Optional: no
-optional changes deferred. Verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
-(134 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
-(533 passed). Phase Complete is the next action.
+Delivered ARCH-specified wild-card accepts and near-miss recording for the Attention Filter, with config/type validation, filter partitioning, export coverage, review, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.1 Completion" entry.
 
 ### Phase B: Unresolvedness composite utility + network diagnostics tool
 

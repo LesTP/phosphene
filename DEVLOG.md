@@ -10,6 +10,39 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase REVIEW_HARDENING.1 Completion: Attention Filter additions
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Pre-Module-7 Hardening Phase A. Final verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
+(533 passed).
+
+Phase A delivered the ARCH-specified Attention Filter hardening additions:
+`wild_card_ratio` and `near_miss_margin` config validation,
+`FilterResult.near_misses` and `FilterResult.wild_cards`, below-threshold
+wild-card sampling tagged with `retention_criteria=["wild_card"]`, fully
+annotated near misses within the configured margin, and `rejected_count`
+accounting that excludes both exploratory buckets.
+
+DEVLOG learning review: Phase A landed linearly across three implementation
+steps and review. No repeated trial-and-error pattern needs promotion to
+DEVPLAN Gotchas.
+Contract Changes scan: Step 1 recorded public dataclass alignment with the
+already-updated `ARCH_attention_filter.md` contract; no unpropagated upstream
+document or built-consumer contract work remains.
+Log review: loop logs show successful progression through the three steps and
+review. No repeated tool failures or wasted-turn patterns were found beyond the
+already documented no-`rg` environment constraint.
+DEVPLAN cleanup: reduced Phase A to a one-line completion summary and set
+frontmatter to await human audit before Phase B.
+ARCHITECTURE.md: no Implementation Sequence status change was needed; the
+Attention Filter module was already marked Complete before this hardening phase.
+
 ### Phase REVIEW_HARDENING.1 Review: Attention Filter additions
 
 **Date:** 2026-05-06
@@ -89,6 +122,11 @@ Updated Attention Filter config/export tests for the new dataclass fields,
 defaults, and validation boundaries. Verification passed with
 `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
 (130 passed).
+
+<!--
+HISTORY — Do not read past this marker.
+Completed entries kept for audit.
+-->
 
 ### Step 6.3.1: Reflection input preparation and feedback metrics
 
@@ -237,11 +275,6 @@ Contract Changes scan: Phase 6.3 step, review, and completion entries recorded "
 Log review: Phase 6.3 loop logs show successful progression through plan, five steps, and review. No repeated tool failures or wasted-turn patterns were found beyond the already documented no-`rg` environment constraint.
 DEVPLAN cleanup: reduced Module 6 Phase 3 to a one-line completion summary and set frontmatter to await human audit before Module 7 planning.
 ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated from "Phase 2 complete" to "Complete".
-
-<!--
-HISTORY — Do not read past this marker.
-Completed entries kept for audit.
--->
 
 ### Phase 6.1 Plan: Distillation contract, gates, and metadata foundation
 
