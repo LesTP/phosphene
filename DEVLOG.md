@@ -136,6 +136,17 @@ Planned Module 6 Phase 1 as a Build phase over the Distillation control-plane fo
 
 Scope decision recorded in D-43: Phase 1 keeps RAPTOR clustering, embedding calls, LLM reflection/evolution, assertion-cache writes, and Tier 2/Tier 3 Memory Store mutations out of scope so later synthesis phases build on a credential-free, tested run-control boundary.
 
+### Step 6.1.1: Public dataclasses, errors, and exports
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the initial `phosphene.distillation` package with ARCH-aligned public dataclasses for `DistillationConfig`, `GateStatus`, `TierPromotionResult`, `ReflectionInsight`, `SupersessionRecord`, `CriteriaAdjustment`, and `EvolutionResult`. Added the Distillation error hierarchy and a constructor-only `DistillationEngine` shell that stores the Memory Store dependency without performing validation, toolkit calls, gate checks, metadata writes, or synthesis behavior.
+
+Export coverage now verifies the public package surface, dataclass field order, default values, constructor behavior, and error inheritance. `DistillationConfig` is keyword-only so the ARCH field order can be preserved while keeping required toolkit configs after defaulted fields. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (3 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (446 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation

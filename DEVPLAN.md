@@ -2,7 +2,7 @@
 module: DISTILLATION
 phase: 1
 phase_title: Distillation contract, gates, and metadata foundation
-step: 6.1.1
+step: 6.1.2
 mode: Build
 blocked: null
 regime: Build
@@ -114,7 +114,7 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 
 Build the credential-free foundation for the Distillation engine while preserving the ARCH public API and keeping all synthesis behavior deferred.
 
-- **Step 6.1.1** — Public dataclasses, errors, and exports: add `src/phosphene/distillation/` with ARCH-aligned result/config types, package exports, and focused constructor/export tests.
+- **Step 6.1.1 (complete)** — Public dataclasses, errors, and exports: added `src/phosphene/distillation/` with ARCH-aligned result/config types, package exports, and focused constructor/export tests.
 - **Step 6.1.2** — Config validation and engine construction: validate gate thresholds, inertia/compression bounds, toolkit config presence, and Memory Store dependency shape without calling toolkit services.
 - **Step 6.1.3** — Distillation metadata persistence: add private helpers for reading/writing last T1->T2 and T2->T3 run timestamps in the Memory Store vault with malformed/missing metadata handling.
 - **Step 6.1.4** — Lock boundary: add an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
