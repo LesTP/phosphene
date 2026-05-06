@@ -266,7 +266,6 @@ def test_engine_requires_memory_store_vault_path_for_distillation_metadata() -> 
 @pytest.mark.parametrize(
     ("method_name", "message"),
     [
-        ("distill_t1_to_t2", "T1 to T2 distillation is implemented in Phase 2"),
         ("distill_t2_to_t3", "T2 to T3 distillation is implemented in Phase 3"),
     ],
 )

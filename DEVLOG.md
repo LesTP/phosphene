@@ -136,6 +136,17 @@ Added private Distillation toolkit seams for embedding, RAPTOR clustering, and L
 
 Focused tests cover the private import seams, fakeable LLM and embedding callback wiring, vector extraction from embedding results, and strict assertion-cache prompt shape without making live toolkit calls. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (37 passed).
 
+### Step 6.2.2: Tier 1 input selection and feedback preparation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the lock-protected `distill_t1_to_t2` entry path through the scoped Phase 2 preparation boundary. The method now acquires the consolidation lock, reads last T1->T2 metadata, queries pending Tier 1 notes in chronological order, filters feedback events out of cluster input material, raises `InsufficientDataError` before downstream work when content volume is too low, and releases the lock on both normal deferred continuation and errors.
+
+Added deterministic feedback boost preparation for `source="feedback"` Tier 1 events when enabled. Feedback links and `friction_target` references contribute bounded importance boosts to referenced input notes without Memory Store writes, toolkit calls, run metadata updates, or cluster synthesis. Focused tests cover since-query shape, disabled feedback, insufficient data, concurrent lock rejection, no-write behavior, and boost clamping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (40 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (483 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

@@ -11,7 +11,11 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Protocol
 
-from phosphene.distillation.errors import DistillationConfigError, DistillationLockError
+from phosphene.distillation.errors import (
+    DistillationConfigError,
+    DistillationLockError,
+    InsufficientDataError,
+)
 from phosphene.distillation.types import (
     DistillationConfig,
     EvolutionResult,
@@ -63,6 +67,20 @@ class _LLMCompleteCallable(Protocol):
 class _DistillationRunMetadata:
     last_t1_to_t2_run: datetime | None = None
     last_t2_to_t3_run: datetime | None = None
+
+
+@dataclass(frozen=True)
+class _PreparedTier1Note:
+    note: object
+    effective_importance: float
+    feedback_boost: float
+
+
+@dataclass(frozen=True)
+class _Tier1DistillationInput:
+    notes: list[_PreparedTier1Note]
+    feedback_events: list[object]
+    since: datetime | None
 
 
 class DistillationEngine:
@@ -155,9 +173,16 @@ class DistillationEngine:
     ) -> TierPromotionResult:
         """Promote Tier 1 notes into Tier 2 clusters.
 
-        RAPTOR clustering and assertion-cache writes are deferred to Phase 2.
+        Tier 1 selection and feedback preparation are implemented here.
+        RAPTOR clustering and assertion-cache writes are deferred to later
+        Phase 2 steps.
         """
-        raise NotImplementedError("T1 to T2 distillation is implemented in Phase 2")
+        with self._acquire_consolidation_lock():
+            self._prepare_tier1_distillation_input(config)
+
+            raise NotImplementedError(
+                "T1 to T2 clustering is implemented in Phase 2 step 6.2.3"
+            )
 
     def distill_t2_to_t3(
         self,
@@ -198,6 +223,66 @@ class DistillationEngine:
             encoding="utf-8",
         )
         temp_path.replace(self._run_metadata_path)
+
+    def _prepare_tier1_distillation_input(
+        self,
+        config: DistillationConfig,
+    ) -> _Tier1DistillationInput:
+        metadata = self._read_run_metadata()
+        since = metadata.last_t1_to_t2_run
+        tier1_notes = self.memory_store.query_notes(
+            NoteQuery(
+                tier=1,
+                since=since,
+                limit=_UNBOUNDED_QUERY_LIMIT,
+                order_by="created_at",
+                descending=False,
+            )
+        )
+        input_notes = [
+            note
+            for note in tier1_notes
+            if getattr(note, "source", None) != "feedback"
+        ]
+
+        if len(input_notes) < config.min_tier1_volume:
+            raise InsufficientDataError(
+                "distill_t1_to_t2 requires at least "
+                f"{config.min_tier1_volume} Tier 1 notes since the last T1 to T2 run; "
+                f"found {len(input_notes)}"
+            )
+
+        feedback_events: list[object] = []
+        if config.incorporate_feedback:
+            feedback_events = self.memory_store.query_notes(
+                NoteQuery(
+                    tier=1,
+                    source="feedback",
+                    since=since,
+                    limit=_UNBOUNDED_QUERY_LIMIT,
+                    order_by="created_at",
+                    descending=False,
+                )
+            )
+
+        boosts = _feedback_boosts_by_note_id(feedback_events)
+        prepared_notes = [
+            _PreparedTier1Note(
+                note=note,
+                effective_importance=_clamp_probability(
+                    float(getattr(note, "importance", 0.0))
+                    + boosts.get(str(note.note_id), 0.0)
+                ),
+                feedback_boost=boosts.get(str(note.note_id), 0.0),
+            )
+            for note in input_notes
+        ]
+
+        return _Tier1DistillationInput(
+            notes=prepared_notes,
+            feedback_events=feedback_events,
+            since=since,
+        )
 
 
 def _toolkit_embed(texts: list[str], config: object) -> Any:
@@ -368,3 +453,24 @@ def _format_metadata_datetime(value: datetime | None) -> str | None:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.isoformat(timespec="seconds")
+
+
+def _feedback_boosts_by_note_id(feedback_events: Sequence[object]) -> dict[str, float]:
+    boosts: dict[str, float] = {}
+    for event in feedback_events:
+        boost = max(0.0, float(getattr(event, "importance", 0.0))) * 0.1
+        for note_id in _feedback_referenced_note_ids(event):
+            boosts[note_id] = _clamp_probability(boosts.get(note_id, 0.0) + boost)
+    return boosts
+
+
+def _feedback_referenced_note_ids(feedback_event: object) -> set[str]:
+    note_ids = {str(note_id) for note_id in getattr(feedback_event, "links", []) if note_id}
+    friction_target = getattr(feedback_event, "friction_target", None)
+    if friction_target:
+        note_ids.add(str(friction_target))
+    return note_ids
+
+
+def _clamp_probability(value: float) -> float:
+    return min(1.0, max(0.0, value))
