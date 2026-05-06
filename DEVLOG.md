@@ -9,6 +9,116 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 6.1 Plan: Distillation contract, gates, and metadata foundation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 6 Phase 1 as a Build phase over the Distillation control-plane foundation: public dataclasses, errors, exports, config validation, Memory Store boundary checks, in-process consolidation lock, persisted run metadata, deterministic gate evaluation, and no-toolkit-call integration hardening.
+
+Scope decision recorded in D-43: Phase 1 keeps RAPTOR clustering, embedding calls, LLM reflection/evolution, assertion-cache writes, and Tier 2/Tier 3 Memory Store mutations out of scope so later synthesis phases build on a credential-free, tested run-control boundary.
+
+### Step 6.1.1: Public dataclasses, errors, and exports
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the initial `phosphene.distillation` package with ARCH-aligned public dataclasses for `DistillationConfig`, `GateStatus`, `TierPromotionResult`, `ReflectionInsight`, `SupersessionRecord`, `CriteriaAdjustment`, and `EvolutionResult`. Added the Distillation error hierarchy and a constructor-only `DistillationEngine` shell that stores the Memory Store dependency without performing validation, toolkit calls, gate checks, metadata writes, or synthesis behavior.
+
+Export coverage now verifies the public package surface, dataclass field order, default values, constructor behavior, and error inheritance. `DistillationConfig` is keyword-only so the ARCH field order can be preserved while keeping required toolkit configs after defaulted fields. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (3 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (446 passed).
+
+### Step 6.1.2: Config validation and engine construction
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Distillation config validation for required toolkit config objects, non-null LLM rotation entries, non-negative run cadence, positive Tier 1 volume and T2->T3 cycle thresholds, non-negative inertia growth, minimum max-inertia bounds, and probability-bounded compression/coherence thresholds. Validation is local and does not import or call toolkit services.
+
+Added `DistillationEngine` construction checks for the Memory Store read/write surface needed by later metadata, gate, and promotion steps: `query_notes`, `store_note`, `update_note`, `add_links`, `get_personality_context`, `supersede`, and a `vault_path` attribute for persisted distillation metadata. Focused tests cover invalid config values, rotation presence checks, valid fake-store construction, missing store methods, and missing metadata vault path. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (458 passed).
+
+### Step 6.1.3: Distillation metadata persistence
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added private Distillation run metadata helpers backed by a JSON file at `.phosphene/distillation_runs.json` under the Memory Store vault. The helper record tracks last T1->T2 and T2->T3 run timestamps, creates the metadata directory on write, writes through a temporary file before replace, and treats missing, unreadable, invalid JSON, non-object, or field-level malformed metadata as never-run values instead of failing gate evaluation setup.
+
+Focused tests cover missing metadata, round-trip persistence, malformed file handling, independent malformed field handling, and the boundary that metadata helpers do not call Memory Store note APIs. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (19 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (462 passed).
+
+### Step 6.1.4: Lock boundary
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added a private in-process consolidation lock helper to `DistillationEngine` for future T1->T2 and T2->T3 operations. The helper acquires non-blocking, raises `DistillationLockError` when another run is active, releases deterministically through a context manager, and exposes a private lock-state check for next-step gate reporting without touching Memory Store notes or toolkit services.
+
+Focused tests cover acquire/release behavior, nested acquisition rejection, exception-safe release, and the no-Memory-Store-note-API boundary. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (465 passed).
+
+### Step 6.1.5: Gate evaluation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented public `DistillationEngine.check_gates(config) -> GateStatus` using persisted run metadata, Memory Store `NoteQuery` reads, and the in-process lock state. Gate evaluation now reports never-run behavior, elapsed time since the latest distillation run, pending Tier 1 volume since the last T1->T2 run, monthly T2->T3 readiness when Tier 2 patterns exist, aggregate volume readiness, and lock-gate blocking without acquiring the run lock.
+
+Kept the boundary credential-free and read-only against Memory Store note state: `check_gates` performs only tier queries and metadata reads, with no toolkit calls or Memory Store writes. Focused tests cover never-run T1 readiness, Tier 1 since-filtering, recent-run time blocking, monthly T2->T3 readiness, and lock-gate reporting. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (470 passed).
+
+### Step 6.1.6: Foundation integration hardening
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added phase-level Distillation foundation integration coverage that exercises engine construction, metadata persistence, and `check_gates()` together while using callable toolkit sentinels that fail if invoked. The integration store records query shape and rejects all Memory Store content-write methods, verifying the Phase 1 boundary remains credential-free and read-only against note state except for the private metadata file.
+
+Added public error export coverage for the Distillation error hierarchy so `DistillationConfigError`, `DistillationLockError`, `InsufficientDataError`, and `NoPatternDataError` remain available from the package API and continue to share `DistillationError` as their base class. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (472 passed).
+
+### Phase 6.1 Review: Distillation contract, gates, and metadata foundation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Distillation Phase 1 against `ARCH_distillation.md`. Must fix: `DistillationEngine` exposed `check_gates()` but not the two ARCH-declared public distillation methods, which would produce `AttributeError` for callers before the synthesis phases. Added explicit `distill_t1_to_t2(config)` and `distill_t2_to_t3(config)` stubs with ARCH return annotations and clear deferred-phase failures, preserving the public method surface without adding toolkit calls or Memory Store note writes.
+
+Should fix: none beyond refreshing the engine docstring to describe the current Phase 1 control-plane boundary. Optional: no optional changes deferred. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (32 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (475 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
+### Phase 6.1 Completion: Distillation contract, gates, and metadata foundation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Module 6 Phase 1. Final verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (32 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (475 passed).
+
+Phase 1 delivered the Distillation control-plane foundation behind the `ARCH_distillation.md` public contract: public dataclasses, error exports, config validation, Memory Store boundary checks, private metadata persistence, in-process consolidation locking, deterministic gate evaluation, explicit deferred public distillation method stubs, and phase-level integration coverage proving no toolkit calls or Memory Store note writes outside private metadata.
+
+DEVLOG learning review: Phase 6.1 landed linearly across planning, six implementation steps, and review. Review found one must-fix public-surface gap: `DistillationEngine` needed explicit `distill_t1_to_t2` and `distill_t2_to_t3` stubs before synthesis phases. The fix was applied during review; no repeated trial-and-error pattern needs promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 6.1 plan, step, review, and completion entries recorded "Contract changes: None"; D-43 documents the foundation boundary without upstream contract propagation.
+Log review: Phase 6.1 loop logs show successful step progression and no new repeated tooling failure beyond the already documented no-`rg` environment constraint.
+DEVPLAN cleanup: reduced Module 6 Phase 1 to a one-line completion summary and set frontmatter to await human audit before Module 6 Phase 2 planning.
+ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
+
+<!--
+HISTORY — Do not read past this marker.
+Completed entries kept for audit.
+-->
+
 ### Phase 5.2 Plan: LLM generation modes and skeptical memory
 
 **Date:** 2026-05-05
@@ -125,96 +235,6 @@ Log review: Recent iterations repeatedly tried `rg` before loading the existing 
 DEVPLAN cleanup: reduced Module 5 Phase 2 to a one-line completion summary and set frontmatter to await human audit before Module 6 planning.
 ARCHITECTURE.md: Generator + Output Router row in the Implementation Sequence table updated from "Phase 1 complete" to "Complete".
 
-### Phase 6.1 Plan: Distillation contract, gates, and metadata foundation
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Planned
-**Contract changes:** None
-
-Planned Module 6 Phase 1 as a Build phase over the Distillation control-plane foundation: public dataclasses, errors, exports, config validation, Memory Store boundary checks, in-process consolidation lock, persisted run metadata, deterministic gate evaluation, and no-toolkit-call integration hardening.
-
-Scope decision recorded in D-43: Phase 1 keeps RAPTOR clustering, embedding calls, LLM reflection/evolution, assertion-cache writes, and Tier 2/Tier 3 Memory Store mutations out of scope so later synthesis phases build on a credential-free, tested run-control boundary.
-
-### Step 6.1.1: Public dataclasses, errors, and exports
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added the initial `phosphene.distillation` package with ARCH-aligned public dataclasses for `DistillationConfig`, `GateStatus`, `TierPromotionResult`, `ReflectionInsight`, `SupersessionRecord`, `CriteriaAdjustment`, and `EvolutionResult`. Added the Distillation error hierarchy and a constructor-only `DistillationEngine` shell that stores the Memory Store dependency without performing validation, toolkit calls, gate checks, metadata writes, or synthesis behavior.
-
-Export coverage now verifies the public package surface, dataclass field order, default values, constructor behavior, and error inheritance. `DistillationConfig` is keyword-only so the ARCH field order can be preserved while keeping required toolkit configs after defaulted fields. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (3 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (446 passed).
-
-### Step 6.1.2: Config validation and engine construction
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added Distillation config validation for required toolkit config objects, non-null LLM rotation entries, non-negative run cadence, positive Tier 1 volume and T2->T3 cycle thresholds, non-negative inertia growth, minimum max-inertia bounds, and probability-bounded compression/coherence thresholds. Validation is local and does not import or call toolkit services.
-
-Added `DistillationEngine` construction checks for the Memory Store read/write surface needed by later metadata, gate, and promotion steps: `query_notes`, `store_note`, `update_note`, `add_links`, `get_personality_context`, `supersede`, and a `vault_path` attribute for persisted distillation metadata. Focused tests cover invalid config values, rotation presence checks, valid fake-store construction, missing store methods, and missing metadata vault path. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (458 passed).
-
-### Step 6.1.3: Distillation metadata persistence
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added private Distillation run metadata helpers backed by a JSON file at `.phosphene/distillation_runs.json` under the Memory Store vault. The helper record tracks last T1->T2 and T2->T3 run timestamps, creates the metadata directory on write, writes through a temporary file before replace, and treats missing, unreadable, invalid JSON, non-object, or field-level malformed metadata as never-run values instead of failing gate evaluation setup.
-
-Focused tests cover missing metadata, round-trip persistence, malformed file handling, independent malformed field handling, and the boundary that metadata helpers do not call Memory Store note APIs. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (19 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (462 passed).
-
-### Step 6.1.4: Lock boundary
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added a private in-process consolidation lock helper to `DistillationEngine` for future T1->T2 and T2->T3 operations. The helper acquires non-blocking, raises `DistillationLockError` when another run is active, releases deterministically through a context manager, and exposes a private lock-state check for next-step gate reporting without touching Memory Store notes or toolkit services.
-
-Focused tests cover acquire/release behavior, nested acquisition rejection, exception-safe release, and the no-Memory-Store-note-API boundary. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (465 passed).
-
-### Step 6.1.5: Gate evaluation
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Implemented public `DistillationEngine.check_gates(config) -> GateStatus` using persisted run metadata, Memory Store `NoteQuery` reads, and the in-process lock state. Gate evaluation now reports never-run behavior, elapsed time since the latest distillation run, pending Tier 1 volume since the last T1->T2 run, monthly T2->T3 readiness when Tier 2 patterns exist, aggregate volume readiness, and lock-gate blocking without acquiring the run lock.
-
-Kept the boundary credential-free and read-only against Memory Store note state: `check_gates` performs only tier queries and metadata reads, with no toolkit calls or Memory Store writes. Focused tests cover never-run T1 readiness, Tier 1 since-filtering, recent-run time blocking, monthly T2->T3 readiness, and lock-gate reporting. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (470 passed).
-
-### Step 6.1.6: Foundation integration hardening
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added phase-level Distillation foundation integration coverage that exercises engine construction, metadata persistence, and `check_gates()` together while using callable toolkit sentinels that fail if invoked. The integration store records query shape and rejects all Memory Store content-write methods, verifying the Phase 1 boundary remains credential-free and read-only against note state except for the private metadata file.
-
-Added public error export coverage for the Distillation error hierarchy so `DistillationConfigError`, `DistillationLockError`, `InsufficientDataError`, and `NoPatternDataError` remain available from the package API and continue to share `DistillationError` as their base class. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (472 passed).
-
-### Phase 6.1 Review: Distillation contract, gates, and metadata foundation
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Reviewed
-**Contract changes:** None
-
-Reviewed Distillation Phase 1 against `ARCH_distillation.md`. Must fix: `DistillationEngine` exposed `check_gates()` but not the two ARCH-declared public distillation methods, which would produce `AttributeError` for callers before the synthesis phases. Added explicit `distill_t1_to_t2(config)` and `distill_t2_to_t3(config)` stubs with ARCH return annotations and clear deferred-phase failures, preserving the public method surface without adding toolkit calls or Memory Store note writes.
-
-Should fix: none beyond refreshing the engine docstring to describe the current Phase 1 control-plane boundary. Optional: no optional changes deferred. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (32 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (475 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
-
-<!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
-
 ### Phase 5.1 Plan: Contract and routing foundation
 
 **Date:** 2026-05-05
@@ -299,4 +319,4 @@ DEVPLAN cleanup: reduced Phase 1 to a one-line completion summary and set frontm
 ARCHITECTURE.md: Generator + Output Router row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
 
 
-<!-- Entries below archived to DEVLOG_archive.md on 2026-05-05. -->
+(Module 5 Phase 1 and earlier entries archived to DEVLOG_archive.md on 2026-05-05.)

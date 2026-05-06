@@ -1,12 +1,12 @@
 ---
 module: DISTILLATION
-phase: 1
-phase_title: Distillation contract, gates, and metadata foundation
-step: 6.1.6
+phase: null
+phase_title: Module 6 Phase 1 complete — Module 6 Phase 2 next
+step: null
 mode: Complete
-blocked: null
+blocked: "awaiting-human-audit"
 regime: Build
-review_done: true
+review_done: false
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +33,9 @@ review_done: true
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 1 reviewed: Distillation contract, gates, and metadata foundation
-- **Focus** — Phase Complete is next: close the reviewed foundation phase, update architecture status, and gate Module 6 Phase 2 planning behind human audit.
-- **Blocked/Broken** — None
+- **Phase** — Module 6 Phase 1 complete: Distillation contract, gates, and metadata foundation
+- **Focus** — Awaiting human audit before Module 6 Phase 2 planning for T1->T2 RAPTOR promotion and assertion cache work.
+- **Blocked/Broken** — awaiting-human-audit
 
 ## Module 1: Memory Store (complete)
 
@@ -110,15 +110,9 @@ Delivered prompted, response, and free-play generation behind fakeable toolkit/l
 
 Planned phases follow `ARCH_distillation.md`: first stabilize the public contract, validation, Memory Store read/write boundary helpers, in-process lock, persisted run metadata, and deterministic gate evaluation without live clustering or LLM synthesis; then add T1->T2 RAPTOR promotion and assertion cache; then add T2->T3 reflect-evolve with supersession and criteria-adjustment output.
 
-### Phase 1 (in progress): Distillation contract, gates, and metadata foundation
+- **Phase 1 (complete)** — Delivered ARCH-aligned public dataclasses/errors/exports, config and Memory Store boundary validation, persisted run metadata, in-process locking, deterministic gate evaluation, deferred public distillation method stubs, and integration coverage proving no toolkit calls or Memory Store note writes outside metadata. Reviewed and completed. See DEVLOG "Phase 6.1 Review" and "Phase 6.1 Completion" entries.
 
-Build the credential-free foundation for the Distillation engine while preserving the ARCH public API and keeping all synthesis behavior deferred.
-
-- **Step 6.1.1 (complete)** — Public dataclasses, errors, and exports: added `src/phosphene/distillation/` with ARCH-aligned result/config types, package exports, and focused constructor/export tests.
-- **Step 6.1.2 (complete)** — Config validation and engine construction: validated gate thresholds, inertia/compression bounds, toolkit config presence, and Memory Store dependency shape without calling toolkit services.
-- **Step 6.1.3 (complete)** — Distillation metadata persistence: added private helpers for reading/writing last T1->T2 and T2->T3 run timestamps in the Memory Store vault with malformed/missing metadata handling.
-- **Step 6.1.4 (complete)** — Lock boundary: added an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
-- **Step 6.1.5 (complete)** — Gate evaluation: implemented `check_gates(config) -> GateStatus` from Memory Store tier queries plus persisted metadata, including never-run behavior, time/volume/monthly gates, and lock-gate reporting.
-- **Step 6.1.6 (complete)** — Foundation integration hardening: added phase-level integration tests for no-toolkit-call behavior, no Memory Store writes outside metadata, public error exports, and compatibility with the existing full test suite.
-
-<!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->
+<!--
+HISTORY — Do not read past this marker.
+Completed phase history below.
+-->
