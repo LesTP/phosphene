@@ -3,7 +3,7 @@ module: REVIEW_HARDENING
 phase: 1
 phase_title: "Pre-Module-7 Hardening Phase A — Attention Filter additions"
 step: 3
-mode: Build
+mode: Review
 blocked: false
 regime: Build
 review_done: false
@@ -58,11 +58,14 @@ remaining within-margin candidates, and `rejected_count` excludes both buckets.
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
 (134 passed).
 
-**Step 3: Export and integration check**
+**Step 3 (complete): Export and integration check**
 
-- Verify `__init__.py` exports include `wild_card_ratio` and `near_miss_margin` in the config surface.
-- Run full test suite: `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`.
-- Run cross-module regression: `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v` (ensure no breakage in other modules that construct `FilterResult`).
+Verified the Attention Filter public export/dataclass surface includes
+`wild_card_ratio` and `near_miss_margin` on `AttentionFilterConfig` and the
+new `FilterResult` buckets remain contract-covered. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
+(533 passed).
 
 ### Phase B: Unresolvedness composite utility + network diagnostics tool
 

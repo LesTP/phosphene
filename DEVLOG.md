@@ -10,6 +10,25 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.1.3: Export and integration check
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Verified the Attention Filter hardening additions at the package-contract and
+cross-module boundaries. `tests/attention_filter/test_exports.py` confirms the
+public dataclass surface includes `wild_card_ratio` and `near_miss_margin` on
+`AttentionFilterConfig`, plus `near_misses` and `wild_cards` on `FilterResult`;
+`src/phosphene/attention_filter/__init__.py` continues to export the
+ARCH-specified public config/result classes.
+
+No implementation changes were needed in this step. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed) and the cross-module regression
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v` (533 passed).
+
 ### Step REVIEW_HARDENING.1.2: Filter logic
 
 **Date:** 2026-05-06
