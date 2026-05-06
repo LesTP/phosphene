@@ -3,10 +3,10 @@ module: DISTILLATION
 phase: 1
 phase_title: Distillation contract, gates, and metadata foundation
 step: 6.1.6
-mode: Review
+mode: Complete
 blocked: null
 regime: Build
-review_done: false
+review_done: true
 ---
 
 # Phosphene — Development Plan
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 1 ready for review: Distillation contract, gates, and metadata foundation
-- **Focus** — Review the public Distillation API surface, config validation, metadata persistence, lock boundary, gate evaluation, and integration hardening against `ARCH_distillation.md` before live synthesis phases.
+- **Phase** — Module 6 Phase 1 reviewed: Distillation contract, gates, and metadata foundation
+- **Focus** — Phase Complete is next: close the reviewed foundation phase, update architecture status, and gate Module 6 Phase 2 planning behind human audit.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)

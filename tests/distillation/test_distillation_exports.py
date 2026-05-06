@@ -130,6 +130,14 @@ def test_arch_dataclass_field_names_match_contract() -> None:
     ]
 
 
+def test_engine_exposes_arch_public_methods() -> None:
+    engine = DistillationEngine(memory_store=FakeMemoryStore())
+
+    assert callable(engine.check_gates)
+    assert callable(engine.distill_t1_to_t2)
+    assert callable(engine.distill_t2_to_t3)
+
+
 def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     config = DistillationConfig(llm_config=object(), embedding_config=object())
     gates = GateStatus(
@@ -253,3 +261,21 @@ def test_engine_requires_memory_store_vault_path_for_distillation_metadata() -> 
 
     with pytest.raises(DistillationConfigError, match="memory_store must expose vault_path"):
         DistillationEngine(memory_store=MissingVaultPath())
+
+
+@pytest.mark.parametrize(
+    ("method_name", "message"),
+    [
+        ("distill_t1_to_t2", "T1 to T2 distillation is implemented in Phase 2"),
+        ("distill_t2_to_t3", "T2 to T3 distillation is implemented in Phase 3"),
+    ],
+)
+def test_deferred_distillation_methods_fail_explicitly_without_side_effects(
+    method_name: str,
+    message: str,
+) -> None:
+    engine = DistillationEngine(memory_store=FakeMemoryStore())
+    config = DistillationConfig(llm_config=object(), embedding_config=object())
+
+    with pytest.raises(NotImplementedError, match=message):
+        getattr(engine, method_name)(config)

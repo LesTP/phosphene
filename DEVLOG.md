@@ -202,6 +202,17 @@ Added phase-level Distillation foundation integration coverage that exercises en
 
 Added public error export coverage for the Distillation error hierarchy so `DistillationConfigError`, `DistillationLockError`, `InsufficientDataError`, and `NoPatternDataError` remain available from the package API and continue to share `DistillationError` as their base class. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (472 passed).
 
+### Phase 6.1 Review: Distillation contract, gates, and metadata foundation
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Distillation Phase 1 against `ARCH_distillation.md`. Must fix: `DistillationEngine` exposed `check_gates()` but not the two ARCH-declared public distillation methods, which would produce `AttributeError` for callers before the synthesis phases. Added explicit `distill_t1_to_t2(config)` and `distill_t2_to_t3(config)` stubs with ARCH return annotations and clear deferred-phase failures, preserving the public method surface without adding toolkit calls or Memory Store note writes.
+
+Should fix: none beyond refreshing the engine docstring to describe the current Phase 1 control-plane boundary. Optional: no optional changes deferred. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (32 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (475 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase Complete is the next action.
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation

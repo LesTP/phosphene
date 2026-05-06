@@ -12,7 +12,12 @@ from threading import Lock
 from typing import Any
 
 from phosphene.distillation.errors import DistillationConfigError, DistillationLockError
-from phosphene.distillation.types import DistillationConfig, GateStatus
+from phosphene.distillation.types import (
+    DistillationConfig,
+    EvolutionResult,
+    GateStatus,
+    TierPromotionResult,
+)
 from phosphene.memory_store import NoteQuery
 
 _REQUIRED_MEMORY_STORE_METHODS = (
@@ -39,8 +44,8 @@ class _DistillationRunMetadata:
 class DistillationEngine:
     """Coordinate tier promotion through a Memory Store.
 
-    Phase 1 starts with the constructor-only public shell. Gate evaluation,
-    metadata, locking, and synthesis operations are added in subsequent steps.
+    Phase 1 exposes the ARCH public shell plus gate evaluation, metadata, and
+    locking. Live synthesis operations are implemented in later phases.
     """
 
     def __init__(self, memory_store):
@@ -119,6 +124,26 @@ class DistillationEngine:
             tier1_pending=tier1_pending,
             days_since_last_t3=days_since_last_t3,
         )
+
+    def distill_t1_to_t2(
+        self,
+        config: DistillationConfig,
+    ) -> TierPromotionResult:
+        """Promote Tier 1 notes into Tier 2 clusters.
+
+        RAPTOR clustering and assertion-cache writes are deferred to Phase 2.
+        """
+        raise NotImplementedError("T1 to T2 distillation is implemented in Phase 2")
+
+    def distill_t2_to_t3(
+        self,
+        config: DistillationConfig,
+    ) -> EvolutionResult:
+        """Evolve Tier 2 patterns into Tier 3 personality files.
+
+        Reflect-evolve synthesis and supersession are deferred to Phase 3.
+        """
+        raise NotImplementedError("T2 to T3 distillation is implemented in Phase 3")
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
         if not self._run_metadata_path.exists():
