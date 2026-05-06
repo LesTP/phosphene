@@ -2,7 +2,7 @@
 module: REVIEW_HARDENING
 phase: 2
 phase_title: "Pre-Module-7 Hardening Phase B: unresolvedness composite utility + network diagnostics"
-step: 1
+step: 2
 mode: Build
 blocked: null
 regime: Build
@@ -34,7 +34,7 @@ review_done: false
 ## Current Status
 
 - **Phase** — Pre-Module-7 Hardening: Phase B in progress.
-- **Focus** — Step 1: unresolvedness composite utility.
+- **Focus** — Step 2: network diagnostics tool.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -49,38 +49,13 @@ Delivered ARCH-specified wild-card accepts and near-miss recording for the Atten
 
 Adds the unresolvedness composite scorer (phosphene.md Section 7.3) and the network diagnostics tool (phosphene.md Section 7.7). These are new code — no existing module modifications.
 
-**Step 1 (next): Unresolvedness composite utility**
+**Step 1 (complete): Unresolvedness composite utility**
 
-Create `src/phosphene/scoring/__init__.py` and `src/phosphene/scoring/unresolvedness.py`:
+Created `phosphene.scoring.compute_unresolvedness()` as a pure, caller-fed
+composite utility with configurable weights and focused tests. Verification:
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q` (541 passed).
 
-```python
-def compute_unresolvedness(
-    note: MemoryNote,
-    density_metrics: DensityMetrics,
-    similar_notes: list[MemoryNote],  # from search_by_embedding
-) -> float:
-```
-
-The function computes a composite [0.0, 1.0] from the following subcomponents:
-- **Rising links without promotion:** `min(1.0, note.link_count / 5.0)` when `note.tier == 1`. A Tier 1 note with 5+ links that hasn't been clustered is strongly unresolved. Zero contribution if promoted.
-- **Reappearance signal:** count of `similar_notes` with high similarity (>0.7) that are themselves unresolved (unresolvedness > 0.3). Normalized to [0.0, 1.0].
-- **Conflicting alignments:** count of `similar_notes` where the note is linked to notes that have friction targets pointing at each other. Requires checking `friction_target` on connected notes. Normalized.
-- **Survival signal:** `min(1.0, days_since_creation / tier1_base_retention_days)` — how close to decay deadline without promotion. Higher = more unresolved.
-
-Composite: weighted average with configurable weights, default equal. Output clamped to [0.0, 1.0].
-
-This is a pure function with no side effects. It does not call Memory Store — the caller passes in the data. This keeps it testable without any store fixture.
-
-Tests (`tests/scoring/test_unresolvedness.py`):
-- Zero inputs → 0.0.
-- High link count on Tier 1 note → high subcomponent.
-- Promoted note (Tier 2) → zero link-without-promotion contribution.
-- Similar unresolved notes present → high reappearance signal.
-- Near-decay-deadline note → high survival signal.
-- Composite is clamped to [0.0, 1.0].
-- Custom weights shift the composite.
-
-**Step 2 (pending): Network diagnostics tool**
+**Step 2 (next): Network diagnostics tool**
 
 Create `tools/network_diagnostics.py` — a standalone script that reads Memory Store and computes health metrics. Not a module — no ARCH file, no exports, no module dependencies beyond Memory Store.
 

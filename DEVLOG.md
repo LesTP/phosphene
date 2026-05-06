@@ -10,6 +10,28 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.2.1: Unresolvedness composite utility
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the shared `phosphene.scoring` package with a pure
+`compute_unresolvedness()` utility and configurable `UnresolvednessWeights`.
+The scorer computes the Phase B composite from rising Tier 1 links without
+promotion, unresolved reappearance among high-similarity notes, mutually
+friction-targeted connected notes, and Tier 1 survival toward the base decay
+deadline. It remains caller-fed and does not call Memory Store.
+
+The exact DEVPLAN signature lacks similarity scores and retention-day config,
+so the implementation preserves the three positional inputs while supporting
+keyword-only weights, retention days, deterministic `now`, and pass-through
+`(MemoryNote, similarity)` search-result tuples. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/scoring/test_unresolvedness.py tests/memory_store/test_types.py -q`
+(18 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q`
+(541 passed).
+
 ### Phase REVIEW_HARDENING.2 Plan: Unresolvedness composite utility + network diagnostics
 
 **Date:** 2026-05-06
