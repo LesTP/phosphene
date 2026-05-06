@@ -22,6 +22,7 @@ from phosphene.distillation.errors import (
     NoPatternDataError,
 )
 from phosphene.distillation.types import (
+    CriteriaAdjustment,
     DistillationConfig,
     EvolutionResult,
     GateStatus,
@@ -163,6 +164,33 @@ class _ReflectionAuditArtifact:
     request_messages: list[Mapping[str, str]]
     raw_response: str
     insights: list[ReflectionInsight]
+
+
+@dataclass(frozen=True)
+class _PreparedPersonalityFile:
+    note: object
+    note_id: str
+    title: str
+    content: str
+    version_count: int
+    inertia: float
+
+
+@dataclass(frozen=True)
+class _SupersessionProposal:
+    old_note_id: str
+    new_title: str
+    new_content: str
+    change_summary: str
+
+
+@dataclass(frozen=True)
+class _EvolutionProposalArtifact:
+    request_messages: list[Mapping[str, str]]
+    raw_response: str
+    supersession_proposals: list[_SupersessionProposal]
+    unchanged_ids: list[str]
+    criteria_adjustments: list[CriteriaAdjustment]
 
 
 class DistillationEngine:
@@ -338,7 +366,8 @@ class DistillationEngine:
         """
         with self._acquire_consolidation_lock():
             prepared = self._prepare_tier2_evolution_input(config)
-            self._reflect_tier2_patterns(prepared, config)
+            reflection = self._reflect_tier2_patterns(prepared, config)
+            self._propose_personality_evolution(reflection, config)
         raise NotImplementedError("T2 to T3 distillation is implemented in Phase 3")
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
@@ -475,6 +504,23 @@ class DistillationEngine:
     ) -> _ReflectionAuditArtifact:
         return _build_reflection_audit_artifact(
             prepared,
+            config,
+            llm_complete_callable=llm_complete_callable,
+        )
+
+    def _propose_personality_evolution(
+        self,
+        reflection: _ReflectionAuditArtifact,
+        config: DistillationConfig,
+        *,
+        llm_complete_callable: _LLMCompleteCallable | None = None,
+    ) -> _EvolutionProposalArtifact:
+        personality_context = self.memory_store.get_personality_context()
+        personality_files = _prepare_personality_files(personality_context, config)
+        return _build_evolution_proposal_artifact(
+            reflection.insights,
+            personality_files,
+            personality_context,
             config,
             llm_complete_callable=llm_complete_callable,
         )
@@ -737,6 +783,289 @@ def _build_reflection_audit_artifact(
             },
         ),
     )
+
+
+def _prepare_personality_files(
+    personality_context: object,
+    config: DistillationConfig,
+) -> list[_PreparedPersonalityFile]:
+    raw_files = getattr(personality_context, "personality_files", None)
+    if raw_files is None:
+        raw_files = []
+    if not isinstance(raw_files, Sequence) or isinstance(raw_files, str | bytes):
+        raise DistillationError("personality context must expose personality_files list")
+
+    prepared_files: list[_PreparedPersonalityFile] = []
+    for note in raw_files:
+        note_id = getattr(note, "note_id", None)
+        if note_id is None or not str(note_id).strip():
+            raise DistillationError("personality file note_id is required")
+        content = _note_content(note).strip()
+        if not content:
+            raise DistillationError(
+                f"personality file content cannot be empty: {note_id}"
+            )
+        version_count = _personality_version_count(note)
+        prepared_files.append(
+            _PreparedPersonalityFile(
+                note=note,
+                note_id=str(note_id),
+                title=str(getattr(note, "title", "") or str(note_id)),
+                content=content,
+                version_count=version_count,
+                inertia=_effective_inertia(version_count, config),
+            )
+        )
+
+    return prepared_files
+
+
+def _effective_inertia(version_count: int, config: DistillationConfig) -> float:
+    normalized_count = max(1, int(version_count))
+    return min(
+        config.max_inertia,
+        1.0 + (normalized_count - 1) * config.inertia_per_cycle,
+    )
+
+
+def _personality_version_count(note: object) -> int:
+    raw_count = getattr(note, "version_count", None)
+    if raw_count is None:
+        raw_count = _version_count_from_tags(getattr(note, "tags", []) or [])
+    try:
+        count = int(raw_count)
+    except (TypeError, ValueError):
+        count = 1
+    return max(1, count)
+
+
+def _version_count_from_tags(tags: Sequence[object]) -> int | None:
+    for tag in tags:
+        tag_text = str(tag).strip()
+        for separator in (":", "="):
+            prefix = f"version_count{separator}"
+            if tag_text.startswith(prefix):
+                try:
+                    return int(tag_text[len(prefix) :])
+                except ValueError:
+                    return None
+    return None
+
+
+def _build_evolution_request(
+    insights: Sequence[ReflectionInsight],
+    personality_files: Sequence[_PreparedPersonalityFile],
+    personality_context: object,
+) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "distill_t2_to_t3_evolution",
+        "instructions": (
+            "Use the reflection insights to propose personality-file evolution. "
+            "Respect each file's inertia: higher inertia requires stronger "
+            "evidence to override. Resolve contradictions by proposing "
+            "supersession, not accumulation. Do not omit unchanged personality "
+            "files. Return only JSON with shape "
+            '{"personality_proposals": [{"note_id": "...", "action": '
+            '"supersede|unchanged", "new_title": "...", "new_content": "...", '
+            '"change_summary": "..."}], "criteria_adjustments": [{"criterion_name": '
+            '"...", "old_weight": 0.0, "new_weight": 0.0, "evidence": "..."}]}. '
+            "new_title, new_content, and change_summary are required for "
+            "supersede actions and must be absent or ignored for unchanged."
+        ),
+        "personality_version_id": _optional_string(
+            getattr(personality_context, "version_id", None)
+        ),
+        "reflection_insights": [
+            {
+                "content": insight.content,
+                "source_pattern_ids": insight.source_pattern_ids,
+                "insight_type": insight.insight_type,
+                "confidence": insight.confidence,
+            }
+            for insight in insights
+        ],
+        "personality_files": [
+            {
+                "note_id": personality_file.note_id,
+                "title": personality_file.title,
+                "content": personality_file.content,
+                "version_count": personality_file.version_count,
+                "effective_inertia": personality_file.inertia,
+            }
+            for personality_file in personality_files
+        ],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _build_evolution_proposal_artifact(
+    insights: Sequence[ReflectionInsight],
+    personality_files: Sequence[_PreparedPersonalityFile],
+    personality_context: object,
+    config: DistillationConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> _EvolutionProposalArtifact:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    request_messages = _build_evolution_request(
+        insights,
+        personality_files,
+        personality_context,
+    )
+    raw_response = llm_complete_callable(
+        messages=request_messages,
+        config=config.llm_config,
+        tier=config.evolution_tier,
+    )
+    supersession_proposals, unchanged_ids, criteria_adjustments = (
+        _parse_evolution_proposals(
+            raw_response,
+            valid_personality_ids={
+                personality_file.note_id for personality_file in personality_files
+            },
+        )
+    )
+    return _EvolutionProposalArtifact(
+        request_messages=request_messages,
+        raw_response=raw_response,
+        supersession_proposals=supersession_proposals,
+        unchanged_ids=unchanged_ids,
+        criteria_adjustments=criteria_adjustments,
+    )
+
+
+def _parse_evolution_proposals(
+    response_text: str,
+    *,
+    valid_personality_ids: set[str] | None = None,
+) -> tuple[list[_SupersessionProposal], list[str], list[CriteriaAdjustment]]:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM evolution response",
+    )
+    raw_proposals = payload.get("personality_proposals", payload.get("proposals"))
+    if not isinstance(raw_proposals, Sequence) or isinstance(
+        raw_proposals, str | bytes
+    ):
+        raise DistillationError(
+            "LLM evolution response must contain personality_proposals list"
+        )
+
+    supersession_proposals: list[_SupersessionProposal] = []
+    unchanged_ids: list[str] = []
+    seen_ids: set[str] = set()
+    for raw_proposal in raw_proposals:
+        if not isinstance(raw_proposal, Mapping):
+            raise DistillationError("LLM evolution personality proposals must be objects")
+
+        note_id = _required_non_empty_string(
+            raw_proposal.get("note_id"),
+            "LLM evolution proposal note_id",
+        )
+        if valid_personality_ids is not None and note_id not in valid_personality_ids:
+            raise DistillationError(
+                "LLM evolution proposal note_id is unknown: " f"{note_id}"
+            )
+        if note_id in seen_ids:
+            raise DistillationError(
+                "LLM evolution proposal note_id is duplicated: " f"{note_id}"
+            )
+        seen_ids.add(note_id)
+
+        action = _required_non_empty_string(
+            raw_proposal.get("action"),
+            "LLM evolution proposal action",
+        )
+        if action == "unchanged":
+            unchanged_ids.append(note_id)
+        elif action == "supersede":
+            new_content = _required_non_empty_string(
+                raw_proposal.get("new_content"),
+                "LLM evolution supersede new_content",
+            )
+            new_title = _required_non_empty_string(
+                raw_proposal.get("new_title"),
+                "LLM evolution supersede new_title",
+            )
+            change_summary = _required_non_empty_string(
+                raw_proposal.get("change_summary"),
+                "LLM evolution supersede change_summary",
+            )
+            supersession_proposals.append(
+                _SupersessionProposal(
+                    old_note_id=note_id,
+                    new_title=new_title,
+                    new_content=new_content,
+                    change_summary=change_summary,
+                )
+            )
+        else:
+            raise DistillationError(
+                "LLM evolution proposal action must be supersede or unchanged"
+            )
+
+    raw_adjustments = payload.get("criteria_adjustments", [])
+    if not isinstance(raw_adjustments, Sequence) or isinstance(
+        raw_adjustments, str | bytes
+    ):
+        raise DistillationError(
+            "LLM evolution response criteria_adjustments must be a list"
+        )
+    criteria_adjustments = [
+        _parse_criteria_adjustment(raw_adjustment)
+        for raw_adjustment in raw_adjustments
+    ]
+    return supersession_proposals, unchanged_ids, criteria_adjustments
+
+
+def _parse_criteria_adjustment(raw_adjustment: object) -> CriteriaAdjustment:
+    if not isinstance(raw_adjustment, Mapping):
+        raise DistillationError("LLM evolution criteria adjustments must be objects")
+    criterion_name = _normalize_criterion_name(
+        _required_non_empty_string(
+            raw_adjustment.get("criterion_name"),
+            "LLM evolution criteria criterion_name",
+        )
+    )
+    if criterion_name is None:
+        raise DistillationError("LLM evolution criteria criterion_name cannot be empty")
+    return CriteriaAdjustment(
+        criterion_name=criterion_name,
+        old_weight=_required_number(
+            raw_adjustment.get("old_weight"),
+            "LLM evolution criteria old_weight",
+        ),
+        new_weight=_required_number(
+            raw_adjustment.get("new_weight"),
+            "LLM evolution criteria new_weight",
+        ),
+        evidence=_required_non_empty_string(
+            raw_adjustment.get("evidence"),
+            "LLM evolution criteria evidence",
+        ),
+    )
+
+
+def _required_non_empty_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise DistillationError(f"{field_name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise DistillationError(f"{field_name} cannot be empty")
+    return normalized
+
+
+def _required_number(value: object, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise DistillationError(f"{field_name} must be numeric")
+    return float(value)
 
 
 def _parse_reflection_insights(

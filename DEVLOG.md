@@ -255,6 +255,31 @@ Implemented the reflection LLM boundary for the T2->T3 path. `distill_t2_to_t3(c
 
 Added strict reflection parsing for the ARCH insight shape: non-empty content, known `source_pattern_ids`, allowed insight types (`recurring_tension`, `new_pattern`, `evolution`, `contradiction`), and probability-bounded confidence. Malformed reflection payloads fail with `DistillationError`; provider failures propagate from the LLM seam; no Memory Store writes, personality context reads, supersession, cache writes, or T2->T3 metadata updates occur in this step. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (62 passed).
 
+### Step 6.3.3: Evolution request, inertia, and proposal parsing
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the evolution proposal boundary for the T2->T3 path. After the
+reflection audit artifact is parsed, `distill_t2_to_t3(config)` now loads the
+current Memory Store personality context, normalizes personality files, computes
+effective version-count inertia with the ARCH formula, builds the evolution LLM
+request with reflection insights and personality content, calls the fakeable LLM
+completion seam at `config.evolution_tier`, and parses proposals before any
+Memory Store writeback.
+
+Added strict evolution-response parsing for supersede, unchanged, and criteria
+adjustment proposals. Malformed JSON, unknown or duplicated personality ids,
+invalid actions, missing supersession content/title/summary, and malformed
+criteria-adjustment fields now fail with `DistillationError` before supersession,
+unchanged-note updates, run metadata updates, or criteria output assembly. Focused
+tests cover inertia calculation, request payload shape, evolution-tier LLM
+wiring, proposal parsing, malformed-response rejection, lock release, and the
+no-write/no-metadata-update boundary. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (73 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
