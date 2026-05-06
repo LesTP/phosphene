@@ -169,6 +169,17 @@ Implemented Tier 2 Memory Store writes for coherent T1->T2 clusters. `distill_t1
 
 Added related-cluster wiring after all coherent clusters are materialized by calling `add_links` between promoted Tier 2 note ids. Noise and incoherent Tier 1 notes remain unmodified, and assertion-cache persistence and run metadata updates remain deferred to later Phase 2 steps. Updated clustering/preparation tests to cover new cluster creation, existing cluster updates, source-link preservation, related-cluster links, label-result fallback summaries, and the new Tier 2 query. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (43 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (486 passed).
 
+### Step 6.2.5: Assertion cache persistence
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented Tier 2 assertion-cache persistence for coherent T1->T2 cluster promotions. `distill_t1_to_t2(config)` now extracts assertions from each new or updated cluster summary through the private LLM completion seam, validates strict JSON assertion payloads, writes per-cluster cache files under `vault/tier2/{cluster_group}.json`, and returns refreshed cluster groups in `TierPromotionResult.assertion_cache_updated`.
+
+Malformed assertion extraction payloads now fail with clear `DistillationError` messages before any cache file is written for the batch, and each cache write uses a temporary file followed by replace. Focused tests cover cache content, cache update result ids, fake LLM boundary wiring in existing T1->T2 paths, and malformed-payload atomicity. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (44 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

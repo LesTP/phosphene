@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
+import json
+
+import pytest
 
 from phosphene.distillation import DistillationConfig, DistillationEngine
+from phosphene.distillation.errors import DistillationError
 
 
 @dataclass
@@ -110,6 +114,12 @@ def test_distill_t1_to_t2_embeds_clusters_and_splits_by_coherence(
 
     monkeypatch.setattr("phosphene.distillation.engine._toolkit_embed", fake_embed)
     monkeypatch.setattr("phosphene.distillation.engine._toolkit_cluster", fake_cluster)
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps(
+            {"assertions": [{"text": "Alpha coheres", "confidence": 0.8}]}
+        ),
+    )
 
     store = ClusterMemoryStore(
         tmp_path / "vault",
@@ -158,7 +168,12 @@ def test_distill_t1_to_t2_embeds_clusters_and_splits_by_coherence(
     assert result.incoherent_cluster_count == 1
     assert result.cluster_tree_depth == 3
     assert result.feedback_processed == 0
-    assert result.assertion_cache_updated == []
+    assert result.assertion_cache_updated == ["coherent"]
+    assert json.loads((tmp_path / "vault" / "tier2" / "coherent.json").read_text()) == {
+        "assertions": [{"confidence": 0.8, "text": "Alpha coheres"}],
+        "cluster_group": "coherent",
+        "cluster_summary": "Coherent alpha pattern",
+    }
     assert len(store.stored_notes) == 1
     stored_note = store.stored_notes[0]
     assert stored_note.tier == 2
@@ -183,6 +198,10 @@ def test_distill_t1_to_t2_treats_unassigned_labels_as_noise(
         "phosphene.distillation.engine._toolkit_cluster",
         lambda _embeddings, _config, *, texts: {"labels": [0, 0, -1]},
     )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps({"assertions": []}),
+    )
     store = ClusterMemoryStore(
         tmp_path / "vault",
         [
@@ -206,6 +225,7 @@ def test_distill_t1_to_t2_treats_unassigned_labels_as_noise(
     assert result.noise_count == 1
     assert result.incoherent_cluster_count == 0
     assert result.new_cluster_ids == ["stored-1"]
+    assert result.assertion_cache_updated == ["0"]
 
 
 def test_distill_t1_to_t2_updates_existing_cluster_and_links_related_clusters(
@@ -224,6 +244,10 @@ def test_distill_t1_to_t2_updates_existing_cluster_and_links_related_clusters(
                 {"id": "new", "member_indices": [1], "summary": "New pattern"},
             ],
         },
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps({"assertions": []}),
     )
     store = ClusterMemoryStore(
         tmp_path / "vault",
@@ -255,6 +279,7 @@ def test_distill_t1_to_t2_updates_existing_cluster_and_links_related_clusters(
 
     assert result.new_cluster_ids == ["stored-1"]
     assert result.updated_cluster_ids == ["tier2-existing"]
+    assert result.assertion_cache_updated == ["existing", "new"]
     assert store.updated_notes[0][0] == "tier2-existing"
     patch = store.updated_notes[0][1]
     assert patch.title == "Existing title"
@@ -265,3 +290,54 @@ def test_distill_t1_to_t2_updates_existing_cluster_and_links_related_clusters(
         ("tier2-existing", ["stored-1"]),
         ("stored-1", ["tier2-existing"]),
     ]
+
+
+def test_distill_t1_to_t2_malformed_assertion_cache_payload_fails_atomically(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_embed",
+        lambda texts, _config: [[1.0, 0.0] for _text in texts],
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_cluster",
+        lambda _embeddings, _config, *, texts: {
+            "clusters": [
+                {"id": "first", "member_indices": [0], "summary": "First pattern"},
+                {"id": "second", "member_indices": [1], "summary": "Second pattern"},
+            ],
+        },
+    )
+    responses = iter(
+        [
+            json.dumps({"assertions": [{"text": "First claim", "confidence": 0.9}]}),
+            "{not-json",
+        ]
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: next(responses),
+    )
+    store = ClusterMemoryStore(
+        tmp_path / "vault",
+        [
+            ClusterNote("note-a", "alpha one"),
+            ClusterNote("note-b", "alpha two"),
+        ],
+    )
+    engine = DistillationEngine(store)
+
+    with pytest.raises(DistillationError, match="must be valid JSON"):
+        engine.distill_t1_to_t2(
+            DistillationConfig(
+                llm_config=object(),
+                embedding_config=object(),
+                min_tier1_volume=2,
+                incorporate_feedback=False,
+            )
+        )
+
+    assert not (tmp_path / "vault" / "tier2" / "first.json").exists()
+    assert not (tmp_path / "vault" / "tier2" / "second.json").exists()
+    assert engine._is_consolidation_locked() is False

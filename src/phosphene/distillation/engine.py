@@ -16,6 +16,7 @@ import numpy as np
 
 from phosphene.distillation.errors import (
     DistillationConfigError,
+    DistillationError,
     DistillationLockError,
     InsufficientDataError,
 )
@@ -40,6 +41,7 @@ _RUN_METADATA_FILENAME = "distillation_runs.json"
 _LAST_T1_TO_T2_KEY = "last_t1_to_t2_run"
 _LAST_T2_TO_T3_KEY = "last_t2_to_t3_run"
 _UNBOUNDED_QUERY_LIMIT = 1_000_000
+_ASSERTION_CACHE_DIRECTORY = "tier2"
 
 
 class _EmbeddingCallable(Protocol):
@@ -117,6 +119,19 @@ class _CoherentClusterPromotion:
     importance: float
     unresolvedness: float
     centroid: object
+
+
+@dataclass(frozen=True)
+class _ClusterAssertion:
+    text: str
+    confidence: float
+
+
+@dataclass(frozen=True)
+class _AssertionCachePayload:
+    cluster_group: str
+    summary: str
+    assertions: tuple[_ClusterAssertion, ...]
 
 
 class DistillationEngine:
@@ -210,8 +225,8 @@ class DistillationEngine:
         """Promote Tier 1 notes into Tier 2 clusters.
 
         Phase 2 currently performs Tier 1 selection, feedback preparation,
-        RAPTOR clustering, coherence gating, and Tier 2 cluster note writes.
-        Assertion-cache persistence is deferred to a later Phase 2 step.
+        RAPTOR clustering, coherence gating, Tier 2 cluster note writes, and
+        assertion-cache persistence.
         """
         with self._acquire_consolidation_lock():
             prepared = self._prepare_tier1_distillation_input(config)
@@ -254,6 +269,10 @@ class DistillationEngine:
             noise_indices = set(cluster_result.noise_indices)
             noise_indices.update(set(range(len(prepared.notes))) - clustered_indices)
             write_result = self._write_tier2_cluster_notes(coherent_promotions)
+            assertion_cache_updated = self._write_assertion_caches(
+                coherent_promotions,
+                config,
+            )
 
             return TierPromotionResult(
                 new_cluster_ids=write_result["new_cluster_ids"],
@@ -263,7 +282,7 @@ class DistillationEngine:
                 incoherent_cluster_count=incoherent_cluster_count,
                 cluster_tree_depth=cluster_result.tree_depth,
                 feedback_processed=len(prepared.feedback_events),
-                assertion_cache_updated=[],
+                assertion_cache_updated=assertion_cache_updated,
             )
 
     def distill_t2_to_t3(
@@ -445,6 +464,41 @@ class DistillationEngine:
             "updated_cluster_ids": updated_cluster_ids,
         }
 
+    def _write_assertion_caches(
+        self,
+        promotions: Sequence[_CoherentClusterPromotion],
+        config: DistillationConfig,
+    ) -> list[str]:
+        payloads = [
+            _AssertionCachePayload(
+                cluster_group=promotion.cluster.cluster_id,
+                summary=promotion.summary,
+                assertions=_extract_cluster_assertions(
+                    promotion.summary,
+                    config,
+                ),
+            )
+            for promotion in promotions
+        ]
+
+        cache_dir = Path(self.memory_store.vault_path) / _ASSERTION_CACHE_DIRECTORY
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for payload in payloads:
+            cache_path = _assertion_cache_path(cache_dir, payload.cluster_group)
+            temp_path = cache_path.with_name(f"{cache_path.name}.tmp")
+            temp_path.write_text(
+                json.dumps(
+                    _assertion_cache_json(payload),
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            temp_path.replace(cache_path)
+
+        return [payload.cluster_group for payload in payloads]
+
 
 def _toolkit_embed(texts: list[str], config: object) -> Any:
     from toolkit.embedding import embed
@@ -520,6 +574,82 @@ def _build_assertion_cache_request(cluster_summary: str) -> list[Mapping[str, st
             "content": json.dumps(payload, sort_keys=True),
         }
     ]
+
+
+def _extract_cluster_assertions(
+    cluster_summary: str,
+    config: DistillationConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> tuple[_ClusterAssertion, ...]:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    response_text = llm_complete_callable(
+        messages=_build_assertion_cache_request(cluster_summary),
+        config=config.llm_config,
+        tier=config.reflection_tier,
+    )
+    return _parse_assertion_cache_payload(response_text)
+
+
+def _parse_assertion_cache_payload(response_text: str) -> tuple[_ClusterAssertion, ...]:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM assertion cache response",
+    )
+    raw_assertions = payload.get("assertions")
+    if not isinstance(raw_assertions, Sequence) or isinstance(
+        raw_assertions, str | bytes
+    ):
+        raise DistillationError(
+            "LLM assertion cache response must contain assertions list"
+        )
+
+    assertions: list[_ClusterAssertion] = []
+    for raw_assertion in raw_assertions:
+        if not isinstance(raw_assertion, Mapping):
+            raise DistillationError("LLM assertion cache entries must be objects")
+
+        raw_text = raw_assertion.get("text", raw_assertion.get("claim"))
+        if not isinstance(raw_text, str):
+            raise DistillationError("LLM assertion cache text must be a string")
+
+        text = raw_text.strip()
+        if not text:
+            continue
+
+        raw_confidence = raw_assertion.get("confidence", 1.0)
+        if isinstance(raw_confidence, bool) or not isinstance(
+            raw_confidence, int | float
+        ):
+            raise DistillationError("LLM assertion cache confidence must be numeric")
+        if raw_confidence < 0.0 or raw_confidence > 1.0:
+            raise DistillationError(
+                "LLM assertion cache confidence must be in [0.0, 1.0]"
+            )
+
+        assertions.append(
+            _ClusterAssertion(text=text, confidence=float(raw_confidence))
+        )
+
+    return tuple(assertions)
+
+
+def _extract_json_object(
+    response_text: str,
+    *,
+    response_name: str,
+) -> Mapping[str, object]:
+    try:
+        payload = json.loads(response_text)
+    except json.JSONDecodeError as exc:
+        raise DistillationError(f"{response_name} must be valid JSON") from exc
+
+    if not isinstance(payload, Mapping):
+        raise DistillationError(f"{response_name} must be a JSON object")
+
+    return payload
 
 
 def _make_raptor_summarizer(
@@ -903,3 +1033,28 @@ def _merged_cluster_content(existing_content: str, new_summary: str) -> str:
     if new_summary in existing_content:
         return existing_content
     return f"{existing_content.rstrip()}\n\n---\n\n{new_summary}"
+
+
+def _assertion_cache_path(cache_dir: Path, cluster_group: str) -> Path:
+    cluster_group = cluster_group.strip()
+    if not cluster_group:
+        raise DistillationError("cluster_group is required for assertion cache")
+    if "/" in cluster_group or "\\" in cluster_group:
+        raise DistillationError(
+            f"cluster_group cannot contain path separators: {cluster_group!r}"
+        )
+    return cache_dir / f"{cluster_group}.json"
+
+
+def _assertion_cache_json(payload: _AssertionCachePayload) -> Mapping[str, object]:
+    return {
+        "cluster_group": payload.cluster_group,
+        "cluster_summary": payload.summary,
+        "assertions": [
+            {
+                "text": assertion.text,
+                "confidence": assertion.confidence,
+            }
+            for assertion in payload.assertions
+        ],
+    }

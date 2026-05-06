@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import json
 
 import pytest
 
@@ -76,6 +77,10 @@ def test_distill_t1_to_t2_guard_queries_since_metadata_and_prepares_feedback_boo
             "clusters": [{"id": "cluster-a", "member_indices": list(range(len(texts)))}],
             "tree_depth": 2,
         },
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps({"assertions": []}),
     )
     store = PrepMemoryStore(
         tmp_path / "vault",
@@ -166,6 +171,10 @@ def test_distill_t1_to_t2_respects_disabled_feedback_preparation(
         lambda _embeddings, _config, *, texts: {
             "clusters": [{"id": "cluster-a", "member_indices": list(range(len(texts)))}],
         },
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps({"assertions": []}),
     )
     store = PrepMemoryStore(
         tmp_path / "vault",
