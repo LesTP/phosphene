@@ -3,7 +3,7 @@ module: DISTILLATION
 phase: 1
 phase_title: Distillation contract, gates, and metadata foundation
 step: 6.1.6
-mode: Build
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 1: Distillation contract, gates, and metadata foundation
-- **Focus** — Implement the public Distillation API surface, config validation, lock/run metadata, and deterministic gate evaluation before live RAPTOR clustering, embedding, LLM synthesis, assertion-cache writes, or personality evolution.
+- **Phase** — Module 6 Phase 1 ready for review: Distillation contract, gates, and metadata foundation
+- **Focus** — Review the public Distillation API surface, config validation, metadata persistence, lock boundary, gate evaluation, and integration hardening against `ARCH_distillation.md` before live synthesis phases.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -119,6 +119,6 @@ Build the credential-free foundation for the Distillation engine while preservin
 - **Step 6.1.3 (complete)** — Distillation metadata persistence: added private helpers for reading/writing last T1->T2 and T2->T3 run timestamps in the Memory Store vault with malformed/missing metadata handling.
 - **Step 6.1.4 (complete)** — Lock boundary: added an in-process consolidation lock helper used by future distillation operations, with deterministic acquire/release and exception-safety tests.
 - **Step 6.1.5 (complete)** — Gate evaluation: implemented `check_gates(config) -> GateStatus` from Memory Store tier queries plus persisted metadata, including never-run behavior, time/volume/monthly gates, and lock-gate reporting.
-- **Step 6.1.6** — Foundation integration hardening: add phase-level integration tests for no-toolkit-call behavior, no Memory Store writes outside metadata, public error exports, and compatibility with the existing full test suite.
+- **Step 6.1.6 (complete)** — Foundation integration hardening: added phase-level integration tests for no-toolkit-call behavior, no Memory Store writes outside metadata, public error exports, and compatibility with the existing full test suite.
 
 <!-- HISTORY --> <!-- Worker: stop reading here. Everything below is completed phase history. -->

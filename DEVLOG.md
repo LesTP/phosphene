@@ -191,6 +191,17 @@ Implemented public `DistillationEngine.check_gates(config) -> GateStatus` using 
 
 Kept the boundary credential-free and read-only against Memory Store note state: `check_gates` performs only tier queries and metadata reads, with no toolkit calls or Memory Store writes. Focused tests cover never-run T1 readiness, Tier 1 since-filtering, recent-run time blocking, monthly T2->T3 readiness, and lock-gate reporting. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (470 passed).
 
+### Step 6.1.6: Foundation integration hardening
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added phase-level Distillation foundation integration coverage that exercises engine construction, metadata persistence, and `check_gates()` together while using callable toolkit sentinels that fail if invoked. The integration store records query shape and rejects all Memory Store content-write methods, verifying the Phase 1 boundary remains credential-free and read-only against note state except for the private metadata file.
+
+Added public error export coverage for the Distillation error hierarchy so `DistillationConfigError`, `DistillationLockError`, `InsufficientDataError`, and `NoPatternDataError` remain available from the package API and continue to share `DistillationError` as their base class. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (29 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (472 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation
