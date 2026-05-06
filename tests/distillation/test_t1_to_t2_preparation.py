@@ -11,6 +11,7 @@ from phosphene.distillation.errors import DistillationLockError, InsufficientDat
 @dataclass
 class PrepNote:
     note_id: str
+    content: str = ""
     importance: float = 0.0
     source: str | None = None
     links: list[str] = field(default_factory=list)
@@ -57,12 +58,24 @@ class PrepMemoryStore:
 
 def test_distill_t1_to_t2_guard_queries_since_metadata_and_prepares_feedback_boosts(
     tmp_path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_embed",
+        lambda texts, _config: [[1.0, 0.0] for _text in texts],
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_cluster",
+        lambda _embeddings, _config, *, texts: {
+            "clusters": [{"id": "cluster-a", "member_indices": list(range(len(texts)))}],
+            "tree_depth": 2,
+        },
+    )
     store = PrepMemoryStore(
         tmp_path / "vault",
         [
-            PrepNote("note-a", importance=0.4),
-            PrepNote("note-b", importance=0.96),
+            PrepNote("note-a", content="first", importance=0.4),
+            PrepNote("note-b", content="second", importance=0.96),
             PrepNote("feedback-1", importance=0.7, source="feedback", links=["note-a"]),
             PrepNote(
                 "feedback-2",
@@ -76,14 +89,13 @@ def test_distill_t1_to_t2_guard_queries_since_metadata_and_prepares_feedback_boo
     last_run = (datetime.now(timezone.utc) - timedelta(days=2)).replace(microsecond=0)
     engine._write_run_metadata(_DistillationRunMetadata(last_t1_to_t2_run=last_run))
 
-    with pytest.raises(NotImplementedError, match="Phase 2 step 6.2.3"):
-        engine.distill_t1_to_t2(
-            DistillationConfig(
-                llm_config=object(),
-                embedding_config=object(),
-                min_tier1_volume=2,
-            )
+    result = engine.distill_t1_to_t2(
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            min_tier1_volume=2,
         )
+    )
 
     prepared = engine._prepare_tier1_distillation_input(
         DistillationConfig(
@@ -102,6 +114,11 @@ def test_distill_t1_to_t2_guard_queries_since_metadata_and_prepares_feedback_boo
     assert [item.feedback_boost for item in prepared.notes] == pytest.approx([0.07, 0.08])
     assert [item.effective_importance for item in prepared.notes] == pytest.approx([0.47, 1.0])
     assert [event.note_id for event in prepared.feedback_events] == ["feedback-1", "feedback-2"]
+    assert result.promoted_count == 2
+    assert result.noise_count == 0
+    assert result.incoherent_cluster_count == 0
+    assert result.cluster_tree_depth == 2
+    assert result.feedback_processed == 2
     assert store.write_calls == []
     assert engine._is_consolidation_locked() is False
 
@@ -130,7 +147,20 @@ def test_distill_t1_to_t2_raises_insufficient_data_before_feedback_or_writes(tmp
     assert engine._is_consolidation_locked() is False
 
 
-def test_distill_t1_to_t2_respects_disabled_feedback_preparation(tmp_path) -> None:
+def test_distill_t1_to_t2_respects_disabled_feedback_preparation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_embed",
+        lambda texts, _config: [[1.0, 0.0] for _text in texts],
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_cluster",
+        lambda _embeddings, _config, *, texts: {
+            "clusters": [{"id": "cluster-a", "member_indices": list(range(len(texts)))}],
+        },
+    )
     store = PrepMemoryStore(
         tmp_path / "vault",
         [
@@ -141,18 +171,18 @@ def test_distill_t1_to_t2_respects_disabled_feedback_preparation(tmp_path) -> No
     )
     engine = DistillationEngine(store)
 
-    with pytest.raises(NotImplementedError, match="Phase 2 step 6.2.3"):
-        engine.distill_t1_to_t2(
-            DistillationConfig(
-                llm_config=object(),
-                embedding_config=object(),
-                min_tier1_volume=2,
-                incorporate_feedback=False,
-            )
+    result = engine.distill_t1_to_t2(
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            min_tier1_volume=2,
+            incorporate_feedback=False,
         )
+    )
 
     assert len(store.queries) == 1
     assert store.queries[0].source is None
+    assert result.feedback_processed == 0
     assert store.write_calls == []
 
 

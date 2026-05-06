@@ -2,7 +2,7 @@
 module: DISTILLATION
 phase: 2
 phase_title: T1->T2 RAPTOR promotion and assertion cache
-step: 6.2.3
+step: 6.2.4
 mode: Build
 blocked: null
 regime: Build
@@ -118,7 +118,7 @@ Build phase. Scope is limited to replacing the `distill_t1_to_t2(config)` stub w
 
 - [x] **Step 6.2.1 — Toolkit boundary and prompt helpers**: Add private wrappers for embedding, RAPTOR clustering, LLM cluster summarization, and LLM assertion extraction; preserve import-time compatibility when `toolkit` is absent; add focused tests with injectable fakes/sentinels.
 - [x] **Step 6.2.2 — Tier 1 input selection and feedback preparation**: Implement the lock-protected `distill_t1_to_t2` entry guard, metadata-based Tier 1 query, `InsufficientDataError`, feedback-event query when enabled, and deterministic importance boost preparation without Memory Store writes yet.
-- [ ] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
+- [x] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
 - [ ] **Step 6.2.4 — Tier 2 note writes and cluster links**: Create or update Tier 2 pattern notes through `store_note`/`update_note`, set `cluster_group`, preserve source Tier 1 links, wire related clusters through `add_links`, and leave noise/incoherent Tier 1 notes unmodified.
 - [ ] **Step 6.2.5 — Assertion cache persistence**: Extract dominant assertions from every new/updated cluster summary and write JSON cache files under the Tier 2 assertion-cache location keyed by `cluster_group`, with malformed LLM payloads failing clearly and atomically.
 - [ ] **Step 6.2.6 — Phase integration hardening**: Exercise `distill_t1_to_t2` end to end with fake Memory Store/toolkit services, verify lock release and run metadata update on success only, verify toolkit errors propagate, and confirm `distill_t2_to_t3` remains deferred.

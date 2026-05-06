@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
+import math
 from pathlib import Path
 from threading import Lock
 from typing import Any, Protocol
@@ -81,6 +82,28 @@ class _Tier1DistillationInput:
     notes: list[_PreparedTier1Note]
     feedback_events: list[object]
     since: datetime | None
+
+
+@dataclass(frozen=True)
+class _RaptorClusterConfig:
+    strategy: str
+    raptor_summarizer: Callable[[list[str]], str]
+    raptor_embedder: Callable[[list[str]], object]
+    raptor_max_depth: int = 3
+
+
+@dataclass(frozen=True)
+class _NormalizedCluster:
+    cluster_id: str
+    member_indices: list[int]
+    summary: str | None = None
+
+
+@dataclass(frozen=True)
+class _NormalizedClusterResult:
+    clusters: list[_NormalizedCluster]
+    noise_indices: set[int]
+    tree_depth: int
 
 
 class DistillationEngine:
@@ -173,15 +196,50 @@ class DistillationEngine:
     ) -> TierPromotionResult:
         """Promote Tier 1 notes into Tier 2 clusters.
 
-        Tier 1 selection and feedback preparation are implemented here.
-        RAPTOR clustering and assertion-cache writes are deferred to later
-        Phase 2 steps.
+        Phase 2 currently performs Tier 1 selection, feedback preparation,
+        RAPTOR clustering, and coherence gating. Tier 2 Memory Store writes
+        and assertion-cache persistence are deferred to later Phase 2 steps.
         """
         with self._acquire_consolidation_lock():
-            self._prepare_tier1_distillation_input(config)
+            prepared = self._prepare_tier1_distillation_input(config)
+            texts = [_note_content(item.note) for item in prepared.notes]
+            embeddings = _embedding_vectors(
+                _toolkit_embed(texts, config.embedding_config)
+            )
+            cluster_config = _build_raptor_cluster_config(config)
+            cluster_result = _normalize_cluster_result(
+                _toolkit_cluster(embeddings, cluster_config, texts=texts),
+                note_count=len(prepared.notes),
+            )
 
-            raise NotImplementedError(
-                "T1 to T2 clustering is implemented in Phase 2 step 6.2.3"
+            coherent_member_indices: set[int] = set()
+            incoherent_cluster_count = 0
+            for cluster in cluster_result.clusters:
+                coherence = _mean_pairwise_similarity(
+                    [_vector_at(embeddings, index) for index in cluster.member_indices]
+                )
+                if coherence >= config.min_cluster_coherence:
+                    coherent_member_indices.update(cluster.member_indices)
+                else:
+                    incoherent_cluster_count += 1
+
+            clustered_indices = {
+                index
+                for cluster in cluster_result.clusters
+                for index in cluster.member_indices
+            }
+            noise_indices = set(cluster_result.noise_indices)
+            noise_indices.update(set(range(len(prepared.notes))) - clustered_indices)
+
+            return TierPromotionResult(
+                new_cluster_ids=[],
+                updated_cluster_ids=[],
+                promoted_count=len(coherent_member_indices),
+                noise_count=len(noise_indices),
+                incoherent_cluster_count=incoherent_cluster_count,
+                cluster_tree_depth=cluster_result.tree_depth,
+                feedback_processed=len(prepared.feedback_events),
+                assertion_cache_updated=[],
             )
 
     def distill_t2_to_t3(
@@ -392,6 +450,191 @@ def _make_raptor_embedder(
         return _embedding_vectors(embedding_callable(texts, embedding_config))
 
     return embedder
+
+
+def _build_raptor_cluster_config(config: DistillationConfig) -> object:
+    summarizer = _make_raptor_summarizer(config.llm_config, config.reflection_tier)
+    embedder = _make_raptor_embedder(config.embedding_config)
+
+    if config.clustering_config is None:
+        return _RaptorClusterConfig(
+            strategy="RAPTOR",
+            raptor_summarizer=summarizer,
+            raptor_embedder=embedder,
+        )
+
+    if isinstance(config.clustering_config, dict):
+        cluster_config = dict(config.clustering_config)
+        cluster_config.setdefault("strategy", "RAPTOR")
+        cluster_config["raptor_summarizer"] = summarizer
+        cluster_config["raptor_embedder"] = embedder
+        return cluster_config
+
+    for field_name, value in (
+        ("raptor_summarizer", summarizer),
+        ("raptor_embedder", embedder),
+    ):
+        try:
+            setattr(config.clustering_config, field_name, value)
+        except (AttributeError, TypeError):
+            pass
+    return config.clustering_config
+
+
+def _normalize_cluster_result(
+    result: object,
+    *,
+    note_count: int,
+) -> _NormalizedClusterResult:
+    clusters_payload = _result_value(result, "clusters")
+    if clusters_payload is not None:
+        clusters = [
+            _normalize_cluster(cluster, fallback_id=f"cluster-{index}")
+            for index, cluster in enumerate(clusters_payload)
+        ]
+        return _NormalizedClusterResult(
+            clusters=[
+                cluster
+                for cluster in clusters
+                if _valid_member_indices(cluster.member_indices, note_count)
+            ],
+            noise_indices=_normalize_index_set(
+                _result_value(result, "noise_indices", "noise", "outliers"),
+                note_count,
+            ),
+            tree_depth=_normalize_tree_depth(result),
+        )
+
+    labels = _result_value(result, "labels", "assignments")
+    if labels is not None:
+        grouped: dict[str, list[int]] = {}
+        noise_indices: set[int] = set()
+        for index, label in enumerate(labels):
+            if index >= note_count:
+                break
+            if label in (None, -1, "noise", "outlier"):
+                noise_indices.add(index)
+            else:
+                grouped.setdefault(str(label), []).append(index)
+        return _NormalizedClusterResult(
+            clusters=[
+                _NormalizedCluster(cluster_id=cluster_id, member_indices=indices)
+                for cluster_id, indices in grouped.items()
+            ],
+            noise_indices=noise_indices,
+            tree_depth=_normalize_tree_depth(result),
+        )
+
+    return _NormalizedClusterResult(
+        clusters=[],
+        noise_indices=set(range(note_count)),
+        tree_depth=_normalize_tree_depth(result),
+    )
+
+
+def _normalize_cluster(cluster: object, *, fallback_id: str) -> _NormalizedCluster:
+    member_indices = _result_value(
+        cluster,
+        "member_indices",
+        "indices",
+        "note_indices",
+        "members",
+    )
+    return _NormalizedCluster(
+        cluster_id=str(_result_value(cluster, "cluster_id", "id", default=fallback_id)),
+        member_indices=[int(index) for index in member_indices or []],
+        summary=_optional_string(_result_value(cluster, "summary", "text")),
+    )
+
+
+def _result_value(
+    value: object,
+    *names: str,
+    default: object | None = None,
+) -> object | None:
+    if isinstance(value, Mapping):
+        for name in names:
+            if name in value:
+                return value[name]
+        return default
+
+    for name in names:
+        if hasattr(value, name):
+            return getattr(value, name)
+    return default
+
+
+def _normalize_index_set(value: object, note_count: int) -> set[int]:
+    if value is None:
+        return set()
+    return {
+        int(index)
+        for index in value
+        if isinstance(index, int) and 0 <= index < note_count
+    }
+
+
+def _valid_member_indices(indices: Sequence[int], note_count: int) -> bool:
+    return bool(indices) and all(0 <= index < note_count for index in indices)
+
+
+def _normalize_tree_depth(result: object) -> int:
+    depth = _result_value(result, "tree_depth", "depth", "raptor_depth", default=1)
+    try:
+        return max(0, int(depth))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _optional_string(value: object | None) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _mean_pairwise_similarity(vectors: Sequence[object]) -> float:
+    if len(vectors) < 2:
+        return 1.0
+
+    similarities: list[float] = []
+    for left_index, left in enumerate(vectors):
+        for right in vectors[left_index + 1 :]:
+            similarities.append(_cosine_similarity(left, right))
+    if not similarities:
+        return 1.0
+    return sum(similarities) / len(similarities)
+
+
+def _cosine_similarity(left: object, right: object) -> float:
+    left_values = [float(value) for value in left]
+    right_values = [float(value) for value in right]
+    if len(left_values) != len(right_values):
+        return 0.0
+
+    left_norm = math.sqrt(sum(value * value for value in left_values))
+    right_norm = math.sqrt(sum(value * value for value in right_values))
+    if left_norm == 0.0 or right_norm == 0.0:
+        return 0.0
+
+    dot = sum(
+        left_value * right_value
+        for left_value, right_value in zip(left_values, right_values, strict=True)
+    )
+    return dot / (left_norm * right_norm)
+
+
+def _vector_at(vectors: object, index: int) -> object:
+    return vectors[index]
+
+
+def _note_content(note: object) -> str:
+    content = getattr(note, "content", None)
+    if content is not None:
+        return str(content)
+    title = getattr(note, "title", None)
+    if title is not None:
+        return str(title)
+    return str(getattr(note, "note_id", ""))
 
 
 def _validate_memory_store(memory_store: object) -> None:

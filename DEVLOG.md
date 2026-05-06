@@ -147,6 +147,17 @@ Implemented the lock-protected `distill_t1_to_t2` entry path through the scoped 
 
 Added deterministic feedback boost preparation for `source="feedback"` Tier 1 events when enabled. Feedback links and `friction_target` references contribute bounded importance boosts to referenced input notes without Memory Store writes, toolkit calls, run metadata updates, or cluster synthesis. Focused tests cover since-query shape, disabled feedback, insufficient data, concurrent lock rejection, no-write behavior, and boost clamping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (40 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (483 passed).
 
+### Step 6.2.3: RAPTOR clustering and coherence gating
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the T1->T2 clustering path through the scoped Step 6.2.3 boundary. `distill_t1_to_t2(config)` now embeds prepared Tier 1 note content through the private embedding seam, constructs RAPTOR clustering callbacks, passes note texts into the clustering seam, normalizes cluster outputs, computes mean pairwise cosine similarity per cluster, and returns `TierPromotionResult` counts for coherent promoted members, explicit/unassigned noise, incoherent clusters, tree depth, and processed feedback events.
+
+Kept Tier 2 Memory Store writes, cluster links, assertion-cache persistence, and run metadata updates deferred to later Phase 2 steps. Added focused clustering tests for callback wiring, coherent versus incoherent split behavior, noise labels, and no-write behavior, while updating preparation tests now that the public method advances past the previous deferred stub. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (42 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (485 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
