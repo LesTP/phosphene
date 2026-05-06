@@ -147,6 +147,17 @@ Added the initial `phosphene.distillation` package with ARCH-aligned public data
 
 Export coverage now verifies the public package surface, dataclass field order, default values, constructor behavior, and error inheritance. `DistillationConfig` is keyword-only so the ARCH field order can be preserved while keeping required toolkit configs after defaulted fields. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (3 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (446 passed).
 
+### Step 6.1.2: Config validation and engine construction
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Distillation config validation for required toolkit config objects, non-null LLM rotation entries, non-negative run cadence, positive Tier 1 volume and T2->T3 cycle thresholds, non-negative inertia growth, minimum max-inertia bounds, and probability-bounded compression/coherence thresholds. Validation is local and does not import or call toolkit services.
+
+Added `DistillationEngine` construction checks for the Memory Store read/write surface needed by later metadata, gate, and promotion steps: `query_notes`, `store_note`, `update_note`, `add_links`, `get_personality_context`, `supersede`, and a `vault_path` attribute for persisted distillation metadata. Focused tests cover invalid config values, rotation presence checks, valid fake-store construction, missing store methods, and missing metadata vault path. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (458 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation

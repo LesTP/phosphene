@@ -7,6 +7,8 @@ from datetime import timedelta
 from enum import Enum
 from typing import Any
 
+from phosphene.distillation.errors import DistillationConfigError
+
 try:
     from toolkit.clustering import ClusterConfig
     from toolkit.embedding import EmbeddingConfig
@@ -22,6 +24,39 @@ except ImportError:
         DEFAULT = "default"
         COMMODITY = "commodity"
         QUALITY = "quality"
+
+
+def _require_present(value: object, field_name: str) -> None:
+    if value is None:
+        raise DistillationConfigError(f"{field_name} is required")
+
+
+def _require_non_negative_timedelta(value: timedelta, field_name: str) -> None:
+    if not isinstance(value, timedelta):
+        raise DistillationConfigError(f"{field_name} must be a timedelta")
+    if value < timedelta(0):
+        raise DistillationConfigError(f"{field_name} must be non-negative")
+
+
+def _require_positive_int(value: int, field_name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DistillationConfigError(f"{field_name} must be an integer")
+    if value <= 0:
+        raise DistillationConfigError(f"{field_name} must be positive")
+
+
+def _require_non_negative_float(value: float, field_name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise DistillationConfigError(f"{field_name} must be a number")
+    if value < 0.0:
+        raise DistillationConfigError(f"{field_name} must be non-negative")
+
+
+def _require_probability(value: float, field_name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise DistillationConfigError(f"{field_name} must be a number")
+    if value < 0.0 or value > 1.0:
+        raise DistillationConfigError(f"{field_name} must be in [0.0, 1.0]")
 
 
 @dataclass(kw_only=True)
@@ -40,6 +75,26 @@ class DistillationConfig:
     max_compression_ratio: float = 0.5
     incorporate_feedback: bool = True
     min_cluster_coherence: float = 0.4
+
+    def __post_init__(self) -> None:
+        _require_present(self.llm_config, "llm_config")
+        _require_present(self.embedding_config, "embedding_config")
+
+        for index, llm_config in enumerate(self.llm_configs_rotation or []):
+            _require_present(llm_config, f"llm_configs_rotation[{index}]")
+
+        _require_non_negative_timedelta(
+            self.min_time_between_runs,
+            "min_time_between_runs",
+        )
+        _require_positive_int(self.min_tier1_volume, "min_tier1_volume")
+        _require_positive_int(self.t2_to_t3_cycle_days, "t2_to_t3_cycle_days")
+        _require_non_negative_float(self.inertia_per_cycle, "inertia_per_cycle")
+        _require_non_negative_float(self.max_inertia, "max_inertia")
+        if self.max_inertia < 1.0:
+            raise DistillationConfigError("max_inertia must be at least 1.0")
+        _require_probability(self.max_compression_ratio, "max_compression_ratio")
+        _require_probability(self.min_cluster_coherence, "min_cluster_coherence")
 
 
 @dataclass

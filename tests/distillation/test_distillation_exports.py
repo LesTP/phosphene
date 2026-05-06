@@ -1,6 +1,8 @@
 from dataclasses import fields
 from datetime import timedelta
 
+import pytest
+
 import phosphene.distillation as distillation
 from phosphene.distillation import (
     CriteriaAdjustment,
@@ -18,6 +20,28 @@ from phosphene.distillation import (
     TierPromotionResult,
 )
 from phosphene.distillation.types import ModelTier
+
+
+class FakeMemoryStore:
+    vault_path = "/tmp/phosphene-test-vault"
+
+    def query_notes(self, *_args: object, **_kwargs: object) -> list[object]:
+        return []
+
+    def store_note(self, *_args: object, **_kwargs: object) -> str:
+        return "note-id"
+
+    def update_note(self, *_args: object, **_kwargs: object) -> object:
+        return object()
+
+    def add_links(self, *_args: object, **_kwargs: object) -> None:
+        return None
+
+    def get_personality_context(self) -> object:
+        return object()
+
+    def supersede(self, *_args: object, **_kwargs: object) -> object:
+        return object()
 
 
 def test_package_exports_arch_public_api() -> None:
@@ -153,7 +177,7 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
         criteria_adjustments=[adjustment],
         compression_ratio=0.25,
     )
-    memory_store = object()
+    memory_store = FakeMemoryStore()
     engine = DistillationEngine(memory_store=memory_store)
 
     assert config.llm_configs_rotation is None
@@ -176,3 +200,56 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     assert issubclass(DistillationLockError, DistillationError)
     assert issubclass(InsufficientDataError, DistillationError)
     assert issubclass(NoPatternDataError, DistillationError)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("llm_config", None, "llm_config is required"),
+        ("embedding_config", None, "embedding_config is required"),
+        ("min_time_between_runs", timedelta(seconds=-1), "min_time_between_runs must be non-negative"),
+        ("min_tier1_volume", 0, "min_tier1_volume must be positive"),
+        ("t2_to_t3_cycle_days", 0, "t2_to_t3_cycle_days must be positive"),
+        ("inertia_per_cycle", -0.1, "inertia_per_cycle must be non-negative"),
+        ("max_inertia", 0.9, "max_inertia must be at least 1.0"),
+        ("max_compression_ratio", 1.1, r"max_compression_ratio must be in \[0.0, 1.0\]"),
+        ("min_cluster_coherence", -0.1, r"min_cluster_coherence must be in \[0.0, 1.0\]"),
+    ],
+)
+def test_distillation_config_validates_thresholds_and_required_toolkit_configs(
+    field_name: str,
+    value: object,
+    message: str,
+) -> None:
+    kwargs = {"llm_config": object(), "embedding_config": object(), field_name: value}
+
+    with pytest.raises(DistillationConfigError, match=message):
+        DistillationConfig(**kwargs)
+
+
+def test_distillation_config_validates_rotation_entries_without_toolkit_calls() -> None:
+    with pytest.raises(
+        DistillationConfigError,
+        match=r"llm_configs_rotation\[1\] is required",
+    ):
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            llm_configs_rotation=[object(), None],
+        )
+
+
+def test_engine_validates_memory_store_dependency_shape() -> None:
+    with pytest.raises(DistillationConfigError, match="memory_store is required"):
+        DistillationEngine(memory_store=None)
+
+    with pytest.raises(DistillationConfigError, match=r"memory_store must provide query_notes\(\)"):
+        DistillationEngine(memory_store=object())
+
+
+def test_engine_requires_memory_store_vault_path_for_distillation_metadata() -> None:
+    class MissingVaultPath(FakeMemoryStore):
+        vault_path = None
+
+    with pytest.raises(DistillationConfigError, match="memory_store must expose vault_path"):
+        DistillationEngine(memory_store=MissingVaultPath())
