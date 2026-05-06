@@ -158,6 +158,17 @@ Added Distillation config validation for required toolkit config objects, non-nu
 
 Added `DistillationEngine` construction checks for the Memory Store read/write surface needed by later metadata, gate, and promotion steps: `query_notes`, `store_note`, `update_note`, `add_links`, `get_personality_context`, `supersede`, and a `vault_path` attribute for persisted distillation metadata. Focused tests cover invalid config values, rotation presence checks, valid fake-store construction, missing store methods, and missing metadata vault path. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests` (458 passed).
 
+### Step 6.1.3: Distillation metadata persistence
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added private Distillation run metadata helpers backed by a JSON file at `.phosphene/distillation_runs.json` under the Memory Store vault. The helper record tracks last T1->T2 and T2->T3 run timestamps, creates the metadata directory on write, writes through a temporary file before replace, and treats missing, unreadable, invalid JSON, non-object, or field-level malformed metadata as never-run values instead of failing gate evaluation setup.
+
+Focused tests cover missing metadata, round-trip persistence, malformed file handling, independent malformed field handling, and the boundary that metadata helpers do not call Memory Store note APIs. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (19 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (462 passed).
+
 <!-- HISTORY --> <!-- do not read past this line. Completed entries kept for audit. -->
 
 ### Phase 5.1 Plan: Contract and routing foundation
