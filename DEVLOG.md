@@ -10,6 +10,26 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Step REVIEW_HARDENING.1.2: Filter logic
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the Attention Filter below-threshold partitioning for wild-card
+accepts and near-miss recording. `filter_content` now samples wild cards from
+below-threshold candidates, preserves result order after sampling, annotates
+wild cards with `retention_criteria=["wild_card"]`, annotates near misses from
+the remaining within-margin candidates, and keeps true rejects as count-only.
+
+Added focused regression coverage for zero wild-card ratio, full wild-card
+admission, wild-card tagging and annotation, near-miss margin selection,
+zero near-miss margin, rejected-count exclusion, unchanged accepted/auto-accepted
+behavior, and no Memory Store writes. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed).
+
 ### Step REVIEW_HARDENING.1.1: Config and types
 
 **Date:** 2026-05-06

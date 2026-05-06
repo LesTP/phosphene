@@ -437,6 +437,182 @@ def test_filter_content_prompt_only_mode_skips_assertion_extraction(
     assert result.accepted[0].annotation == "Prompt-only annotation."
 
 
+def test_filter_content_zero_wild_card_ratio_skips_wild_card_annotation(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics(note_count=2, cluster_count=0, mean_link_degree=0.0)
+    store = FakeMemoryStore(density, [[]])
+    llm_calls: list[dict[str, object]] = []
+
+    def fake_embed(_texts: list[str], _config: object) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[np.array([1.0, 0.0])])
+
+    def fake_complete(**kwargs: object) -> str:
+        llm_calls.append(dict(kwargs))
+        payload = json.loads(kwargs["messages"][0]["content"])
+        if payload["task"] == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.1}}'
+        return '{"annotation": "Should not be generated."}'
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [make_item("below")],
+        make_config(
+            acceptance_threshold=0.5,
+            wild_card_ratio=0.0,
+            near_miss_margin=0.0,
+        ),
+    )
+
+    payloads = [json.loads(call["messages"][0]["content"]) for call in llm_calls]
+    assert [payload["task"] for payload in payloads] == [
+        "score_attention_filter_prompt_criteria"
+    ]
+    assert result.accepted == []
+    assert result.wild_cards == []
+    assert result.near_misses == []
+    assert result.rejected_count == 1
+
+
+def test_filter_content_wild_card_ratio_one_admits_all_below_threshold(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics(note_count=2, cluster_count=0, mean_link_degree=0.0)
+    store = FakeMemoryStore(density, [[], []])
+    llm_calls: list[dict[str, object]] = []
+
+    def fake_embed(texts: list[str], _config: object) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[np.array([float(len(texts[0])), 0.0])])
+
+    def fake_complete(**kwargs: object) -> str:
+        llm_calls.append(dict(kwargs))
+        payload = json.loads(kwargs["messages"][0]["content"])
+        content = payload["content_item"]["content"]
+        if payload["task"] == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.1}}'
+        return json.dumps({"annotation": f"Wild annotation for {content}."})
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [make_item("wild one"), make_item("wild two")],
+        make_config(
+            acceptance_threshold=0.5,
+            wild_card_ratio=1.0,
+            near_miss_margin=0.05,
+        ),
+    )
+
+    payloads = [json.loads(call["messages"][0]["content"]) for call in llm_calls]
+    assert [payload["task"] for payload in payloads] == [
+        "score_attention_filter_prompt_criteria",
+        "score_attention_filter_prompt_criteria",
+        "generate_attention_filter_annotation",
+        "generate_attention_filter_annotation",
+    ]
+    assert result.accepted == []
+    assert [fragment.content for fragment in result.wild_cards] == [
+        "wild one",
+        "wild two",
+    ]
+    assert [fragment.annotation for fragment in result.wild_cards] == [
+        "Wild annotation for wild one.",
+        "Wild annotation for wild two.",
+    ]
+    assert [fragment.retention_criteria for fragment in result.wild_cards] == [
+        ["wild_card"],
+        ["wild_card"],
+    ]
+    assert result.near_misses == []
+    assert result.rejected_count == 0
+    assert store.write_calls == 0
+
+
+def test_filter_content_near_misses_within_margin_receive_full_annotation(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics(note_count=2, cluster_count=0, mean_link_degree=0.0)
+    store = FakeMemoryStore(density, [[], []])
+    scores = {
+        "near": 0.46,
+        "low": 0.44,
+    }
+
+    def fake_embed(texts: list[str], _config: object) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[np.array([float(len(texts[0])), 0.0])])
+
+    def fake_complete(**kwargs: object) -> str:
+        payload = json.loads(kwargs["messages"][0]["content"])
+        content = payload["content_item"]["content"]
+        if payload["task"] == "score_attention_filter_prompt_criteria":
+            return json.dumps({"scores": {"precision_surplus": scores[content]}})
+        return json.dumps({"annotation": f"Near-miss annotation for {content}."})
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [make_item("near"), make_item("low")],
+        make_config(
+            acceptance_threshold=0.5,
+            wild_card_ratio=0.0,
+            near_miss_margin=0.05,
+        ),
+    )
+
+    assert result.accepted == []
+    assert result.wild_cards == []
+    assert [fragment.content for fragment in result.near_misses] == ["near"]
+    assert result.near_misses[0].annotation == "Near-miss annotation for near."
+    assert result.near_misses[0].retention_criteria == ["precision_surplus"]
+    assert result.rejected_count == 1
+    assert store.write_calls == 0
+
+
+def test_filter_content_zero_near_miss_margin_suppresses_near_misses(
+    monkeypatch,
+) -> None:
+    import phosphene.attention_filter.filter as filter_module
+
+    density = metrics(note_count=2, cluster_count=0, mean_link_degree=0.0)
+    store = FakeMemoryStore(density, [[]])
+
+    def fake_embed(_texts: list[str], _config: object) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[np.array([1.0, 0.0])])
+
+    def fake_complete(**kwargs: object) -> str:
+        payload = json.loads(kwargs["messages"][0]["content"])
+        if payload["task"] == "score_attention_filter_prompt_criteria":
+            return '{"scores": {"precision_surplus": 0.499}}'
+        return '{"annotation": "Should not be generated."}'
+
+    monkeypatch.setattr(filter_module, "_toolkit_embed", fake_embed)
+    monkeypatch.setattr(filter_module, "_toolkit_complete", fake_complete)
+
+    result = AttentionFilter(store).filter_content(
+        [make_item("almost")],
+        make_config(
+            acceptance_threshold=0.5,
+            wild_card_ratio=0.0,
+            near_miss_margin=0.0,
+        ),
+    )
+
+    assert result.accepted == []
+    assert result.wild_cards == []
+    assert result.near_misses == []
+    assert result.rejected_count == 1
+
+
 def test_private_item_evaluation_preserves_retrieval_and_blends_prompt_scores() -> None:
     embedding = np.array([1.0, 0.0])
     embedding_config = object()

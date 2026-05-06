@@ -2,7 +2,7 @@
 module: REVIEW_HARDENING
 phase: 1
 phase_title: "Pre-Module-7 Hardening Phase A — Attention Filter additions"
-step: 2
+step: 3
 mode: Build
 blocked: false
 regime: Build
@@ -49,25 +49,14 @@ Adds two anti-overfitting mechanisms to the Attention Filter (phosphene.md Secti
 
 Added ARCH-specified config/type fields: `wild_card_ratio`, `near_miss_margin`, `near_misses`, and `wild_cards`. Added config validation coverage and updated public contract tests. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v` (130 passed).
 
-**Step 2: Filter logic**
+**Step 2 (complete): Filter logic**
 
-Modify `src/phosphene/attention_filter/filter.py` `filter_content` method:
-- After scoring and before the accept/reject decision, partition below-threshold items into three buckets:
-  1. **Wild cards:** randomly select `wild_card_ratio` fraction of below-threshold items (use `random.sample` or equivalent). Tag with `retention_criteria=["wild_card"]`. Generate full annotation for these (same LLM call as accepted items).
-  2. **Near misses:** from remaining below-threshold items, select those scoring within `near_miss_margin` below `acceptance_threshold`. Generate full annotation for these (same format as accepted, for human review). Do NOT store these in Memory Store — they are informational only.
-  3. **Rejected:** everything else. Count only.
-- Update `FilterResult` construction to populate `near_misses` and `wild_cards`.
-- When `wild_card_ratio == 0.0`, skip wild-card logic entirely (no random selection, no annotation). When `near_miss_margin == 0.0`, skip near-miss logic.
-
-Tests:
-- `wild_card_ratio=0.0` produces empty wild_cards list.
-- `wild_card_ratio=1.0` admits all below-threshold items as wild cards.
-- Wild cards are tagged with `retention_criteria=["wild_card"]`.
-- Near misses are populated only for items scoring within margin.
-- `near_miss_margin=0.0` produces empty near_misses list.
-- Wild cards and near misses receive full annotation (non-empty annotation field).
-- `rejected_count` excludes wild cards and near misses.
-- Existing acceptance and auto-accept logic unchanged (regression).
+Implemented below-threshold partitioning in `filter_content`: deterministic accepts
+remain unchanged, wild cards are randomly sampled from rejected candidates and
+tagged `retention_criteria=["wild_card"]`, near misses are annotated from the
+remaining within-margin candidates, and `rejected_count` excludes both buckets.
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/attention_filter -v`
+(134 passed).
 
 **Step 3: Export and integration check**
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations
@@ -633,8 +634,73 @@ def _accepted_evaluations(
     return tuple(decision.evaluation for decision in decisions if decision.accepted)
 
 
-def _rejected_count(decisions: Sequence[_RetentionDecision]) -> int:
-    return sum(1 for decision in decisions if not decision.accepted)
+def _below_threshold_decisions(
+    decisions: Sequence[_RetentionDecision],
+) -> tuple[_RetentionDecision, ...]:
+    return tuple(decision for decision in decisions if not decision.accepted)
+
+
+def _wild_card_count(below_threshold_count: int, wild_card_ratio: float) -> int:
+    if wild_card_ratio <= 0.0 or below_threshold_count <= 0:
+        return 0
+
+    return min(below_threshold_count, int(below_threshold_count * wild_card_ratio))
+
+
+def _select_wild_card_decisions(
+    below_threshold_decisions: Sequence[_RetentionDecision],
+    config: AttentionFilterConfig,
+) -> tuple[_RetentionDecision, ...]:
+    count = _wild_card_count(
+        len(below_threshold_decisions),
+        config.wild_card_ratio,
+    )
+    if count == 0:
+        return ()
+
+    sampled_ids = {
+        id(decision)
+        for decision in random.sample(tuple(below_threshold_decisions), count)
+    }
+    return tuple(
+        decision
+        for decision in below_threshold_decisions
+        if id(decision) in sampled_ids
+    )
+
+
+def _near_miss_decisions(
+    below_threshold_decisions: Sequence[_RetentionDecision],
+    wild_card_decisions: Sequence[_RetentionDecision],
+    config: AttentionFilterConfig,
+) -> tuple[_RetentionDecision, ...]:
+    if config.near_miss_margin <= 0.0:
+        return ()
+
+    wild_card_ids = {id(decision) for decision in wild_card_decisions}
+    lower_bound = config.acceptance_threshold - config.near_miss_margin
+    return tuple(
+        decision
+        for decision in below_threshold_decisions
+        if id(decision) not in wild_card_ids
+        and decision.evaluation.composite_score >= lower_bound
+    )
+
+
+def _rejected_count(
+    decisions: Sequence[_RetentionDecision],
+    wild_card_decisions: Sequence[_RetentionDecision] = (),
+    near_miss_decisions: Sequence[_RetentionDecision] = (),
+) -> int:
+    excluded_ids = {
+        *(id(decision) for decision in wild_card_decisions),
+        *(id(decision) for decision in near_miss_decisions),
+    }
+    return sum(
+        1
+        for decision in decisions
+        if not decision.accepted and id(decision) not in excluded_ids
+    )
 
 
 def _retention_criteria_for_generated_annotation(
@@ -686,6 +752,27 @@ def _assemble_annotated_fragments(
         _assemble_annotated_fragment(
             generated,
             _retention_criteria_for_generated_annotation(generated, decisions),
+        )
+        for generated in generated_annotations
+    ]
+
+
+def _assemble_wild_card_fragments(
+    generated_annotations: Sequence[_GeneratedAnnotation],
+) -> list[AnnotatedFragment]:
+    return [
+        _assemble_annotated_fragment(generated, ("wild_card",))
+        for generated in generated_annotations
+    ]
+
+
+def _assemble_near_miss_fragments(
+    generated_annotations: Sequence[_GeneratedAnnotation],
+) -> list[AnnotatedFragment]:
+    return [
+        _assemble_annotated_fragment(
+            generated,
+            _retention_criteria_for_evaluation(generated.evaluation),
         )
         for generated in generated_annotations
     ]
@@ -1079,17 +1166,39 @@ class AttentionFilter:
             phase2_active=phase2_active,
         )
         decisions = _decide_batch_retention(evaluations, config)
+        below_threshold_decisions = _below_threshold_decisions(decisions)
+        wild_card_decisions = _select_wild_card_decisions(
+            below_threshold_decisions,
+            config,
+        )
+        near_miss_decisions = _near_miss_decisions(
+            below_threshold_decisions,
+            wild_card_decisions,
+            config,
+        )
         accepted_evaluations = _accepted_evaluations(decisions)
         generated_annotations = _generate_annotations(accepted_evaluations, config)
+        wild_card_annotations = _generate_annotations(
+            tuple(decision.evaluation for decision in wild_card_decisions),
+            config,
+        )
+        near_miss_annotations = _generate_annotations(
+            tuple(decision.evaluation for decision in near_miss_decisions),
+            config,
+        )
         accepted_fragments = _assemble_annotated_fragments(
             generated_annotations,
             decisions,
         )
         return FilterResult(
             accepted=accepted_fragments,
-            near_misses=[],
-            wild_cards=[],
-            rejected_count=_rejected_count(decisions),
+            near_misses=_assemble_near_miss_fragments(near_miss_annotations),
+            wild_cards=_assemble_wild_card_fragments(wild_card_annotations),
+            rejected_count=_rejected_count(
+                decisions,
+                wild_card_decisions,
+                near_miss_decisions,
+            ),
             total_count=len(items),
             prompt_weight=prompt_weight,
             structure_weight=structure_weight,
