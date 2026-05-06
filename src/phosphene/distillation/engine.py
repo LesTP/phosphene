@@ -273,6 +273,13 @@ class DistillationEngine:
                 coherent_promotions,
                 config,
             )
+            metadata = self._read_run_metadata()
+            self._write_run_metadata(
+                _DistillationRunMetadata(
+                    last_t1_to_t2_run=datetime.now(timezone.utc),
+                    last_t2_to_t3_run=metadata.last_t2_to_t3_run,
+                )
+            )
 
             return TierPromotionResult(
                 new_cluster_ids=write_result["new_cluster_ids"],

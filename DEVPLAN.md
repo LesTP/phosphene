@@ -2,8 +2,8 @@
 module: DISTILLATION
 phase: 2
 phase_title: T1->T2 RAPTOR promotion and assertion cache
-step: 6.2.6
-mode: Build
+step: 6.2.review
+mode: Review
 blocked: null
 regime: Build
 review_done: false
@@ -33,8 +33,8 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 2 in progress: T1->T2 RAPTOR promotion and assertion cache
-- **Focus** — Implement `distill_t1_to_t2(config)` behind fakeable toolkit boundaries: Tier 1 selection, feedback-aware weighting, embedding/clustering callback wiring, coherence gating, Tier 2 Memory Store writes, cluster links, assertion-cache persistence, and run metadata updates.
+- **Phase** — Module 6 Phase 2 ready for review: T1->T2 RAPTOR promotion and assertion cache
+- **Focus** — Review `distill_t1_to_t2(config)` against the Distillation architecture contract: fakeable toolkit boundaries, Tier 1 selection, feedback-aware weighting, embedding/clustering callback wiring, coherence gating, Tier 2 Memory Store writes, cluster links, assertion-cache persistence, run metadata updates, and deferred T2->T3 behavior.
 - **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
@@ -121,7 +121,7 @@ Build phase. Scope is limited to replacing the `distill_t1_to_t2(config)` stub w
 - [x] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
 - [x] **Step 6.2.4 — Tier 2 note writes and cluster links**: Create or update Tier 2 pattern notes through `store_note`/`update_note`, set `cluster_group`, preserve source Tier 1 links, wire related clusters through `add_links`, and leave noise/incoherent Tier 1 notes unmodified.
 - [x] **Step 6.2.5 — Assertion cache persistence**: Extract dominant assertions from every new/updated cluster summary and write JSON cache files under the Tier 2 assertion-cache location keyed by `cluster_group`, with malformed LLM payloads failing clearly and atomically.
-- [ ] **Step 6.2.6 — Phase integration hardening**: Exercise `distill_t1_to_t2` end to end with fake Memory Store/toolkit services, verify lock release and run metadata update on success only, verify toolkit errors propagate, and confirm `distill_t2_to_t3` remains deferred.
+- [x] **Step 6.2.6 — Phase integration hardening**: Exercise `distill_t1_to_t2` end to end with fake Memory Store/toolkit services, verify lock release and run metadata update on success only, verify toolkit errors propagate, and confirm `distill_t2_to_t3` remains deferred.
 
 <!--
 HISTORY — Do not read past this marker.

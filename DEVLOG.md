@@ -180,6 +180,17 @@ Implemented Tier 2 assertion-cache persistence for coherent T1->T2 cluster promo
 
 Malformed assertion extraction payloads now fail with clear `DistillationError` messages before any cache file is written for the batch, and each cache write uses a temporary file followed by replace. Focused tests cover cache content, cache update result ids, fake LLM boundary wiring in existing T1->T2 paths, and malformed-payload atomicity. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (44 passed).
 
+### Step 6.2.6: Phase integration hardening
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added phase-level T1->T2 integration coverage using fake Memory Store, embedding, clustering, and LLM completion services. The integration path now exercises Tier 1 selection through coherent cluster promotion, Tier 2 note creation, source links, assertion-cache writes, result counts, and successful run metadata persistence while preserving any existing T2->T3 run timestamp.
+
+Hardened success-only metadata behavior by updating `last_t1_to_t2_run` only after Memory Store writes and assertion-cache persistence complete. Added regression coverage that toolkit embedding failures propagate unchanged, do not write Tier 2 notes or links, do not advance T1->T2 run metadata, and release the consolidation lock. Added explicit coverage that `distill_t2_to_t3(config)` remains deferred to Phase 3. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation` (47 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest` (490 passed).
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.
