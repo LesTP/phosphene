@@ -114,6 +114,17 @@ Log review: Phase 6.1 loop logs show successful step progression and no new repe
 DEVPLAN cleanup: reduced Module 6 Phase 1 to a one-line completion summary and set frontmatter to await human audit before Module 6 Phase 2 planning.
 ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated from "In progress" to "Phase 1 complete".
 
+### Phase 6.2 Plan: T1->T2 RAPTOR promotion and assertion cache
+
+**Date:** 2026-05-06
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Planned Module 6 Phase 2 as a Build phase over `DistillationEngine.distill_t1_to_t2(config)`: toolkit boundary wrappers, Tier 1 selection and feedback preparation, RAPTOR clustering and coherence gating, Tier 2 note writes and cluster links, assertion-cache JSON persistence, and phase-level integration hardening.
+
+Scope decision recorded in D-44: Phase 2 is limited to T1->T2 promotion. T2->T3 reflect-evolve behavior, personality supersession, version-count inertia, compression caps, and criteria-adjustment output remain deferred to Phase 3 so cluster formation and assertion-cache ownership can stabilize first.
+
 <!--
 HISTORY — Do not read past this marker.
 Completed entries kept for audit.

@@ -1,10 +1,10 @@
 ---
 module: DISTILLATION
-phase: null
-phase_title: Module 6 Phase 1 complete — Module 6 Phase 2 next
-step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+phase: 2
+phase_title: T1->T2 RAPTOR promotion and assertion cache
+step: 6.2.1
+mode: Build
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -33,9 +33,9 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Module 6 Phase 1 complete: Distillation contract, gates, and metadata foundation
-- **Focus** — Awaiting human audit before Module 6 Phase 2 planning for T1->T2 RAPTOR promotion and assertion cache work.
-- **Blocked/Broken** — awaiting-human-audit
+- **Phase** — Module 6 Phase 2 in progress: T1->T2 RAPTOR promotion and assertion cache
+- **Focus** — Implement `distill_t1_to_t2(config)` behind fakeable toolkit boundaries: Tier 1 selection, feedback-aware weighting, embedding/clustering callback wiring, coherence gating, Tier 2 Memory Store writes, cluster links, assertion-cache persistence, and run metadata updates.
+- **Blocked/Broken** — None
 
 ## Module 1: Memory Store (complete)
 
@@ -111,6 +111,17 @@ Delivered prompted, response, and free-play generation behind fakeable toolkit/l
 Planned phases follow `ARCH_distillation.md`: first stabilize the public contract, validation, Memory Store read/write boundary helpers, in-process lock, persisted run metadata, and deterministic gate evaluation without live clustering or LLM synthesis; then add T1->T2 RAPTOR promotion and assertion cache; then add T2->T3 reflect-evolve with supersession and criteria-adjustment output.
 
 - **Phase 1 (complete)** — Delivered ARCH-aligned public dataclasses/errors/exports, config and Memory Store boundary validation, persisted run metadata, in-process locking, deterministic gate evaluation, deferred public distillation method stubs, and integration coverage proving no toolkit calls or Memory Store note writes outside metadata. Reviewed and completed. See DEVLOG "Phase 6.1 Review" and "Phase 6.1 Completion" entries.
+
+### Phase 2 (in progress): T1->T2 RAPTOR promotion and assertion cache
+
+Build phase. Scope is limited to replacing the `distill_t1_to_t2(config)` stub with ARCH-aligned Tier 1 to Tier 2 promotion. `distill_t2_to_t3(config)`, personality-file supersession, reflection/evolution prompts, and Attention Filter criteria-adjustment application remain deferred to Phase 3. Toolkit calls must stay behind private wrappers/import seams so the current no-toolkit test environment remains deterministic.
+
+- [ ] **Step 6.2.1 — Toolkit boundary and prompt helpers**: Add private wrappers for embedding, RAPTOR clustering, LLM cluster summarization, and LLM assertion extraction; preserve import-time compatibility when `toolkit` is absent; add focused tests with injectable fakes/sentinels.
+- [ ] **Step 6.2.2 — Tier 1 input selection and feedback preparation**: Implement the lock-protected `distill_t1_to_t2` entry guard, metadata-based Tier 1 query, `InsufficientDataError`, feedback-event query when enabled, and deterministic importance boost preparation without Memory Store writes yet.
+- [ ] **Step 6.2.3 — RAPTOR clustering and coherence gating**: Embed selected Tier 1 notes, call clustering with RAPTOR callbacks and note texts, compute mean pairwise similarity per cluster, split coherent promotions from noise/incoherent clusters, and report tree depth/counts.
+- [ ] **Step 6.2.4 — Tier 2 note writes and cluster links**: Create or update Tier 2 pattern notes through `store_note`/`update_note`, set `cluster_group`, preserve source Tier 1 links, wire related clusters through `add_links`, and leave noise/incoherent Tier 1 notes unmodified.
+- [ ] **Step 6.2.5 — Assertion cache persistence**: Extract dominant assertions from every new/updated cluster summary and write JSON cache files under the Tier 2 assertion-cache location keyed by `cluster_group`, with malformed LLM payloads failing clearly and atomically.
+- [ ] **Step 6.2.6 — Phase integration hardening**: Exercise `distill_t1_to_t2` end to end with fake Memory Store/toolkit services, verify lock release and run metadata update on success only, verify toolkit errors propagate, and confirm `distill_t2_to_t3` remains deferred.
 
 <!--
 HISTORY — Do not read past this marker.
