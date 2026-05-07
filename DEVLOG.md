@@ -9,6 +9,25 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 7.1 Review: Feedback Collector contract and immediate feedback foundation
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Reviewed
+**Contract changes:** None
+
+Reviewed Phase 7.1 against `ARCH_feedback_collector.md`. Must fix: none.
+Should fix: none. Optional: none deferred. The implementation preserves the
+Phase 7.1 scope: ARCH-aligned public dataclasses and exports, in-memory output
+tracking, immediate Gateway feedback normalization, Tier 1 Memory Store
+feedback-note writes, silence detection, bounded pruning, and Tier 1
+unresolvedness bumps for positive feedback.
+
+Delayed engagement remains intentionally deferred to Phase 7.2 per DEVPLAN.
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest
+tests/feedback_collector` (27 passed) and
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/` (574 passed).
+
 ### Step 7.1.5: Integration and regression
 
 **Date:** 2026-05-07

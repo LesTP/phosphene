@@ -1,7 +1,7 @@
 ---
 phase: 7.1
 blocked: null
-state: review
+state: close
 ---
 
 # Phosphene — Development Plan
@@ -30,7 +30,7 @@ state: review
 
 - **Module** — 7: Feedback Collector.
 - **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Review Phase 7.1: Feedback Collector contract and immediate feedback foundation.
+- **Focus** — Close Phase 7.1: Feedback Collector contract and immediate feedback foundation.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
