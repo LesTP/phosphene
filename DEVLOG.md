@@ -9,6 +9,26 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 7.1.2: Output registration and retention criteria
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `FeedbackCollector.register_output()` for the successful Gateway
+delivery path. The collector now ignores failed deliveries and successful
+deliveries without a `message_id`, maps tracked message ids to `OutputRecord`
+metadata from `GeneratorOutput`, stamps the in-memory delivery time, and keeps
+tracking state only in the collector's `output_records` map.
+
+Retention criteria are derived from Memory Store source-note tags using the
+known Attention Filter retention criteria, preserving first-seen source order
+and deduplicating repeated criteria. Missing or unreadable source notes are
+ignored so registration remains non-throwing per the ARCH contract.
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/`
+(560 passed).
+
 ### Step 7.1.1: Feedback Collector public package contract
 
 **Date:** 2026-05-07

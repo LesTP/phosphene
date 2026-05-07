@@ -1,8 +1,10 @@
 from dataclasses import fields
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
+from phosphene.gateway import DeliveryResult
 import phosphene.feedback_collector as feedback_collector
 from phosphene.feedback_collector import (
     FeedbackCollector,
@@ -125,3 +127,91 @@ def test_config_validates_arch_runtime_settings(
 
     with pytest.raises(ValueError, match=message):
         FeedbackCollectorConfig(**kwargs)
+
+
+class FakeMemoryStore:
+    def __init__(self, notes: dict[str, object]) -> None:
+        self.notes = notes
+
+    def get_note(self, note_id: str) -> object:
+        return self.notes[note_id]
+
+
+def test_register_output_tracks_successful_delivery_metadata() -> None:
+    store = FakeMemoryStore(
+        {
+            "note-1": SimpleNamespace(
+                tags=["source", "precision_surplus", "friction"]
+            ),
+            "note-2": SimpleNamespace(
+                tags=["friction", "unresolvedness_affinity", "other"]
+            ),
+        }
+    )
+    collector = FeedbackCollector(memory_store=store)
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1", "note-2"],
+    )
+    delivery = DeliveryResult(
+        success=True,
+        platform="telegram",
+        message_id="msg-1",
+    )
+
+    collector.register_output(output, delivery)
+
+    record = collector.output_records["msg-1"]
+    assert record.message_id == "msg-1"
+    assert record.intent_tag == "synthesis"
+    assert record.output_mode == "prompted"
+    assert record.source_note_ids == ["note-1", "note-2"]
+    assert record.retention_criteria == [
+        "precision_surplus",
+        "friction",
+        "unresolvedness_affinity",
+    ]
+    assert isinstance(record.delivered_at, datetime)
+    assert record.feedback_events == []
+    assert record.silence_recorded is False
+
+
+@pytest.mark.parametrize(
+    "delivery",
+    [
+        DeliveryResult(success=False, platform="telegram", message_id="msg-1"),
+        DeliveryResult(success=True, platform="telegram", message_id=None),
+    ],
+)
+def test_register_output_ignores_failed_or_unaddressable_deliveries(
+    delivery: DeliveryResult,
+) -> None:
+    collector = FeedbackCollector(memory_store=FakeMemoryStore({}))
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1"],
+    )
+
+    collector.register_output(output, delivery)
+
+    assert collector.output_records == {}
+
+
+def test_register_output_keeps_tracking_state_in_memory_only() -> None:
+    store = FakeMemoryStore({"note-1": SimpleNamespace(tags=["precision_surplus"])})
+    collector = FeedbackCollector(memory_store=store)
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1"],
+    )
+    delivery = DeliveryResult(success=True, platform="telegram", message_id="msg-1")
+
+    collector.register_output(output, delivery)
+
+    assert collector.output_records["msg-1"].retention_criteria == [
+        "precision_surplus"
+    ]
+    assert not hasattr(store, "store_note")
