@@ -9,6 +9,24 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 7.1.1: Feedback Collector public package contract
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the `phosphene.feedback_collector` package with ARCH-aligned
+`FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, and
+`FeedbackCollector` exports. The collector now exposes the public constructor
+and method signatures for output registration, signal processing, silence
+checks, delayed-engagement checks, and unresolvedness updates while later
+steps fill in behavior.
+
+Added focused tests for package exports, dataclass field order, default values,
+collector construction, method availability, and config validation for timing
+windows, reaction lists, and boolean policy flags. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/` (556 passed).
 
 ### Phase 7.1 Plan: Feedback Collector contract and immediate feedback foundation
 

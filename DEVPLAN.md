@@ -30,7 +30,7 @@ state: execute
 
 - **Module** — 7: Feedback Collector.
 - **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Execute Step 7.1.1: public package, dataclasses, config validation, and exports.
+- **Focus** — Execute Step 7.1.2: output registration and source-note retention criteria.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -132,8 +132,8 @@ Planned phases follow `ARCH_feedback_collector.md`: first stabilize the public c
 
 Build phase scoped to the Feedback Collector's core runtime loop without delayed-engagement persistence heuristics. Public dataclasses and exports must match `ARCH_feedback_collector.md`; implementation uses Gateway `FeedbackSignal` / `DeliveryResult`, Generator `GeneratorOutput`, and Memory Store `NoteInput` / `NotePatch` boundaries directly.
 
-- **Step 7.1.1 (next)** — Public package contract: add `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
-- **Step 7.1.2** — Output registration: map successful `DeliveryResult.message_id` values to output metadata, ignore failed/no-id deliveries, aggregate source-note retention criteria from Memory Store notes, and keep tracking state in memory.
+- **Step 7.1.1 (complete)** — Public package contract: added `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
+- **Step 7.1.2 (next)** — Output registration: map successful `DeliveryResult.message_id` values to output metadata, ignore failed/no-id deliveries, aggregate source-note retention criteria from Memory Store notes, and keep tracking state in memory.
 - **Step 7.1.3** — Signal processing: classify Gateway reactions/replies/forwards, ignore unknown or untracked signals, store feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and return `FeedbackEvent`.
 - **Step 7.1.4** — Silence and unresolvedness: record one silence event after the configured window only when no feedback arrived, prune old records, and bump unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
 - **Step 7.1.5** — Integration and regression: cover Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
