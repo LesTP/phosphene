@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from phosphene.gateway import DeliveryResult
+from phosphene.gateway import FeedbackSignal
 import phosphene.feedback_collector as feedback_collector
 from phosphene.feedback_collector import (
     FeedbackCollector,
@@ -132,9 +133,14 @@ def test_config_validates_arch_runtime_settings(
 class FakeMemoryStore:
     def __init__(self, notes: dict[str, object]) -> None:
         self.notes = notes
+        self.stored_notes: list[object] = []
 
     def get_note(self, note_id: str) -> object:
         return self.notes[note_id]
+
+    def store_note(self, note: object) -> str:
+        self.stored_notes.append(note)
+        return f"feedback-{len(self.stored_notes)}"
 
 
 def test_register_output_tracks_successful_delivery_metadata() -> None:
@@ -214,4 +220,106 @@ def test_register_output_keeps_tracking_state_in_memory_only() -> None:
     assert collector.output_records["msg-1"].retention_criteria == [
         "precision_surplus"
     ]
-    assert not hasattr(store, "store_note")
+    assert store.stored_notes == []
+
+
+def _registered_collector() -> tuple[FeedbackCollector, FakeMemoryStore]:
+    store = FakeMemoryStore(
+        {
+            "note-1": SimpleNamespace(tags=["precision_surplus"]),
+            "note-2": SimpleNamespace(tags=["friction", "other"]),
+        }
+    )
+    collector = FeedbackCollector(memory_store=store)
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1", "note-2"],
+    )
+    delivery = DeliveryResult(success=True, platform="telegram", message_id="msg-1")
+    collector.register_output(output, delivery)
+    return collector, store
+
+
+def _feedback_signal(
+    *,
+    message_id: str = "msg-1",
+    signal_type: str = "reaction",
+    value: str | None = "👍",
+) -> FeedbackSignal:
+    return FeedbackSignal(
+        platform="telegram",
+        message_id=message_id,
+        signal_type=signal_type,
+        value=value,
+        sender="human",
+        timestamp=datetime(2026, 5, 7, 12, 0),
+    )
+
+
+def test_process_signal_stores_positive_reaction_feedback_note() -> None:
+    collector, store = _registered_collector()
+
+    event = collector.process_signal(_feedback_signal(value="💡"))
+
+    assert event == collector.output_records["msg-1"].feedback_events[0]
+    assert event is not None
+    assert event.output_message_id == "msg-1"
+    assert event.output_intent_tag == "synthesis"
+    assert event.output_mode == "prompted"
+    assert event.signal_type == "like"
+    assert event.signal_value == "💡"
+    assert event.source_note_ids == ["note-1", "note-2"]
+    assert event.retention_criteria == ["precision_surplus", "friction"]
+    assert event.timestamp == datetime(2026, 5, 7, 12, 0)
+
+    stored = store.stored_notes[0]
+    assert stored.tier == 1
+    assert stored.content == "Feedback: like on [synthesis] output"
+    assert stored.title == "Feedback: like on synthesis"
+    assert stored.importance == 0.7
+    assert stored.tags == ["feedback", "like", "synthesis", "precision_surplus", "friction"]
+    assert stored.source == "feedback"
+    assert stored.links == ["note-1", "note-2"]
+
+
+@pytest.mark.parametrize(
+    ("signal", "expected_type", "expected_importance"),
+    [
+        (_feedback_signal(value="👎"), "dislike", 0.8),
+        (_feedback_signal(signal_type="reply", value="tell me more"), "reply", 0.7),
+        (_feedback_signal(signal_type="forward", value=None), "forward", 0.9),
+    ],
+)
+def test_process_signal_classifies_supported_feedback_signals(
+    signal: FeedbackSignal,
+    expected_type: str,
+    expected_importance: float,
+) -> None:
+    collector, store = _registered_collector()
+
+    event = collector.process_signal(signal)
+
+    assert event is not None
+    assert event.signal_type == expected_type
+    assert store.stored_notes[0].importance == expected_importance
+
+
+@pytest.mark.parametrize(
+    "signal",
+    [
+        _feedback_signal(message_id="missing", value="👍"),
+        _feedback_signal(value="❓"),
+        _feedback_signal(signal_type="edit", value="changed"),
+    ],
+)
+def test_process_signal_ignores_unknown_or_untracked_signals(
+    signal: FeedbackSignal,
+) -> None:
+    collector, store = _registered_collector()
+
+    event = collector.process_signal(signal)
+
+    assert event is None
+    assert collector.output_records["msg-1"].feedback_events == []
+    assert store.stored_notes == []

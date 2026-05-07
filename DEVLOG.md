@@ -9,6 +9,28 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 7.1.3: Immediate Gateway feedback signal processing
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `FeedbackCollector.process_signal()` for tracked Gateway feedback.
+The collector now ignores unknown message ids, unsupported signal types, and
+unrecognized reactions; classifies positive reactions as likes, negative
+reactions as dislikes, and Gateway replies/forwards as immediate feedback
+events; appends returned `FeedbackEvent` objects to the in-memory output
+record; and stores each event as a Tier 1 Memory Store `NoteInput` with
+`source="feedback"`, ARCH tags, source-note links, and signal-specific
+importance.
+
+Added focused tests covering positive reaction note storage, dislike/reply/
+forward classification, and ignored untracked or unsupported signals.
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest
+tests/feedback_collector` (20 passed) and `PYTHONPATH=src:.python_deps python3
+-m pytest tests/` (567 passed).
+
 ### Step 7.1.2: Output registration and retention criteria
 
 **Date:** 2026-05-07

@@ -30,7 +30,7 @@ state: execute
 
 - **Module** — 7: Feedback Collector.
 - **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Execute Step 7.1.3: immediate Gateway feedback signal processing.
+- **Focus** — Execute Step 7.1.4: silence detection and positive-feedback unresolvedness updates.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -134,8 +134,8 @@ Build phase scoped to the Feedback Collector's core runtime loop without delayed
 
 - **Step 7.1.1 (complete)** — Public package contract: added `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
 - **Step 7.1.2 (complete)** — Output registration: mapped successful `DeliveryResult.message_id` values to in-memory output metadata, ignored failed/no-id deliveries, and aggregated known retention-criteria tags from Memory Store source notes.
-- **Step 7.1.3 (next)** — Signal processing: classify Gateway reactions/replies/forwards, ignore unknown or untracked signals, store feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and return `FeedbackEvent`.
-- **Step 7.1.4** — Silence and unresolvedness: record one silence event after the configured window only when no feedback arrived, prune old records, and bump unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
+- **Step 7.1.3 (complete)** — Signal processing: classified Gateway reactions/replies/forwards, ignored unknown or untracked signals, stored feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and returned `FeedbackEvent`.
+- **Step 7.1.4 (next)** — Silence and unresolvedness: record one silence event after the configured window only when no feedback arrived, prune old records, and bump unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
 - **Step 7.1.5** — Integration and regression: cover Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
 
 ### Phase 2 (planned): Delayed engagement and retention hardening

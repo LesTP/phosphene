@@ -9,6 +9,7 @@ from phosphene.feedback_collector.types import (
     FeedbackEvent,
     OutputRecord,
 )
+from phosphene.memory_store import NoteInput
 
 _RETENTION_CRITERIA_TAGS = {
     "precision_surplus",
@@ -70,6 +71,41 @@ class FeedbackCollector:
         return criteria
 
     def process_signal(self, signal) -> FeedbackEvent | None:
+        record = self.output_records.get(signal.message_id)
+        if record is None:
+            return None
+
+        signal_type = self._classify_signal(signal)
+        if signal_type is None:
+            return None
+
+        event = FeedbackEvent(
+            output_message_id=record.message_id,
+            output_intent_tag=record.intent_tag,
+            output_mode=record.output_mode,
+            signal_type=signal_type,
+            signal_value=signal.value,
+            source_note_ids=list(record.source_note_ids),
+            retention_criteria=list(record.retention_criteria),
+            timestamp=signal.timestamp,
+        )
+        self.memory_store.store_note(_feedback_note_input(event))
+        record.feedback_events.append(event)
+        return event
+
+    def _classify_signal(self, signal) -> str | None:
+        signal_type = signal.signal_type
+        if signal_type == "reaction":
+            values = _reaction_values(signal.value)
+            if any(value in self.config.positive_reactions for value in values):
+                return "like"
+            if any(value in self.config.negative_reactions for value in values):
+                return "dislike"
+            return None
+        if signal_type == "reply":
+            return "reply"
+        if signal_type == "forward":
+            return "forward"
         return None
 
     def check_silence(self) -> list[FeedbackEvent]:
@@ -80,3 +116,40 @@ class FeedbackCollector:
 
     def update_unresolvedness_on_feedback(self, event: FeedbackEvent) -> None:
         return None
+
+
+def _reaction_values(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _feedback_note_input(event: FeedbackEvent) -> NoteInput:
+    return NoteInput(
+        tier=1,
+        content=f"Feedback: {event.signal_type} on [{event.output_intent_tag}] output",
+        title=f"Feedback: {event.signal_type} on {event.output_intent_tag}",
+        importance=_importance_from_signal(event),
+        tags=["feedback", event.signal_type, event.output_intent_tag]
+        + list(event.retention_criteria),
+        source="feedback",
+        links=list(event.source_note_ids),
+    )
+
+
+def _importance_from_signal(event: FeedbackEvent) -> float:
+    if event.signal_type == "forward":
+        return 0.9
+    if event.signal_type == "reply":
+        return 0.7
+    if event.signal_type == "dislike":
+        return 0.8
+    if event.signal_type == "silence":
+        return 0.3
+    if event.signal_type == "delayed_positive":
+        return 0.85
+    if event.signal_type == "like":
+        if event.signal_value in {"💡", "🤔"}:
+            return 0.7
+        return 0.6
+    return 0.0
