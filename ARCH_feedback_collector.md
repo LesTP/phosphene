@@ -24,6 +24,7 @@ class FeedbackEvent:
 @dataclass
 class FeedbackCollectorConfig:
     silence_window: timedelta = timedelta(hours=24) # how long to wait before recording silence as signal
+    delayed_recheck_window: timedelta = timedelta(days=7)  # how long after initial engagement to check durable engagement
     positive_reactions: list[str] = field(default_factory=lambda: ["👍", "❤️", "🔥", "💡", "🤔"])
     negative_reactions: list[str] = field(default_factory=lambda: ["👎"])
     reply_is_positive: bool = True                  # treat any reply as positive engagement (human took time to respond)
@@ -87,7 +88,32 @@ class OutputRecord:
 - **Returns:** list[FeedbackEvent] — silence events for outputs that received no feedback within `silence_window`
 - **Errors:** none
 
-**Called periodically by the Orchestrator (e.g., during decay activation).** For each `OutputRecord` where `delivered_at + silence_window` has passed and no feedback was received, records a `signal_type="silence"` event. Silence is a meaningful signal — content the human ignored is data about what doesn't land.
+**Called periodically by the Orchestrator (e.g., during decay activation).** For each `OutputRecord` where `delivered_at + silence_window` has passed and no feedback was received, records a `signal_type="silence"` event. Silence is a meaningful signal — content the human ignored is data about what doesn’t land.
+
+### check_delayed_engagement
+
+- **Signature:** `check_delayed_engagement() -> list[FeedbackEvent]`
+- **Parameters:** none
+- **Returns:** list[FeedbackEvent] — delayed-positive events for outputs whose engagement persisted beyond the recheck window
+- **Errors:** none
+
+**Called periodically by the Orchestrator (e.g., during decay activation).** For each `OutputRecord` that received positive feedback and where `delivered_at + delayed_recheck_window` has passed, checks whether the engagement persisted:
+
+1. Did the output’s `source_note_ids` accumulate new links since the initial feedback?
+2. Was the output referenced in any subsequent generated content?
+3. Did the human re-engage with the original output (new reaction/reply after initial engagement)?
+
+If any check passes, records a `signal_type="delayed_positive"` event with importance 0.85 (higher than immediate likes). This separates “interesting right now” from “still seems important later” — a critical distinction for preventing feedback overfitting (see phosphene.md Section 7.4).
+
+### update_unresolvedness_on_feedback
+
+- **Signature:** `update_unresolvedness_on_feedback(event: FeedbackEvent) -> None`
+- **Parameters:**
+  - event: FeedbackEvent — the feedback event that was just processed
+- **Returns:** None
+- **Errors:** none
+
+**Called internally after `process_signal` for positive feedback events.** For each `source_note_id` in the event that is still Tier 1 (not yet promoted through distillation), increases its `unresolvedness` by a small increment (e.g., +0.1, capped at 1.0). Rationale: a note the human found interesting but the system hasn’t synthesized is textbook unresolved — it has engagement evidence but no synthesis closure. This contributes to the unresolvedness composite score (see phosphene.md Section 7.3).
 
 ## How Feedback Flows to Distillation
 
@@ -119,6 +145,7 @@ The Distillation engine reads these during `distill_t1_to_t2` (when `incorporate
 | `like` (👍❤️🔥) | 0.6 | Engaged, general approval |
 | `reply` | 0.7 | Human took time to respond |
 | `dislike` | 0.8 | High importance — negative signal is strong data |
+| `delayed_positive` | 0.85 | Durable engagement — human interest persisted beyond recheck window |
 | `silence` | 0.3 | Weak negative — content didn't land, but absence is ambiguous |
 
 ## Inputs
@@ -135,6 +162,7 @@ The Distillation engine reads these during `distill_t1_to_t2` (when `incorporate
 ## State
 
 - **Output records:** in-memory map of `message_id → OutputRecord`. Bounded — records older than `2 × silence_window` are evicted (feedback on very old messages is unlikely and not useful for calibration). Not persisted — lost on restart, which is acceptable since silence detection resets.
+- **Delayed-engagement tracking:** records that received positive feedback are retained until `delayed_recheck_window` has passed and the delayed check has run. These are evicted after the delayed check completes.
 - No other state. All durable feedback data lives in Memory Store.
 
 ## Usage Example

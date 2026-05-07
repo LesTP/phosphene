@@ -28,8 +28,12 @@ Each iteration begins from scratch. Reconstruct state entirely from repo files:
 
 1. **Load project instructions** — the backend-specific adapter file and every
    document it references (project spec, architecture, governance, devplan).
-2. **Read DEVPLAN current status** — determine the active track and module.
-3. **Read the architecture layer contract** for the active module — understand
+2. **Read DEVPLAN frontmatter** — check the `blocked` field first. If `blocked`
+   is not `null`, the work is gated. Exit ESCALATE immediately without reading
+   further or attempting any action. The `blocked` field is the single source
+   of truth for whether the project is gated.
+3. **Read DEVPLAN current status** — determine the active track and module.
+4. **Read the architecture layer contract** for the active module — understand
    inputs, outputs, dependencies, and constraints.
 
 No external state, no session memory, no inter-iteration side channels.
@@ -47,7 +51,7 @@ Execute **exactly one** of the following actions per iteration:
 | **Phase Plan** | No active phase for the current module | Break the phase into steps. Update DEVPLAN with the step breakdown. Commit. Exit CONTINUE. |
 | **Step Execution** | A phase is in progress with remaining steps | Pick the next step from DEVPLAN. Do all file read/write work. Run builds, tests, git operations. Mark the step done in DEVPLAN. Commit. Exit CONTINUE. |
 | **Phase Review** | All steps in the current phase are complete | Review the phase output against the architecture contract. Apply any must-fix items within this iter. Log decisions to DECISIONS.md. Mark `review_done: true` in DEVPLAN frontmatter. Update DEVPLAN "Next" pointer to Phase Complete. Commit review artifacts. Exit CONTINUE. |
-| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Update DEVPLAN frontmatter to completed state with `blocked: "awaiting-human-audit"` and `phase_title` indicating what was completed and what comes next. The `/close` bot command (or human) clears the gate. Commit. Exit ESCALATE. |
+| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Set DEVPLAN frontmatter `blocked: "awaiting-human-audit"` and `mode: Plan`. The `/close` bot command (or human) clears `blocked` to `null`. Do not write "awaiting human audit" in prose — the frontmatter `blocked` field is the single gate. Commit. Exit ESCALATE. |
 
 ---
 
@@ -73,8 +77,8 @@ Every iteration that modifies project state must leave an auditable trail:
 
 - **DEVPLAN.md** — update step status, mark completions, record blockers.
 - **DEVLOG.md** — add a dated entry describing what was done and why.
-  DEVLOG.md uses a `<!-- HISTORY` fence. New entries go **above** the fence,
-  below existing current-phase entries. Do not read or edit content below the
+  DEVLOG.md uses a multi-line HISTORY fence (`<!-- HISTORY ... -->`). New
+  entries go **above** the fence block. Do not read or edit content below the
   fence. During Phase Complete, move the fence up so only the just-completed
   phase's entries remain above it.
 - **DECISIONS.md** — log any non-trivial design or implementation decision

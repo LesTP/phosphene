@@ -63,6 +63,8 @@ class AttentionFilterConfig:
     auto_accept_sources: list[str] = field(default_factory=list)
                                              # sources that bypass acceptance_threshold but still get full annotation
                                              # e.g., ["human_share"] — human-curated content always enters Tier 1
+    wild_card_ratio: float = 0.05            # fraction of below-threshold items randomly admitted (feedback-immune)
+    near_miss_margin: float = 0.05           # score margin below acceptance_threshold for near-miss recording
     density_crossover: float = 3.0           # mean_link_degree at which prompt/structure blend reaches 50/50
     similarity_candidates: int = 20          # how many existing notes to retrieve for friction/connection detection
     llm_config: LLMConfig                    # toolkit/llm_client — for Phase 1 criteria evaluation and annotation
@@ -90,7 +92,9 @@ class AnnotatedFragment:
 @dataclass
 class FilterResult:
     accepted: list[AnnotatedFragment]       # fragments above acceptance_threshold
-    rejected_count: int                     # items below threshold
+    near_misses: list[AnnotatedFragment]    # fragments within near_miss_margin below threshold (for human review)
+    wild_cards: list[AnnotatedFragment]     # below-threshold fragments randomly admitted (tagged "wild_card")
+    rejected_count: int                     # items below threshold (excluding wild cards and near misses)
     total_count: int                        # items evaluated
     prompt_weight: float                    # current blend: 1.0 = pure prompt, 0.0 = pure structure
     structure_weight: float                 # 1.0 - prompt_weight
@@ -136,7 +140,9 @@ For each content item, the filter:
    - *Unresolvedness affinity*: `sum(sim(text, note_i) × note_i.unresolvedness)` over similar notes — engages with live tensions (hybrid: vector similarity × note metadata)
 7. **Computes composite score** — weighted combination of Phase 1 and Phase 2 scores, blended by `prompt_weight` / `structure_weight`. Phase 1 sub-score is the weighted average of prompt criteria scores. Phase 2 sub-score is the weighted average of geometric criteria scores (using `scoring.*_weight` values).
 8. **Accepts or rejects** based on `acceptance_threshold`. Items from `auto_accept_sources` bypass the threshold but still receive the full annotation pass — importance, unresolvedness, friction, and connections are computed normally.
-9. For accepted items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified. For auto-accepted items, the annotation captures what the system finds interesting *about* the content, even though it was pre-accepted.
+9. **Wild-card admission:** for items scoring below threshold, a random fraction (`config.wild_card_ratio`, default 5%) are admitted regardless of score. Wild cards receive full annotation and are tagged with `retention_criteria=["wild_card"]`. This maintains a feedback-immune exploration channel — content that enters the memory store without being shaped by current scoring calibration.
+10. **Near-miss recording:** items scoring within `config.near_miss_margin` below threshold (but not admitted as wild cards) are fully annotated and placed in `FilterResult.near_misses`. These are available for periodic human review, calibrating the filter against its invisible failure mode: interesting content filtered out before anyone could evaluate it.
+11. For accepted and wild-card items: **generates annotation** via LLM — a short explanation of why this was retained, which criteria it scored on, and what friction or connections were identified. For auto-accepted items, the annotation captures what the system finds interesting *about* the content, even though it was pre-accepted.
 
 ### Default Prompt Criteria (Phase 1)
 
@@ -316,4 +322,20 @@ for fragment in result.accepted:
 for fragment in result.accepted:
     for url in fragment.linked_urls:
         explorer.queue(url)
+
+# Wild cards and near misses are also available
+print(f"Wild cards admitted: {len(result.wild_cards)}")
+print(f"Near misses (for human review): {len(result.near_misses)}")
 ```
+
+## Design Decisions from External Review (May 2026)
+
+### Wild-Card Accepts and Near-Discard Recording
+
+Added in response to external review feedback on feedback overfitting (phosphene.md Section 7.4). The concern: the most available human signals (likes, replies) are biased toward immediacy and legibility. A system optimizing for what-the-human-taps-today can become more engaging while becoming less deep.
+
+**Wild-card accepts** maintain a zone of content that enters the memory store without being shaped by the current feedback-calibrated scoring. The wild-card budget is immune to criteria weight adjustments from Distillation — it is a random exploration channel that feedback cannot close. The ratio is deliberately small (default 5%) — large enough for genuine diversity, small enough not to dilute the filter's personality-shaping function.
+
+**Near-discard recording** creates visibility into the filter's rejection decisions. Without it, the filter's invisible failure mode — interesting content filtered out before anyone could evaluate it — is undetectable. Near-misses are not stored in Memory Store; they are surfaced for periodic human review by the Orchestrator (see ARCH_orchestrator.md).
+
+See phosphene.md Sections 7.4 and 7.10 for full rationale and timeline.

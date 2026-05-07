@@ -51,9 +51,9 @@ Do NOT load these unconditionally. Read only when the action requires them:
 - `DECISIONS.md` — read during Phase Review to verify no contract drift since prior decisions; otherwise on demand
 - `DEVLOG.md` / `DEVLOG_archive.md` — read during Phase Complete (DEVLOG learning review per GOVERNANCE.md)
 
-**DEVLOG.md fence:** DEVLOG.md contains a `<!-- HISTORY` fence. When reading
-or writing to DEVLOG.md, stop at the fence. Insert new entries **above** the
-fence line. Do not read or edit content below it.
+**DEVLOG.md fence:** DEVLOG.md contains a multi-line HISTORY fence (`<!-- HISTORY ... -->`).
+When reading or writing to DEVLOG.md, stop at the fence. Insert new entries
+**above** the fence block. Do not read or edit content below it.
 
 This file (CLAUDE.md) provides Available Modules and Project-Specific Notes
 inline so non-plan iters don't need to load PROJECT or ARCHITECTURE for

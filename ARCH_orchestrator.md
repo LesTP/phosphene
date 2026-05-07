@@ -18,6 +18,10 @@ class OrchestratorConfig:
     quiet_day_budget_ratio: float = 0.6             # budget ratio on low-tension days (remainder banked)
     high_tension_budget_multiplier: float = 1.5     # budget multiplier when unresolved tension is high
     ambient_streams: list[AmbientStreamDef] = field(default_factory=list)  # custom ambient data sources
+    # Task arbitration (see Task Arbitration section below)
+    min_task_completion: float = 0.8                # scheduled task must reach this fraction before lateral check fires
+    max_lateral_debt: int = 4000                    # max tokens of lateral overspend carried to next activation
+    lateral_cooldown: timedelta = timedelta(hours=2)  # minimum time between lateral outputs
 
 @dataclass
 class ScheduleEntry:
@@ -134,16 +138,16 @@ Corpus adapters in Source Ingestion with `auto_accept_sources` handle the bulk o
 
 ## Activation Types
 
-| Type | Modules Involved | Default Trigger | Lateral Budget |
-|------|-----------------|-----------------|----------------|
-| `ingestion` | Source Ingestion → Attention Filter → Memory Store | Scheduled (e.g., every 4h) | Yes |
-| `distillation_t1t2` | Distillation Engine (T1→T2) | Threshold via `check_gates` | No |
-| `distillation_t2t3` | Distillation Engine (T2→T3) | Monthly via `check_gates` | No |
-| `generation` | Generator → Output Router → Gateway | Scheduled (e.g., daily) | Yes |
-| `free_play` | Generator → Output Router → Gateway | Tension threshold or scheduled | Full budget |
-| `respond` | Generator → Output Router → Gateway | Inbound message from Gateway | No |
-| `explore` | Explorer → Attention Filter → Memory Store | Triggered by linked_urls in accepted fragments | Yes |
-| `decay` | Memory Store (`run_decay`) | Scheduled (e.g., daily) | No |
+| Type | Modules Involved | Default Trigger | Lateral Budget | Preemptible |
+|------|-----------------|-----------------|----------------|-------------|
+| `ingestion` | Source Ingestion → Attention Filter → Memory Store | Scheduled (e.g., every 4h) | Yes | Yes |
+| `distillation_t1t2` | Distillation Engine (T1→T2) | Threshold via `check_gates` | No | No |
+| `distillation_t2t3` | Distillation Engine (T2→T3) | Monthly via `check_gates` | No | No |
+| `generation` | Generator → Output Router → Gateway | Scheduled (e.g., daily) | Yes | Yes |
+| `free_play` | Generator → Output Router → Gateway | Tension threshold or scheduled | Full budget | N/A (is lateral) |
+| `respond` | Generator → Output Router → Gateway | Inbound message from Gateway | No | No |
+| `explore` | Explorer → Attention Filter → Memory Store | Triggered by linked_urls in accepted fragments | Yes | Yes |
+| `decay` | Memory Store (`run_decay`) | Scheduled (e.g., daily) | No | No |
 
 ## Activation Lifecycle
 
@@ -183,11 +187,16 @@ Sources:
 
 When the scheduled task completes and lateral budget remains:
 
-1. Query `memory_store.get_density_metrics()` for current `max_unresolvedness`.
-2. If `max_unresolvedness > config.tension_threshold`: the Generator receives the remaining lateral budget and the full affordance list.
-3. The Generator's lateral output is tagged `is_lateral=True` and `output_mode="lateral"`.
-4. Lateral outputs are routed through Output Router and Gateway like any other output.
-5. Lateral movement is weighted toward threads with high `unresolvedness × link_count` — material the system keeps encountering from multiple angles without resolving.
+1. **Preemption check:** if the activation type is non-preemptible (see Activation Types table), skip lateral entirely.
+2. **Completion check:** query the task's completion fraction. If below `config.min_task_completion` (default 80%), skip lateral — the scheduled work is not sufficiently complete to justify diversion.
+3. **Cool-down check:** if the time since the last lateral output is less than `config.lateral_cooldown` (default 2 hours), skip lateral.
+4. **Debt check:** if accumulated lateral debt exceeds `config.max_lateral_debt`, skip lateral until debt is repaid.
+5. Query `memory_store.get_density_metrics()` for current `max_unresolvedness`.
+6. If `max_unresolvedness > config.tension_threshold`: the Generator receives the remaining lateral budget and the full affordance list.
+7. The Generator's lateral output is tagged `is_lateral=True` and `output_mode="lateral"`.
+8. Lateral outputs are routed through Output Router and Gateway like any other output.
+9. Lateral movement is weighted toward threads with high `unresolvedness × link_count` — material the system keeps encountering from multiple angles without resolving.
+10. **Budget accounting:** if the lateral turn exceeds the allocated lateral budget, the overage is recorded as debt, deducted from the next activation's base budget.
 
 The lateral budget is a fraction of the activation's total token budget (`config.lateral_budget_ratio`, default 15%). It is not rolled over between activations.
 
@@ -229,6 +238,40 @@ After `distill_t2_to_t3` returns an `EvolutionResult`:
 - **Running flag**: whether the main loop is active. In-memory.
 
 The Orchestrator does not own any content state — all content lives in Memory Store. Budget and schedule metadata are lightweight operational state.
+
+## Task Arbitration
+
+*Added in response to external review (phosphene.md Section 7.6). The concern: "every activation carries a free-play budget" is conceptually strong, but in practice autonomous systems that can defect from scheduled work into self-initiated activity get annoying or unstable.*
+
+Four mechanisms prevent "everything interesting cannibalizes everything necessary":
+
+### Minimum Completion Fraction
+
+`config.min_task_completion` (default 0.8). The scheduled task must report at least this fraction of work completed before the lateral check in Step 5 fires. Completion reporting is task-type-specific:
+
+- **ingestion:** fraction of source items processed out of total available
+- **generation:** 1.0 when the prompted output is produced (binary — either the output exists or it doesn't)
+- **explore:** fraction of queued URLs evaluated
+
+### Preemption Classes
+
+The `Preemptible` column in the Activation Types table classifies each task. Non-preemptible tasks run to completion regardless of lateral opportunity — the lateral check is skipped entirely. Rationale: distillation cannot be safely interrupted mid-cluster; respond activations are time-sensitive; decay is fast and low-value to interrupt.
+
+### Debt Accounting
+
+If lateral movement exceeds its allocated budget, the overage is recorded as lateral debt. On the next activation, the base budget is reduced by the outstanding debt. Debt does not accrue interest but is capped at `config.max_lateral_debt` (default 4000 tokens, half a base activation) — if the cap would be exceeded, the lateral turn is force-stopped at the budget boundary. This prevents runaway depletion while allowing occasional generous lateral turns.
+
+### Cool-Down Windows
+
+`config.lateral_cooldown` (default 2 hours). Minimum elapsed time since the last lateral output before another lateral turn is permitted. Prevents cascade behavior where one self-initiated output creates unresolved tension that triggers lateral movement in the next activation, which creates more tension, and so on.
+
+## Under-Engaged Material Resurfacing
+
+*Added in response to external review (phosphene.md Section 7.4). The concern: feedback loops tend to let structurally important but un-engaged material fade.*
+
+During `decay` activations, after `run_decay` completes, the Orchestrator queries Memory Store for notes satisfying: `link_count >= 3 AND tier == 1 AND no feedback events exist for this note`. A small sample (e.g., 3 notes) is surfaced via Gateway for human attention. The selection is weighted toward notes with high `unresolvedness × link_count`, consistent with the lateral-movement priority function.
+
+This is a lightweight addition to the existing decay activation type, not a new activation type.
 
 ## Usage Example
 

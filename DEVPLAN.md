@@ -1,10 +1,10 @@
 ---
-module: REVIEW_HARDENING
+module: 7
 phase: null
-phase_title: "Pre-Module-7 hardening complete — Module 7 Feedback Collector next"
+phase_title: "Module 7 Feedback Collector — phase plan next"
 step: null
-mode: Complete
-blocked: "awaiting-human-audit"
+mode: Plan
+blocked: null
 regime: Build
 review_done: false
 ---
@@ -33,9 +33,10 @@ review_done: false
 
 ## Current Status
 
-- **Phase** — Pre-Module-7 Hardening complete.
-- **Focus** — Awaiting human audit before Module 7 (Feedback Collector) planning.
-- **Blocked/Broken** — `awaiting-human-audit`
+- **Module** — 7: Feedback Collector (next).
+- **Phase** — None active. Pre-Module-7 hardening (Phases A & B) human-audited and acknowledged 2026-05-07 (commit ef79088).
+- **Focus** — Phase plan for Module 7 (Feedback Collector) per `ARCH_feedback_collector.md`.
+- **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
 

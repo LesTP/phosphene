@@ -1068,6 +1068,203 @@ Suggested order of implementation. Each step is a standalone module with a defin
 Phosphene — working draft, March 2026
 This document is intended as a living reference. Update as the project develops.
 
+# 7. External Review and Design Responses
+
+*This section records the outcomes of an external review conducted May 2026, after Modules 1–6 were complete (Memory Store, Attention Filter, Source Ingestion, Gateway, Generator + Output Router, Distillation). The review identified nine areas for improvement. Each is documented below with the design response, rationale, and architectural placement.*
+
+*The reviewer's compressed critique: "The spec is now good enough that its main risk is not under-specification, but elegant over-resolution of phenomena that should remain partly rough." The three questions posed: (1) what is the smallest build that can falsify the core thesis? (2) which internal scores deserve first-class status? (3) how do you keep the formalization from sterilizing the attractor?*
+
+## 7.1 Claim-Centric Identity Layer
+
+**Review observation:** Personality files carry version-count inertia at the file level, but files are containers — a file with five statements of different quality gets uniform protection. Moving to per-claim evidence accounting (support, contradiction, recency, source diversity, confidence) would fit the skeptical memory principle better.
+
+**Design response: No change.** "Claim" implies propositional content with clear boundaries. The material this system processes — liminal observations, aesthetic responses, unresolved tensions — does not decompose cleanly into typed claims. The personality files contain nebulous, associative material where the unit of meaning is not a statement but a constellation of related tensions. File-level inertia is coarser but honest about the granularity of what is actually being stored. Version-count inertia remains the drift mitigation mechanism.
+
+The two-step reflect-evolve distillation (Section 3.6) already makes claim-level judgments during the evolution pass — it just doesn't store them at that granularity. If experience shows that file-level inertia is too coarse (specific failure: mature files retaining stale observations alongside still-valid ones, where the stale observations resist revision because the file as a whole has high inertia), the claim-level approach can be revisited.
+
+## 7.2 Centroid-Heaviness in Geometric Scoring
+
+**Review observation:** Liminality, friction, and unexpected connection are all scored against cluster centroids (Section 3.3a). Centroids are compressive — they erase local weirdness, minority subthreads, and the anomalies that often matter most. The spec says it wants friction-preserving behavior; centroid logic rewards smooth cluster-level structure.
+
+**Design response: Observe before fixing.** Two candidate fixes were identified — bridge-node scoring against high-link notes (comparing incoming content against specific structurally important notes rather than centroids), and outlier persistence tracking (detecting items repeatedly near a cluster but never assimilated into its summary). Both are valid but premature — they are solutions to a hypothetical problem.
+
+The correct first step is diagnostics. Build network health instrumentation (Section 7.7) that measures whether centroid-heaviness is actually erasing anomalies in practice. If diagnostics confirm the problem (outlier ratio declining while cluster count grows, bridge-node density stagnating as note count rises), implement the fixes then.
+
+No module contract changes required — the diagnostic tool reads from Memory Store's existing API surface.
+
+**Promote-when:** Diagnostics show centroid-heaviness erasing anomalies.
+
+## 7.3 Unresolvedness as First-Class Composite Score
+
+**Review observation:** Unresolvedness drives free play, lateral movement, scheduling, and generative tension (Sections 1.5, 4.5), but compared with the formalized geometric criteria (Section 3.3a), it reads more like an honored concept than an operationalized metric.
+
+**Design response: Formalize as composite.** Define unresolvedness explicitly as a composite signal with measurable subcomponents:
+
+- **Repeated reappearance:** content similar to existing notes reappears in new ingestion batches without the original being promoted or resolved. Detected by the Attention Filter during `search_by_embedding` — incoming content with high similarity to notes that already have high unresolvedness is a signal that the thread keeps surfacing.
+- **Rising link count without promotion:** note has accumulated significant connections but remains in Tier 1 — well-connected but not yet synthesized. Computed from Memory Store data: `link_count` vs. `tier`.
+- **Conflicting alignments:** note has connections to notes that themselves are in tension (friction targets pointing at each other, or connected notes with high mutual unresolvedness). Detectable during Distillation when reading cluster members.
+- **Engagement without synthesis closure:** note received positive feedback (human found it interesting) but has not been promoted through distillation. Computed by the Feedback Collector when feedback events exist on notes still in Tier 1.
+- **Survival across distillation cycles:** note has persisted through one or more `distill_t1_to_t2` runs without being clustered — it keeps surviving decay but doesn't fit any cluster. Computed by the Distillation engine from run metadata.
+
+The composite formula is defined as a shared utility. Each module updates the unresolvedness score at its natural touchpoint:
+
+- **Attention Filter** sets the initial value at ingestion (already does this).
+- **Distillation** updates during `distill_t1_to_t2` based on survival, link-growth-without-promotion, and conflicting alignment signals.
+- **Feedback Collector** adjusts when engaged-but-not-promoted notes receive positive feedback.
+
+The Memory Store contract does not change — `unresolvedness` is already a `float` on `NoteInput` and `MemoryNote`, and `update_note()` accepts updated values. `DensityMetrics` already exposes `unresolved_count` and `max_unresolvedness`.
+
+## 7.4 Feedback Anti-Overfitting
+
+**Review observation:** The feedback-closes-on-structural-features design (Section 3.8) is strong, but the most available human signals — likes, replies, continued reading — are biased toward immediacy, legibility, and present mood. A system can become more engaging while becoming less deep. The "stopped reading" failure signal is very blunt.
+
+**Design response: Four anti-overfitting mechanisms across three modules.**
+
+### Wild-Card Accepts (Attention Filter)
+
+A configurable fraction of below-threshold items are accepted despite scoring below `acceptance_threshold`. Tagged with `retention_criteria=["wild_card"]`. This maintains a zone of content that enters the memory store without being shaped by the current feedback-calibrated scoring. The wild-card budget is immune to criteria weight adjustments — it is a random exploration channel that feedback cannot close.
+
+Config: `wild_card_ratio: float = 0.05` on `AttentionFilterConfig`. During `filter_content`, 5% of below-threshold items are randomly admitted with full annotation. The ratio is deliberately small — large enough to maintain genuine diversity, small enough not to dilute the filter's personality-shaping function.
+
+### Near-Discard Recording (Attention Filter)
+
+Items that score within a configurable margin below `acceptance_threshold` (e.g., within 0.05 below) are recorded as near-misses in `FilterResult`. This creates a pool of "things the filter almost kept" available for periodic human review, calibrating the filter against the failure mode you cannot normally see: interesting content filtered out before anyone could evaluate it.
+
+Config: `near_miss_margin: float = 0.05` on `AttentionFilterConfig`. Output: `near_misses: list[AnnotatedFragment]` on `FilterResult`.
+
+### Temporal Engagement Distinction (Feedback Collector)
+
+Distinguish between immediate engagement (liked/replied within hours) and durable engagement (still referenced, re-engaged, or built upon days later). Current feedback captures immediate engagement only. A delayed re-check after a configurable window (e.g., 7 days) evaluates whether the engagement persisted: did the note's connections grow? Was it referenced in generated output? Did the human re-engage? If so, record a `"delayed_positive"` signal with higher importance than the immediate like.
+
+This separates "interesting right now" from "still seems important later" — a distinction the original feedback design acknowledges as important (Section 3.8: "what the system should become" vs. "what current-you taps") but does not operationalize.
+
+### Periodic Resurfacing (Orchestrator)
+
+During `decay` activations, query for notes with high `link_count` but zero feedback events — structurally important material the human has never engaged with. Surface a small sample via Gateway. This counteracts the feedback loop's tendency to let structurally important but un-engaged material fade. The selection is weighted toward notes with high unresolvedness × link density, consistent with the lateral-movement priority function (Section 1.5).
+
+## 7.5 MVP Profile and Phased Complexity
+
+**Review observation:** The `deployment.yaml` parameterization (Section 5.9) creates too many interacting knobs before a minimal organism exists. Too many live dials make early behavior impossible to interpret.
+
+**Design response: Define a brutally small MVP profile.** A minimal operational loop that can run before Modules 7–9 are built:
+
+- **Sources:** 1 corpus adapter + 1 live channel (Telegram or RSS)
+- **Output:** 1 channel (Telegram only)
+- **Scoring:** Phase 1 only (prompt-weighted, no Phase 2 geometric scoring)
+- **Distillation:** T1→T2→T3, with manual human review of Tier 2 clusters before any T2→T3 run
+- **Free play:** Fixed budget, no tension-responsive scheduling
+- **Reviewer panel:** None
+- **Feedback:** None (manual observation only)
+- **Explorer:** None
+
+This is a sequential script (`run_mvp.py`), not the full Orchestrator. It runs each step in order, pausing for human review at the T2 stage. The goal is to answer the core falsification question — does three-tier distillation produce genuine personality development or progressive banality? — with the smallest possible build.
+
+Complexity is added one module at a time after the MVP demonstrates the core thesis. The spec describes a platform and a deployment simultaneously; the MVP forces a hard separation. The platform is the module library; the MVP is the first deployment.
+
+## 7.6 Free-Play Task Arbitration
+
+**Review observation:** "Every activation carries a free-play budget" (Section 4.5) is conceptually strong, but in practice this is where autonomous systems get annoying or unstable. When exactly does the system get to defect from scheduled work into free play? The philosophy is clear; the scheduler policy is not.
+
+**Design response: Explicit arbitration rules in the Orchestrator contract.** Four mechanisms prevent "everything interesting cannibalizes everything necessary":
+
+### Minimum Completion Fraction
+
+The scheduled task must report completion of at least `min_task_completion` (default 80%) before the lateral check fires. This prevents chronic task abandonment. Ingestion reports completion as fraction of source items processed; generation reports completion as output produced; distillation is non-interruptible.
+
+### Preemption Classes
+
+Activation types are classified as preemptible or non-preemptible. Non-preemptible tasks (`distillation_t1t2`, `distillation_t2t3`, `respond`, `decay`) run to completion regardless of lateral opportunity. Preemptible tasks (`ingestion`, `generation`, `explore`) allow lateral diversion after `min_task_completion`.
+
+### Debt Accounting
+
+If lateral movement exceeds its allocated budget, the overage is deducted from the next activation's base budget. Lateral movement cannot borrow indefinitely — accumulated debt reduces future base budgets until repaid. Maximum debt is capped to prevent runaway depletion.
+
+### Cool-Down Windows
+
+Minimum time between lateral outputs prevents free-play-induced cascades where one self-initiated output triggers lateral movement in the next activation. Default: 2 hours.
+
+## 7.7 Failure-Mode Instrumentation
+
+**Review observation:** The spec describes failure modes conceptually — mirrorhood, stagnation, novelty addiction, drift, overcompression — but does not monitor them operationally. Many are described as possibilities rather than measured conditions.
+
+**Design response: Standalone diagnostic tooling.** A `tools/network_diagnostics.py` script that reads Memory Store's existing API and computes health metrics. This is not a core module — it has no ARCH file, no contract, no dependency. It is a diagnostic instrument run on demand or on a cron schedule, producing a human-readable report.
+
+| Metric | What it measures | Source |
+|--------|-----------------|--------|
+| Mirror index | Lexical/style overlap with seed corpus | Mean embedding distance between recent outputs and seed notes |
+| Premature convergence | Cluster diversity collapse | Inter-cluster distance trend; cluster count vs. note count ratio |
+| Novelty addiction | Accepted novelty rising, engagement falling | Cluster novelty on accepted items correlated with feedback rates |
+| Compression damage | Over-aggressive forgetting | Decayed notes later referenced by surviving notes (orphaned links) |
+| Free-play value ratio | Self-initiated output quality | Proportion of lateral outputs whose source notes appear in Tier 2 clusters |
+| Outlier ratio | Anomaly survival | Notes with similarity < 0.3 to nearest centroid |
+| Bridge-node density | Connective tissue formation | Notes with similarity > 0.4 to 2+ distant clusters |
+| RAPTOR-Louvain divergence | Structural vs. semantic clustering gap | Louvain community detection on the link graph compared against RAPTOR embedding clusters — notes whose structural community differs from their content cluster are bridge notes the centroid-based scoring may miss |
+| Unresolvedness distribution | Tension health | Histogram of unresolvedness scores |
+
+These metrics serve two purposes: (1) early warning for the failure modes identified in Section 6.1, and (2) evidence base for deciding whether the centroid-heaviness fixes (Section 7.2) are needed. The diagnostics are built before Module 7 so that baseline measurements exist before feedback starts flowing into the system.
+
+## 7.8 Reviewer Panel as Diagnosis, Not Approval (Deferred)
+
+**Review observation:** Multi-model review (Section 5.4) can sand down exactly the eccentricity the system is meant to cultivate. A cultivated organism can get domesticated by its critics.
+
+**Design response: Document and defer.** When the Reviewer Panel is promoted from deferred status and given an ARCH file, the panel should be designed as an annotation system, not a gate. Reviewers annotate tensions — "likely confusing but fertile," "clear but flattening," "factually risky," "stylistically generic" — rather than producing a composite quality score. Reviewer output is stored as tagged annotations on the generated content, consumed by Distillation as structural metadata, not as pass/fail signals blocking output delivery.
+
+The panel should never block delivery. It annotates after delivery, not before.
+
+**Promote-when:** Generator outputs are landing on real channels and a single-model evaluation signal is insufficient.
+
+## 7.9 "Interesting System" vs. "Interesting Writer" (Deferred)
+
+**Review observation:** A sophisticated exploration machine can still produce outputs that are mostly interesting because the architecture is interesting. The system may generate visibly agentic artifacts rather than genuinely compelling thought.
+
+**Design response: Recurring human audit question and partial operationalization.** The audit question — "Did this output feel like a report from a real internal exploration, or like a clever byproduct of the machinery?" — resists formalization but protects the project's center. It should be asked regularly once outputs are flowing.
+
+One partial operationalization: track whether generated outputs reference specific accumulated material (notes, tensions, unresolved threads) or speak in generalities. Outputs grounded in specific internal history are more likely genuine explorations; outputs that could have been generated from personality files alone without referencing specific memory are more likely machinery artifacts. This metric can be added to `tools/network_diagnostics.py` once Generator output logs exist.
+
+**Promote-when:** Generator outputs are being produced regularly and human evaluation is active.
+
+## 7.10 Summary: Design Response Timeline
+
+### Now (pre-Module 7)
+
+| Item | Location |
+|------|----------|
+| Network diagnostics tool | `tools/network_diagnostics.py` |
+| Unresolvedness composite utility | Shared utility under `src/phosphene/` |
+| Wild-card accepts | `AttentionFilterConfig.wild_card_ratio` |
+| Near-discard recording | `AttentionFilterConfig.near_miss_margin`, `FilterResult.near_misses` |
+| Orchestrator ARCH amendments | Task arbitration rules in `ARCH_orchestrator.md` |
+
+### MVP
+
+| Item | Location |
+|------|----------|
+| Minimal operational loop | `run_mvp.py` — sequential script, 1 corpus + 1 channel, manual T2 review |
+
+### Module 7 (Feedback Collector)
+
+| Item | Location |
+|------|----------|
+| Temporal engagement distinction | `FeedbackCollectorConfig.delayed_recheck_window`, `check_delayed_engagement` |
+| Unresolvedness update on feedback | FC adjusts unresolvedness on engaged-but-not-promoted notes |
+
+### Module 9 (Orchestrator)
+
+| Item | Location |
+|------|----------|
+| Resurface under-engaged material | Decay activation extension |
+| Near-discard surfacing | Periodic human review of filter near-misses |
+| Task arbitration implementation | min completion, preemption, debt, cool-down |
+
+### Post-Launch
+
+| Item | Promote-when |
+|------|-------------|
+| Reviewer-as-annotator framing | Generator outputs on real channels, single-model evaluation insufficient |
+| "System vs. writer" audit metric | Outputs flowing, human evaluation active |
+| Bridge-node scoring | Diagnostics confirm centroid-heaviness problem |
+| Outlier persistence tracking | Diagnostics confirm anomaly erasure |
+
 ---
 
 # Appendix A: Corpus-to-Knowledge-Graph Technique (Reference)
