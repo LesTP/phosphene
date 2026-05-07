@@ -1,6 +1,6 @@
 ---
 phase: 7.1
-blocked: null
+blocked: "awaiting-human-audit"
 state: close
 ---
 
@@ -29,8 +29,8 @@ state: close
 ## Current Status
 
 - **Module** — 7: Feedback Collector.
-- **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Close Phase 7.1: Feedback Collector contract and immediate feedback foundation.
+- **Phase** — 7.1 complete: Feedback Collector contract and immediate feedback foundation.
+- **Focus** — Phase 7.1 closed; Phase 7.2 planning is next.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -128,19 +128,13 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 
 Planned phases follow `ARCH_feedback_collector.md`: first stabilize the public contract, in-memory output tracking, immediate Gateway feedback normalization, Memory Store feedback-note writes, silence detection, and Tier 1 unresolvedness updates; then add delayed-engagement checks and retention/pruning hardening.
 
-### Phase 1 (active): Contract and immediate feedback foundation
+### Phase 1 (complete): Contract and immediate feedback foundation
 
-Build phase scoped to the Feedback Collector's core runtime loop without delayed-engagement persistence heuristics. Public dataclasses and exports must match `ARCH_feedback_collector.md`; implementation uses Gateway `FeedbackSignal` / `DeliveryResult`, Generator `GeneratorOutput`, and Memory Store `NoteInput` / `NotePatch` boundaries directly.
-
-- **Step 7.1.1 (complete)** — Public package contract: added `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
-- **Step 7.1.2 (complete)** — Output registration: mapped successful `DeliveryResult.message_id` values to in-memory output metadata, ignored failed/no-id deliveries, and aggregated known retention-criteria tags from Memory Store source notes.
-- **Step 7.1.3 (complete)** — Signal processing: classified Gateway reactions/replies/forwards, ignored unknown or untracked signals, stored feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and returned `FeedbackEvent`.
-- **Step 7.1.4 (complete)** — Silence and unresolvedness: recorded one silence event after the configured window only when no feedback arrived, pruned old records, and bumped unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
-- **Step 7.1.5 (complete)** — Integration and regression: covered Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
+Delivered the Feedback Collector public contract, in-memory output tracking, immediate Gateway feedback normalization, Tier 1 Memory Store feedback-note writes, silence detection, bounded pruning, positive-feedback unresolvedness updates, and integration regression coverage. Reviewed and completed. See DEVLOG "Phase 7.1 Completion" entry.
 
 ### Phase 2 (planned): Delayed engagement and retention hardening
 
-Deferred until Phase 1 is reviewed. Will implement `check_delayed_engagement()`, durable-engagement heuristics over linked notes and subsequent feedback, delayed-positive event storage, and final record-retention behavior.
+Will implement `check_delayed_engagement()`, durable-engagement heuristics over linked notes and subsequent feedback, delayed-positive event storage, and final record-retention behavior.
 
 <!--
 HISTORY — Do not read past this marker.

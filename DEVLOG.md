@@ -9,6 +9,37 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Phase 7.1 Completion: Feedback Collector contract and immediate feedback foundation
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Closed Module 7 Phase 1. Final verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/feedback_collector -q`
+(27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q`
+(574 passed).
+
+Phase 7.1 delivered the ARCH-aligned Feedback Collector public contract,
+in-memory output registration, immediate Gateway reaction/reply/forward
+normalization, Tier 1 `source="feedback"` Memory Store note writes, silence
+event recording, bounded record pruning, and positive-feedback unresolvedness
+bumps for linked Tier 1 source notes. Delayed engagement remains deferred to
+Phase 7.2.
+
+DEVLOG learning review: Phase 7.1 landed linearly through planning, five
+implementation steps, and review. No repeated trial-and-error pattern needs
+promotion to DEVPLAN Gotchas.
+Contract Changes scan: Phase 7.1 entries recorded no contract changes. D-48
+documents the immediate-feedback boundary and delayed-engagement deferral
+without upstream contract propagation.
+DEVPLAN cleanup: reduced Phase 7.1 to a one-line completion summary and set
+frontmatter blocked state.
+ARCHITECTURE.md: updated Feedback Collector status to "Phase 7.1 complete".
+DECISIONS.md and PROJECT.md: no open decisions or project risks were resolved
+by this phase.
+
 ### Phase 7.1 Review: Feedback Collector contract and immediate feedback foundation
 
 **Date:** 2026-05-07
@@ -157,138 +188,6 @@ depends on later graph/reference heuristics rather than the immediate
 Gateway callback path. Updated ARCHITECTURE.md to mark Feedback Collector
 in progress and logged scope decision D-48. No tests were run because this
 was a planning-only action.
-
-### Phase REVIEW_HARDENING.2 Completion: Unresolvedness composite utility + network diagnostics
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Closed Pre-Module-7 Hardening Phase B. Final verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q` (547 passed).
-
-Phase B delivered the pure caller-fed `phosphene.scoring.compute_unresolvedness()`
-utility, configurable `UnresolvednessWeights`, and `tools/network_diagnostics.py`
-as a standalone Memory Store diagnostic report for density, cluster diversity,
-outlier ratio, bridge-node density, unresolvedness distribution, compression
-damage, and RAPTOR-vs-structural divergence.
-
-DEVLOG learning review: Phase B landed linearly through planning, three
-implementation steps, and review. The review found two small should-fix cleanups
-that were resolved in the review iteration; no repeated trial-and-error pattern
-needs promotion to DEVPLAN Gotchas.
-Contract Changes scan: Phase B entries recorded no contract changes. D-47 keeps
-the scorer and diagnostics outside existing module contracts; no upstream
-document or built-consumer propagation remains.
-Log review: loop summary entries for iterations 148-152 show successful Phase B
-planning, steps, and review. No repeated tool failures or wasted-turn patterns
-were found beyond the already documented no-`rg` environment constraint.
-DEVPLAN cleanup: reduced Phase B to a one-line completion summary and set
-frontmatter to await human audit before Module 7 planning.
-ARCHITECTURE.md: no Implementation Sequence status change was needed; this was
-pre-module hardening, and Module 7 remains Not started.
-DECISIONS.md and PROJECT.md: no open decisions or project risks were resolved by
-this phase.
-
-### Phase REVIEW_HARDENING.2 Review: Unresolvedness composite utility + network diagnostics
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Reviewed
-**Contract changes:** None
-
-Reviewed Pre-Module-7 Hardening Phase B against phosphene.md Sections 7.3,
-7.7, and 7.10. Must fix: none. Should fix: align the unresolvedness helper's
-public type annotation with its supported Memory Store search-result tuple
-inputs, and make the diagnostics Louvain path fall back cleanly when an
-installed `community` package lacks `best_partition`. Optional: no optional
-changes deferred.
-
-Applied the should-fix cleanup in `src/phosphene/scoring/unresolvedness.py`,
-`tools/network_diagnostics.py`, and
-`tests/tools/test_network_diagnostics.py`. Verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/scoring/test_unresolvedness.py tests/tools/test_network_diagnostics.py -q`
-(14 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q`
-(547 passed). DEVPLAN frontmatter updated to `review_done: true`; Phase
-Complete is the next action.
-
-### Step REVIEW_HARDENING.2.3: Integration and cross-module regression
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Completed the Phase B integration and regression check. The full test suite
-passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -v`
-(546 passed), including the new `phosphene.scoring` package tests and existing
-module suites.
-
-Verified that `phosphene.scoring` imports cleanly and exports
-`UnresolvednessWeights` and `compute_unresolvedness`. Also verified the
-diagnostics tool runs as a standalone script against `/tmp/test_vault` with
-`PYTHONPATH=src:.python_deps python3 tools/network_diagnostics.py --vault-path /tmp/test_vault`,
-producing the empty-vault diagnostic report without errors.
-
-### Step REVIEW_HARDENING.2.2: Network diagnostics tool
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added `tools/network_diagnostics.py`, a standalone Memory Store diagnostic
-script with `--vault-path` and `--embedding-path` arguments and a formatted
-stdout report. The tool computes note/tier density summary, Tier 2 centroid
-cluster diversity, Tier 1 outlier ratio, bridge-node density, unresolvedness
-histogram, orphaned-link compression damage, and RAPTOR-vs-structural community
-divergence. Mirror index and free-play value ratio are reported as N/A until
-Generator output logs exist.
-
-The Louvain path uses `networkx` and `python-louvain` when available and falls
-back to deterministic connected structural communities in this environment,
-where those optional graph packages are not installed. Verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/tools/test_network_diagnostics.py -q`
-(5 passed).
-
-### Step REVIEW_HARDENING.2.1: Unresolvedness composite utility
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Complete
-**Contract changes:** None
-
-Added the shared `phosphene.scoring` package with a pure
-`compute_unresolvedness()` utility and configurable `UnresolvednessWeights`.
-The scorer computes the Phase B composite from rising Tier 1 links without
-promotion, unresolved reappearance among high-similarity notes, mutually
-friction-targeted connected notes, and Tier 1 survival toward the base decay
-deadline. It remains caller-fed and does not call Memory Store.
-
-The exact DEVPLAN signature lacks similarity scores and retention-day config,
-so the implementation preserves the three positional inputs while supporting
-keyword-only weights, retention days, deterministic `now`, and pass-through
-`(MemoryNote, similarity)` search-result tuples. Verification passed with
-`PYTHONPATH=src:.python_deps python3 -m pytest tests/scoring/test_unresolvedness.py tests/memory_store/test_types.py -q`
-(18 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/ -q`
-(541 passed).
-
-### Phase REVIEW_HARDENING.2 Plan: Unresolvedness composite utility + network diagnostics
-
-**Date:** 2026-05-06
-**Mode:** autonomous
-**Outcome:** Planned
-**Contract changes:** None
-
-Activated Pre-Module-7 Hardening Phase B as a Build phase. The phase is scoped
-to a pure `phosphene.scoring` unresolvedness composite utility, a standalone
-Memory Store network diagnostics tool, and one integration/regression step.
-
-The scorer stays caller-fed and side-effect-free, and the diagnostics script
-remains an operator tool rather than a new ARCH module or exported runtime
-dependency. Logged scope decision D-47. No tests were run because this was a
-planning-only action.
 
 <!--
 HISTORY — Do not read past this marker.
