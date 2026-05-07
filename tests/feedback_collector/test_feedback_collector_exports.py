@@ -134,6 +134,7 @@ class FakeMemoryStore:
     def __init__(self, notes: dict[str, object]) -> None:
         self.notes = notes
         self.stored_notes: list[object] = []
+        self.updated_notes: list[tuple[str, object]] = []
 
     def get_note(self, note_id: str) -> object:
         return self.notes[note_id]
@@ -141,6 +142,13 @@ class FakeMemoryStore:
     def store_note(self, note: object) -> str:
         self.stored_notes.append(note)
         return f"feedback-{len(self.stored_notes)}"
+
+    def update_note(self, note_id: str, patch: object) -> object:
+        self.updated_notes.append((note_id, patch))
+        note = self.notes[note_id]
+        if getattr(patch, "unresolvedness", None) is not None:
+            note.unresolvedness = patch.unresolvedness
+        return note
 
 
 def test_register_output_tracks_successful_delivery_metadata() -> None:
@@ -221,6 +229,7 @@ def test_register_output_keeps_tracking_state_in_memory_only() -> None:
         "precision_surplus"
     ]
     assert store.stored_notes == []
+    assert store.updated_notes == []
 
 
 def _registered_collector() -> tuple[FeedbackCollector, FakeMemoryStore]:
@@ -323,3 +332,104 @@ def test_process_signal_ignores_unknown_or_untracked_signals(
     assert event is None
     assert collector.output_records["msg-1"].feedback_events == []
     assert store.stored_notes == []
+
+
+def test_check_silence_records_one_event_after_window_without_feedback() -> None:
+    collector, store = _registered_collector()
+    record = collector.output_records["msg-1"]
+    record.delivered_at = datetime.now() - timedelta(hours=25)
+
+    events = collector.check_silence()
+    second_check = collector.check_silence()
+
+    assert len(events) == 1
+    assert second_check == []
+    assert events[0].signal_type == "silence"
+    assert events[0].source_note_ids == ["note-1", "note-2"]
+    assert events[0].retention_criteria == ["precision_surplus", "friction"]
+    assert record.feedback_events == [events[0]]
+    assert record.silence_recorded is True
+
+    stored = store.stored_notes[0]
+    assert stored.importance == 0.3
+    assert stored.tags == ["feedback", "silence", "synthesis", "precision_surplus", "friction"]
+
+
+def test_check_silence_skips_records_with_feedback() -> None:
+    collector, store = _registered_collector()
+    collector.process_signal(_feedback_signal(value="👍"))
+    collector.output_records["msg-1"].delivered_at = datetime.now() - timedelta(hours=25)
+
+    events = collector.check_silence()
+
+    assert events == []
+    assert [note.tags[1] for note in store.stored_notes] == ["like"]
+
+
+def test_check_silence_prunes_records_older_than_double_window() -> None:
+    collector, _store = _registered_collector()
+    collector.output_records["msg-1"].delivered_at = datetime.now() - timedelta(hours=49)
+
+    events = collector.check_silence()
+
+    assert [event.signal_type for event in events] == ["silence"]
+    assert collector.output_records == {}
+
+
+def test_positive_feedback_bumps_tier1_source_unresolvedness_with_cap() -> None:
+    store = FakeMemoryStore(
+        {
+            "note-1": SimpleNamespace(
+                tier=1,
+                unresolvedness=0.95,
+                tags=["precision_surplus"],
+            ),
+            "note-2": SimpleNamespace(
+                tier=2,
+                unresolvedness=0.3,
+                tags=["friction"],
+            ),
+        }
+    )
+    collector = FeedbackCollector(memory_store=store)
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1", "note-2"],
+    )
+    delivery = DeliveryResult(success=True, platform="telegram", message_id="msg-1")
+    collector.register_output(output, delivery)
+
+    event = collector.process_signal(_feedback_signal(value="👍"))
+
+    assert event is not None
+    assert [(note_id, patch.unresolvedness) for note_id, patch in store.updated_notes] == [
+        ("note-1", 1.0),
+    ]
+    assert store.notes["note-1"].unresolvedness == 1.0
+    assert store.notes["note-2"].unresolvedness == 0.3
+
+
+def test_non_positive_feedback_does_not_bump_unresolvedness() -> None:
+    store = FakeMemoryStore(
+        {
+            "note-1": SimpleNamespace(
+                tier=1,
+                unresolvedness=0.2,
+                tags=["precision_surplus"],
+            ),
+        }
+    )
+    collector = FeedbackCollector(memory_store=store)
+    output = SimpleNamespace(
+        intent_tag="synthesis",
+        output_mode="prompted",
+        source_note_ids=["note-1"],
+    )
+    delivery = DeliveryResult(success=True, platform="telegram", message_id="msg-1")
+    collector.register_output(output, delivery)
+
+    collector.process_signal(_feedback_signal(value="👎"))
+
+    assert store.updated_notes == []
+    assert store.notes["note-1"].unresolvedness == 0.2

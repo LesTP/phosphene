@@ -9,6 +9,33 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 7.1.4: Silence detection and unresolvedness updates
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `FeedbackCollector.check_silence()` for tracked outputs that pass
+the configured silence window without feedback. The collector now records a
+single Tier 1 `source="feedback"` silence note per eligible output, marks the
+record as silence-recorded, returns the generated `FeedbackEvent`, and prunes
+records older than twice the silence window.
+
+Positive immediate feedback now calls
+`update_unresolvedness_on_feedback()`, which reloads linked source notes,
+bumps unresolvedness by `0.1` only for notes still in Tier 1, and caps the
+value at `1.0` through the Memory Store `NotePatch` boundary. Replies and
+forwards honor the existing config flags when deciding whether they are
+positive for unresolvedness purposes.
+
+Added focused tests for silence-event storage, one-shot silence behavior,
+feedback suppression of silence, old-record pruning, Tier 1-only
+unresolvedness bumps, and capping. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/feedback_collector`
+(25 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/`
+(572 passed).
+
 ### Step 7.1.3: Immediate Gateway feedback signal processing
 
 **Date:** 2026-05-07

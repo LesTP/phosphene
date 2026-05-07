@@ -9,7 +9,7 @@ from phosphene.feedback_collector.types import (
     FeedbackEvent,
     OutputRecord,
 )
-from phosphene.memory_store import NoteInput
+from phosphene.memory_store import NoteInput, NotePatch
 
 _RETENTION_CRITERIA_TAGS = {
     "precision_surplus",
@@ -91,6 +91,8 @@ class FeedbackCollector:
         )
         self.memory_store.store_note(_feedback_note_input(event))
         record.feedback_events.append(event)
+        if self._is_positive_event(event):
+            self.update_unresolvedness_on_feedback(event)
         return event
 
     def _classify_signal(self, signal) -> str | None:
@@ -109,13 +111,68 @@ class FeedbackCollector:
         return None
 
     def check_silence(self) -> list[FeedbackEvent]:
-        return []
+        now = datetime.now()
+        events: list[FeedbackEvent] = []
+
+        for record in list(self.output_records.values()):
+            if (
+                record.silence_recorded
+                or record.feedback_events
+                or now < record.delivered_at + self.config.silence_window
+            ):
+                continue
+
+            event = FeedbackEvent(
+                output_message_id=record.message_id,
+                output_intent_tag=record.intent_tag,
+                output_mode=record.output_mode,
+                signal_type="silence",
+                source_note_ids=list(record.source_note_ids),
+                retention_criteria=list(record.retention_criteria),
+                timestamp=now,
+            )
+            self.memory_store.store_note(_feedback_note_input(event))
+            record.feedback_events.append(event)
+            record.silence_recorded = True
+            events.append(event)
+
+        self._prune_old_records(now)
+        return events
 
     def check_delayed_engagement(self) -> list[FeedbackEvent]:
         return []
 
     def update_unresolvedness_on_feedback(self, event: FeedbackEvent) -> None:
+        for note_id in event.source_note_ids:
+            try:
+                note = self.memory_store.get_note(note_id)
+            except Exception:
+                continue
+
+            if getattr(note, "tier", None) != 1:
+                continue
+
+            current = float(getattr(note, "unresolvedness", 0.0))
+            self.memory_store.update_note(
+                note_id,
+                NotePatch(unresolvedness=min(1.0, current + 0.1)),
+            )
         return None
+
+    def _is_positive_event(self, event: FeedbackEvent) -> bool:
+        if event.signal_type == "like":
+            return True
+        if event.signal_type == "reply":
+            return self.config.reply_is_positive
+        if event.signal_type == "forward":
+            return self.config.forward_is_positive
+        return False
+
+    def _prune_old_records(self, now: datetime) -> None:
+        cutoff = now - (self.config.silence_window * 2)
+        for message_id, record in list(self.output_records.items()):
+            if record.delivered_at < cutoff:
+                del self.output_records[message_id]
 
 
 def _reaction_values(value: str | None) -> list[str]:

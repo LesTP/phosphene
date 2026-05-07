@@ -30,7 +30,7 @@ state: execute
 
 - **Module** — 7: Feedback Collector.
 - **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Execute Step 7.1.4: silence detection and positive-feedback unresolvedness updates.
+- **Focus** — Execute Step 7.1.5: integration and regression for Feedback Collector Phase 1.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -135,8 +135,8 @@ Build phase scoped to the Feedback Collector's core runtime loop without delayed
 - **Step 7.1.1 (complete)** — Public package contract: added `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
 - **Step 7.1.2 (complete)** — Output registration: mapped successful `DeliveryResult.message_id` values to in-memory output metadata, ignored failed/no-id deliveries, and aggregated known retention-criteria tags from Memory Store source notes.
 - **Step 7.1.3 (complete)** — Signal processing: classified Gateway reactions/replies/forwards, ignored unknown or untracked signals, stored feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and returned `FeedbackEvent`.
-- **Step 7.1.4 (next)** — Silence and unresolvedness: record one silence event after the configured window only when no feedback arrived, prune old records, and bump unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
-- **Step 7.1.5** — Integration and regression: cover Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
+- **Step 7.1.4 (complete)** — Silence and unresolvedness: recorded one silence event after the configured window only when no feedback arrived, pruned old records, and bumped unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
+- **Step 7.1.5 (next)** — Integration and regression: cover Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
 
 ### Phase 2 (planned): Delayed engagement and retention hardening
 
