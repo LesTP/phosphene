@@ -1,12 +1,7 @@
 ---
-module: 7
-phase: null
-phase_title: "Module 7 Feedback Collector — phase plan next"
-step: null
-mode: Plan
+phase: 7.1
 blocked: null
-regime: Build
-review_done: false
+state: execute
 ---
 
 # Phosphene — Development Plan
@@ -33,9 +28,9 @@ review_done: false
 
 ## Current Status
 
-- **Module** — 7: Feedback Collector (next).
-- **Phase** — None active. Pre-Module-7 hardening (Phases A & B) human-audited and acknowledged 2026-05-07 (commit ef79088).
-- **Focus** — Phase plan for Module 7 (Feedback Collector) per `ARCH_feedback_collector.md`.
+- **Module** — 7: Feedback Collector.
+- **Phase** — 7.1: Feedback Collector contract and immediate feedback foundation.
+- **Focus** — Execute Step 7.1.1: public package, dataclasses, config validation, and exports.
 - **Blocked/Broken** — None
 
 ## Pre-Module-7 Hardening
@@ -128,6 +123,24 @@ Planned phases follow `ARCH_distillation.md`: first stabilize the public contrac
 - **Phase 2 (complete)** — Delivered ARCH-aligned `distill_t1_to_t2(config)`: toolkit boundary seams, feedback-aware Tier 1 selection, RAPTOR coherence gating, Tier 2 Memory Store writes with cluster links, assertion-cache JSON persistence, and successful-run metadata updates. Reviewed and completed. See DEVLOG "Phase 6.2 Completion" entry.
 
 - **Phase 3 (complete)** — Delivered ARCH-aligned `distill_t2_to_t3(config)`: audited reflection output, evolution proposal parsing with version-count inertia, personality supersession and unchanged-version writeback, compression limits, feedback-derived criteria adjustments, success-only metadata updates, and end-to-end integration coverage. Reviewed and completed. See DEVLOG "Phase 6.3 Completion" entry.
+
+## Module 7: Feedback Collector (in progress)
+
+Planned phases follow `ARCH_feedback_collector.md`: first stabilize the public contract, in-memory output tracking, immediate Gateway feedback normalization, Memory Store feedback-note writes, silence detection, and Tier 1 unresolvedness updates; then add delayed-engagement checks and retention/pruning hardening.
+
+### Phase 1 (active): Contract and immediate feedback foundation
+
+Build phase scoped to the Feedback Collector's core runtime loop without delayed-engagement persistence heuristics. Public dataclasses and exports must match `ARCH_feedback_collector.md`; implementation uses Gateway `FeedbackSignal` / `DeliveryResult`, Generator `GeneratorOutput`, and Memory Store `NoteInput` / `NotePatch` boundaries directly.
+
+- **Step 7.1.1 (next)** — Public package contract: add `src/phosphene/feedback_collector/` with `FeedbackEvent`, `FeedbackCollectorConfig`, `OutputRecord`, `FeedbackCollector`, package exports, and focused validation/default tests.
+- **Step 7.1.2** — Output registration: map successful `DeliveryResult.message_id` values to output metadata, ignore failed/no-id deliveries, aggregate source-note retention criteria from Memory Store notes, and keep tracking state in memory.
+- **Step 7.1.3** — Signal processing: classify Gateway reactions/replies/forwards, ignore unknown or untracked signals, store feedback as Tier 1 `source="feedback"` notes with ARCH importance/tags/links, and return `FeedbackEvent`.
+- **Step 7.1.4** — Silence and unresolvedness: record one silence event after the configured window only when no feedback arrived, prune old records, and bump unresolvedness on linked Tier 1 source notes for positive feedback while capping at 1.0.
+- **Step 7.1.5** — Integration and regression: cover Gateway/Generator/Memory Store boundary behavior, package imports, and full-suite regression.
+
+### Phase 2 (planned): Delayed engagement and retention hardening
+
+Deferred until Phase 1 is reviewed. Will implement `check_delayed_engagement()`, durable-engagement heuristics over linked notes and subsequent feedback, delayed-positive event storage, and final record-retention behavior.
 
 <!--
 HISTORY — Do not read past this marker.

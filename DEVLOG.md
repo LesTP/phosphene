@@ -10,6 +10,25 @@
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
 
+### Phase 7.1 Plan: Feedback Collector contract and immediate feedback foundation
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Planned
+**Contract changes:** None
+
+Activated Module 7 Phase 1 as a Build phase. The phase is scoped to the
+Feedback Collector public contract, in-memory output registration, immediate
+Gateway feedback normalization, Memory Store Tier 1 feedback-event writes,
+silence detection, record pruning, and positive-feedback unresolvedness bumps
+for linked Tier 1 source notes.
+
+Delayed engagement is explicitly deferred to Module 7 Phase 2 because it
+depends on later graph/reference heuristics rather than the immediate
+Gateway callback path. Updated ARCHITECTURE.md to mark Feedback Collector
+in progress and logged scope decision D-48. No tests were run because this
+was a planning-only action.
+
 ### Phase REVIEW_HARDENING.2 Completion: Unresolvedness composite utility + network diagnostics
 
 **Date:** 2026-05-06
