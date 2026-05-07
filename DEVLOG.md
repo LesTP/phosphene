@@ -9,6 +9,29 @@
 
 <!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
 
+### Step 7.1.5: Integration and regression
+
+**Date:** 2026-05-07
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added Feedback Collector phase integration coverage that exercises the real
+Gateway `DeliveryResult` / `FeedbackSignal`, Generator `GeneratorOutput` /
+Output Router, and Memory Store `NoteInput` / `NotePatch` boundaries together.
+The new regression stores a Tier 1 source note, routes a generated output
+through a fake Gateway boundary, registers the delivered message, processes a
+reply signal, verifies the stored Tier 1 `source="feedback"` note, checks
+retention-criteria propagation, and confirms positive-feedback unresolvedness
+updates persist through Memory Store.
+
+Added public-boundary import coverage so Feedback Collector imports cleanly
+alongside the Gateway, Generator, and Memory Store types it consumes. No runtime
+contract changes were made. Verification passed with
+`PYTHONPATH=src:.python_deps python3 -m pytest tests/feedback_collector`
+(27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/`
+(574 passed).
+
 ### Step 7.1.4: Silence detection and unresolvedness updates
 
 **Date:** 2026-05-07
