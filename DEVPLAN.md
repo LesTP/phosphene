@@ -2,7 +2,7 @@
 phase: MVP.2
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 2
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.2: Activation wiring.
-- **Focus** — Step 3: Generation activation + bootstrap.
+- **Focus** — Step 4: Respond activation.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -54,7 +54,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 2. **Distillation activation** — Complete. `_run_distillation()` now checks distillation gates, dispatches ready T1→T2 and T2→T3 promotions, and treats lock contention / insufficient data / missing pattern data as successful skips. Verified with fake-module tests.
 
-3. **Generation activation + bootstrap** — `_run_generation()`: call `memory_store.get_personality_context()`. If empty personality files, return early (bootstrap skip). Otherwise call `generator.generate(prompt, {}, config.generator_config)`, route via `route(output, config.router_config, gateway)`, return `ActivationResult` with `outputs_delivered` count. Catch `EmptyPersonalityError` as bootstrap skip. Tests verify bootstrap detection, successful generation→route→send path, and delivery failure isolation.
+3. **Generation activation + bootstrap** — Complete. `_run_generation()` now checks personality context, skips bootstrap, calls `generator.generate(prompt, {}, config.generator_config)`, routes output through the Output Router, counts successful deliveries, and treats `EmptyPersonalityError` as a bootstrap skip. Verified with fake-module tests.
 
 4. **Respond activation** — `_run_respond(message)`: same as generation but calls `generator.respond(message, {}, config.generator_config)`. Wire Gateway listener callback in `start()` via `gateway.start_listener()` with an `on_message` callback that dispatches respond activations inline. Bootstrap skip applies. Tests verify inbound message dispatch and bootstrap drop.
 

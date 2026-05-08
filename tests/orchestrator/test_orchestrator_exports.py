@@ -10,6 +10,9 @@ from phosphene.distillation import (
     InsufficientDataError,
     NoPatternDataError,
 )
+from phosphene.gateway import DeliveryResult
+from phosphene.generator import EmptyPersonalityError, GeneratorOutput, RouterConfig
+from phosphene.generator.types import TokenUsage
 from phosphene.orchestrator import (
     ActivationResult,
     ConfigError,
@@ -46,13 +49,20 @@ class ValidGateway:
 
 
 class RecordingMemoryStore(ValidMemoryStore):
-    def __init__(self) -> None:
+    def __init__(self, personality_files: list[object] | None = None) -> None:
         super().__init__()
         self.store_note = self._store_note
+        self.get_personality_context = self._get_personality_context
         self.notes: list[object] = []
+        self.personality_files = [] if personality_files is None else personality_files
+        self.personality_context_calls = 0
 
     def _store_note(self, note_input: object) -> None:
         self.notes.append(note_input)
+
+    def _get_personality_context(self) -> object:
+        self.personality_context_calls += 1
+        return SimpleNamespace(personality_files=self.personality_files)
 
 
 class FakeSourceIngestion:
@@ -109,12 +119,48 @@ class FakeDistillationEngine:
             raise self.t2_error
 
 
+class FakeGenerator:
+    def __init__(
+        self,
+        output: object | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.output = output
+        self.error = error
+        self.generate_calls: list[tuple[object, object, object]] = []
+
+    def generate(self, prompt: object, ambient: object, config: object) -> object:
+        self.generate_calls.append((prompt, ambient, config))
+        if self.error is not None:
+            raise self.error
+        return self.output
+
+
+class RoutingGateway(ValidGateway):
+    def __init__(self, delivery_success: bool = True) -> None:
+        super().__init__()
+        self.config = SimpleNamespace(default_platform="telegram")
+        self.delivery_success = delivery_success
+        self.sent_messages: list[object] = []
+        self.send = self._send
+
+    def _send(self, message: object) -> DeliveryResult:
+        self.sent_messages.append(message)
+        return DeliveryResult(
+            success=self.delivery_success,
+            platform=message.platform,
+            message_id="msg-1" if self.delivery_success else None,
+            error=None if self.delivery_success else "delivery failed",
+        )
+
+
 def build_modules(
     *,
     memory_store: object | None = None,
     attention_filter: object | None = None,
     source_ingestion: object | None = None,
     distillation_engine: object | None = None,
+    generator: object | None = None,
     gateway: object | None = None,
 ) -> ModuleRefs:
     return ModuleRefs(
@@ -124,7 +170,7 @@ def build_modules(
         distillation_engine=object()
         if distillation_engine is None
         else distillation_engine,
-        generator=object(),
+        generator=object() if generator is None else generator,
         gateway=ValidGateway() if gateway is None else gateway,
     )
 
@@ -141,7 +187,7 @@ def build_config(
         attention_filter_config=object(),
         distillation_config=object(),
         generator_config=object(),
-        router_config=object(),
+        router_config=RouterConfig(),
     )
 
 
@@ -285,13 +331,13 @@ def test_constructor_validation_does_not_call_module_methods() -> None:
     assert modules.gateway.send.called is False
 
 
-def test_trigger_runs_stub_activation_without_calling_modules() -> None:
+def test_trigger_runs_unwired_decay_stub_without_calling_modules() -> None:
     modules = build_modules()
     instance = MVPOrchestrator(modules, build_config())
 
-    result = instance.trigger("generation")
+    result = instance.trigger("decay")
 
-    assert result.task_type == "generation"
+    assert result.task_type == "decay"
     assert result.success is True
     assert result.outputs_delivered == 0
     assert result.error is None
@@ -467,6 +513,105 @@ def test_trigger_distillation_treats_expected_exceptions_as_skip(error: Exceptio
     assert result.success is True
     assert result.outputs_delivered == 0
     assert result.error is None
+
+
+def make_generator_output(content: str = "generated output") -> GeneratorOutput:
+    return GeneratorOutput(
+        content=content,
+        intent_tag="synthesis",
+        output_mode="prompted",
+        importance_score=0.5,
+        is_lateral=False,
+        source_note_ids=["personality-1"],
+        contradictions_noted=[],
+        token_usage=TokenUsage(),
+    )
+
+
+def test_trigger_generation_skips_bootstrap_without_generator_call() -> None:
+    memory_store = RecordingMemoryStore(personality_files=[])
+    generator = FakeGenerator(make_generator_output())
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=RoutingGateway(),
+        ),
+        build_config(),
+    )
+
+    result = instance.trigger("generation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert memory_store.personality_context_calls == 1
+    assert generator.generate_calls == []
+
+
+def test_trigger_generation_catches_empty_personality_error_as_bootstrap_skip() -> None:
+    memory_store = RecordingMemoryStore(personality_files=[object()])
+    generator = FakeGenerator(error=EmptyPersonalityError("empty"))
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=RoutingGateway(),
+        ),
+        build_config(),
+    )
+
+    result = instance.trigger("generation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert result.error is None
+
+
+def test_trigger_generation_routes_output_and_counts_successful_delivery() -> None:
+    memory_store = RecordingMemoryStore(personality_files=[object()])
+    output = make_generator_output("send this")
+    generator = FakeGenerator(output)
+    gateway = RoutingGateway()
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    result = instance.trigger("generation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 1
+    assert generator.generate_calls == [
+        (config.generation_prompt, {}, config.generator_config)
+    ]
+    assert len(gateway.sent_messages) == 1
+    assert gateway.sent_messages[0].content == "send this"
+
+
+def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
+    memory_store = RecordingMemoryStore(personality_files=[object()])
+    gateway = RoutingGateway(delivery_success=False)
+    config = build_config()
+    config.router_config = RouterConfig(intent_routing={"synthesis": "telegram"})
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=FakeGenerator(make_generator_output()),
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    result = instance.trigger("generation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert len(gateway.sent_messages) == 1
 
 
 def test_trigger_rejects_unknown_task_type() -> None:

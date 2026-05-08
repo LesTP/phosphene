@@ -122,3 +122,14 @@ Added fake-module orchestrator tests for the poll→filter→store path, empty-p
 Implemented `_run_distillation()` behind `trigger("distillation")`. The activation now calls `distillation_engine.check_gates(config.distillation_config)`, skips cleanly when gates are not ready, dispatches `distill_t1_to_t2()` and `distill_t2_to_t3()` for ready gates, and treats `DistillationLockError`, `InsufficientDataError`, and `NoPatternDataError` as successful no-op skips.
 
 Added fake-module orchestrator tests for gate-not-ready behavior, successful dual-promotion dispatch, and expected skip exceptions. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (27 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (601 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 2, and moves focus to MVP.2.3 generation activation + bootstrap.
+
+### Step MVP.2.3: Generation activation + bootstrap
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `_run_generation()` behind `trigger("generation")`. The activation now loads `memory_store.get_personality_context()`, skips cleanly when no personality files exist, calls `generator.generate(config.generation_prompt, {}, config.generator_config)` when bootstrapped, routes the resulting output through `route(output, config.router_config, gateway)`, and reports `outputs_delivered=1` only for successful delivery results. `EmptyPersonalityError` is treated as a bootstrap skip.
+
+Added fake-module orchestrator tests for empty personality bootstrap detection, `EmptyPersonalityError` bootstrap skip, successful generation→route→send delivery, and delivery failure isolation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (31 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (605 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.2.4 respond activation.

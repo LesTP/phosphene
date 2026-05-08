@@ -12,6 +12,7 @@ from phosphene.distillation import (
     InsufficientDataError,
     NoPatternDataError,
 )
+from phosphene.generator import EmptyPersonalityError, route
 from phosphene.memory_store import NoteInput
 from phosphene.orchestrator.errors import ConfigError, UnknownTaskTypeError
 from phosphene.orchestrator.types import (
@@ -107,6 +108,8 @@ class MVPOrchestrator:
             return self._run_ingestion()
         if task_type == "distillation":
             return self._run_distillation()
+        if task_type == "generation":
+            return self._run_generation()
 
         return ActivationResult(
             task_type=task_type,
@@ -171,6 +174,37 @@ class MVPOrchestrator:
             task_type="distillation",
             success=True,
             outputs_delivered=0,
+        )
+
+    def _run_generation(self) -> ActivationResult:
+        try:
+            context = self.modules.memory_store.get_personality_context()
+            if not context.personality_files:
+                return ActivationResult(
+                    task_type="generation",
+                    success=True,
+                    outputs_delivered=0,
+                )
+
+            output = self.modules.generator.generate(
+                self.config.generation_prompt,
+                {},
+                self.config.generator_config,
+            )
+        except EmptyPersonalityError:
+            return ActivationResult(
+                task_type="generation",
+                success=True,
+                outputs_delivered=0,
+            )
+
+        delivery = route(output, self.config.router_config, self.modules.gateway)
+        delivered = 1 if delivery is not None and delivery.success else 0
+
+        return ActivationResult(
+            task_type="generation",
+            success=True,
+            outputs_delivered=delivered,
         )
 
     @staticmethod
