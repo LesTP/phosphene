@@ -2,7 +2,7 @@
 phase: MVP.2
 blocked: false
 state: execute
-steps_remaining: 3
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 3
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.2: Activation wiring.
-- **Focus** — Step 2: Distillation activation.
+- **Focus** — Step 3: Generation activation + bootstrap.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -52,7 +52,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 1. **Ingestion activation** — Complete. `_run_ingestion()` now polls Source Ingestion, flattens items, filters them through Attention Filter, maps accepted fragments to Tier 1 `NoteInput`, and stores them in Memory Store. Verified with fake-module tests.
 
-2. **Distillation activation** — `_run_distillation()`: call `distillation_engine.check_gates(config.distillation_config)`. If `gates.t1_to_t2_ready`, call `distill_t1_to_t2()`. If `gates.t2_to_t3_ready`, call `distill_t2_to_t3()`. Catch `DistillationLockError` as skip (success=True). Catch `InsufficientDataError` / `NoPatternDataError` as skip. Return `ActivationResult`. Tests verify gate-not-ready skips, lock contention skips, and successful dispatch.
+2. **Distillation activation** — Complete. `_run_distillation()` now checks distillation gates, dispatches ready T1→T2 and T2→T3 promotions, and treats lock contention / insufficient data / missing pattern data as successful skips. Verified with fake-module tests.
 
 3. **Generation activation + bootstrap** — `_run_generation()`: call `memory_store.get_personality_context()`. If empty personality files, return early (bootstrap skip). Otherwise call `generator.generate(prompt, {}, config.generator_config)`, route via `route(output, config.router_config, gateway)`, return `ActivationResult` with `outputs_delivered` count. Catch `EmptyPersonalityError` as bootstrap skip. Tests verify bootstrap detection, successful generation→route→send path, and delivery failure isolation.
 

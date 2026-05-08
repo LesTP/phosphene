@@ -5,6 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 import phosphene.orchestrator as orchestrator
+from phosphene.distillation import (
+    DistillationLockError,
+    InsufficientDataError,
+    NoPatternDataError,
+)
 from phosphene.orchestrator import (
     ActivationResult,
     ConfigError,
@@ -70,18 +75,55 @@ class FakeAttentionFilter:
         return SimpleNamespace(accepted=self.accepted)
 
 
+class FakeDistillationEngine:
+    def __init__(
+        self,
+        gates: object | None = None,
+        *,
+        check_error: Exception | None = None,
+        t1_error: Exception | None = None,
+        t2_error: Exception | None = None,
+    ) -> None:
+        self.gates = gates
+        self.check_error = check_error
+        self.t1_error = t1_error
+        self.t2_error = t2_error
+        self.check_configs: list[object] = []
+        self.t1_configs: list[object] = []
+        self.t2_configs: list[object] = []
+
+    def check_gates(self, config: object) -> object:
+        self.check_configs.append(config)
+        if self.check_error is not None:
+            raise self.check_error
+        return self.gates
+
+    def distill_t1_to_t2(self, config: object) -> None:
+        self.t1_configs.append(config)
+        if self.t1_error is not None:
+            raise self.t1_error
+
+    def distill_t2_to_t3(self, config: object) -> None:
+        self.t2_configs.append(config)
+        if self.t2_error is not None:
+            raise self.t2_error
+
+
 def build_modules(
     *,
     memory_store: object | None = None,
     attention_filter: object | None = None,
     source_ingestion: object | None = None,
+    distillation_engine: object | None = None,
     gateway: object | None = None,
 ) -> ModuleRefs:
     return ModuleRefs(
         memory_store=ValidMemoryStore() if memory_store is None else memory_store,
         attention_filter=object() if attention_filter is None else attention_filter,
         source_ingestion=object() if source_ingestion is None else source_ingestion,
-        distillation_engine=object(),
+        distillation_engine=object()
+        if distillation_engine is None
+        else distillation_engine,
         generator=object(),
         gateway=ValidGateway() if gateway is None else gateway,
     )
@@ -363,6 +405,68 @@ def test_ingestion_note_title_falls_back_to_content_and_truncates() -> None:
     note = memory_store.notes[0]
     assert note.title == long_content[:150]
     assert note.unresolvedness == 0.0
+
+
+def test_trigger_distillation_skips_when_gates_not_ready() -> None:
+    gates = SimpleNamespace(ready=False, t1_to_t2_ready=False, t2_to_t3_ready=False)
+    engine = FakeDistillationEngine(gates)
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(distillation_engine=engine),
+        config,
+    )
+
+    result = instance.trigger("distillation")
+
+    assert result.task_type == "distillation"
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert engine.check_configs == [config.distillation_config]
+    assert engine.t1_configs == []
+    assert engine.t2_configs == []
+
+
+def test_trigger_distillation_dispatches_ready_promotions() -> None:
+    gates = SimpleNamespace(ready=True, t1_to_t2_ready=True, t2_to_t3_ready=True)
+    engine = FakeDistillationEngine(gates)
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(distillation_engine=engine),
+        config,
+    )
+
+    result = instance.trigger("distillation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert engine.check_configs == [config.distillation_config]
+    assert engine.t1_configs == [config.distillation_config]
+    assert engine.t2_configs == [config.distillation_config]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        DistillationLockError("locked"),
+        InsufficientDataError("not enough tier 1"),
+        NoPatternDataError("no tier 2 patterns"),
+    ],
+)
+def test_trigger_distillation_treats_expected_exceptions_as_skip(error: Exception) -> None:
+    engine = FakeDistillationEngine(
+        SimpleNamespace(ready=True, t1_to_t2_ready=True, t2_to_t3_ready=False),
+        t1_error=error,
+    )
+    instance = MVPOrchestrator(
+        build_modules(distillation_engine=engine),
+        build_config(),
+    )
+
+    result = instance.trigger("distillation")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert result.error is None
 
 
 def test_trigger_rejects_unknown_task_type() -> None:

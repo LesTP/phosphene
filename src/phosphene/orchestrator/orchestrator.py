@@ -7,6 +7,11 @@ from time import sleep
 
 from croniter import croniter
 
+from phosphene.distillation import (
+    DistillationLockError,
+    InsufficientDataError,
+    NoPatternDataError,
+)
 from phosphene.memory_store import NoteInput
 from phosphene.orchestrator.errors import ConfigError, UnknownTaskTypeError
 from phosphene.orchestrator.types import (
@@ -100,6 +105,8 @@ class MVPOrchestrator:
 
         if task_type == "ingestion":
             return self._run_ingestion()
+        if task_type == "distillation":
+            return self._run_distillation()
 
         return ActivationResult(
             task_type=task_type,
@@ -128,6 +135,40 @@ class MVPOrchestrator:
 
         return ActivationResult(
             task_type="ingestion",
+            success=True,
+            outputs_delivered=0,
+        )
+
+    def _run_distillation(self) -> ActivationResult:
+        try:
+            gates = self.modules.distillation_engine.check_gates(
+                self.config.distillation_config
+            )
+            if not gates.ready:
+                return ActivationResult(
+                    task_type="distillation",
+                    success=True,
+                    outputs_delivered=0,
+                )
+
+            if gates.t1_to_t2_ready:
+                self.modules.distillation_engine.distill_t1_to_t2(
+                    self.config.distillation_config
+                )
+
+            if gates.t2_to_t3_ready:
+                self.modules.distillation_engine.distill_t2_to_t3(
+                    self.config.distillation_config
+                )
+        except (DistillationLockError, InsufficientDataError, NoPatternDataError):
+            return ActivationResult(
+                task_type="distillation",
+                success=True,
+                outputs_delivered=0,
+            )
+
+        return ActivationResult(
+            task_type="distillation",
             success=True,
             outputs_delivered=0,
         )
