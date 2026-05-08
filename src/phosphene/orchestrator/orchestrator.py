@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from croniter import croniter
 
 from phosphene.orchestrator.errors import ConfigError
-from phosphene.orchestrator.types import ModuleRefs, MVPOrchestratorConfig
+from phosphene.orchestrator.types import ModuleRefs, MVPOrchestratorConfig, ScheduleEntry
 
 
 ALLOWED_TASK_TYPES = frozenset({"ingestion", "generation", "distillation", "decay"})
@@ -39,6 +41,26 @@ class MVPOrchestrator:
         self._validate_modules(modules)
         self.modules = modules
         self.config = config
+        self._last_check_by_entry_index: dict[int, datetime] = {}
+
+    def _next_due_entries(self, now: datetime) -> list[ScheduleEntry]:
+        """Return enabled schedule entries that fired since their last check."""
+        normalized_now = _normalize_datetime(now)
+        due_entries: list[ScheduleEntry] = []
+
+        for index, entry in enumerate(self.config.schedule):
+            previous_check = self._last_check_by_entry_index.get(index)
+            self._last_check_by_entry_index[index] = normalized_now
+
+            if previous_check is None or not entry.enabled:
+                continue
+
+            normalized_previous_check = _normalize_datetime(previous_check)
+            next_fire = croniter(entry.cron, normalized_previous_check).get_next(datetime)
+            if _normalize_datetime(next_fire) <= normalized_now:
+                due_entries.append(entry)
+
+        return due_entries
 
     @staticmethod
     def _validate_config(config: MVPOrchestratorConfig) -> None:
@@ -71,3 +93,9 @@ class MVPOrchestrator:
         gateway_send = getattr(modules.gateway, "send", None)
         if not callable(gateway_send):
             raise ConfigError("modules.gateway must provide send()")
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

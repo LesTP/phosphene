@@ -207,3 +207,65 @@ def test_constructor_validation_does_not_call_module_methods() -> None:
     assert memory_store.get_personality_context.called is False
     assert memory_store.run_decay.called is False
     assert modules.gateway.send.called is False
+
+
+def test_next_due_entries_initializes_without_returning_due_entries() -> None:
+    instance = MVPOrchestrator(
+        build_modules(),
+        build_config(
+            schedule=[
+                ScheduleEntry(task_type="ingestion", cron="0 * * * *"),
+                ScheduleEntry(task_type="generation", cron="30 * * * *"),
+            ]
+        ),
+    )
+
+    due = instance._next_due_entries(datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc))
+
+    assert due == []
+
+
+def test_next_due_entries_returns_entries_that_fired_since_last_check() -> None:
+    ingestion = ScheduleEntry(task_type="ingestion", cron="0 * * * *")
+    generation = ScheduleEntry(task_type="generation", cron="30 * * * *")
+    instance = MVPOrchestrator(
+        build_modules(),
+        build_config(schedule=[ingestion, generation]),
+    )
+
+    instance._next_due_entries(datetime(2026, 5, 8, 12, 1, tzinfo=timezone.utc))
+    due = instance._next_due_entries(datetime(2026, 5, 8, 12, 31, tzinfo=timezone.utc))
+
+    assert due == [generation]
+
+
+def test_next_due_entries_tracks_each_schedule_entry_independently() -> None:
+    hourly_ingestion = ScheduleEntry(task_type="ingestion", cron="0 * * * *")
+    daily_decay = ScheduleEntry(task_type="decay", cron="0 3 * * *")
+    instance = MVPOrchestrator(
+        build_modules(),
+        build_config(schedule=[hourly_ingestion, daily_decay]),
+    )
+
+    instance._next_due_entries(datetime(2026, 5, 8, 2, 58, tzinfo=timezone.utc))
+    due = instance._next_due_entries(datetime(2026, 5, 8, 3, 1, tzinfo=timezone.utc))
+
+    assert due == [hourly_ingestion, daily_decay]
+
+
+def test_next_due_entries_ignores_disabled_entries() -> None:
+    enabled_entry = ScheduleEntry(task_type="ingestion", cron="0 * * * *")
+    disabled_entry = ScheduleEntry(
+        task_type="distillation",
+        cron="0 * * * *",
+        enabled=False,
+    )
+    instance = MVPOrchestrator(
+        build_modules(),
+        build_config(schedule=[enabled_entry, disabled_entry]),
+    )
+
+    instance._next_due_entries(datetime(2026, 5, 8, 11, 30, tzinfo=timezone.utc))
+    due = instance._next_due_entries(datetime(2026, 5, 8, 12, 1, tzinfo=timezone.utc))
+
+    assert due == [enabled_entry]

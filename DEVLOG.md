@@ -689,3 +689,14 @@ Added the initial `MVPOrchestrator` constructor shell. It stores `modules` and `
 Implemented constructor validation for the MVP Orchestrator. `MVPOrchestrator` now rejects empty schedules, unknown scheduled task types, non-5-field cron strings, cron expressions rejected by `croniter`, missing module references, missing Memory Store methods, and missing Gateway `send()`.
 
 Validation remains limited to constructor-time shape checks. The Memory Store and Gateway checks inspect callable attributes but do not invoke module methods, preserving the Phase MVP.1 boundary that all modules are held as references and no runtime APIs are called. Installed `croniter` into `.python_deps` per the DEVPLAN gotcha. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (11 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (585 passed).
+
+### Step MVP.1.3: Cron evaluation
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented private cron evaluation for the MVP Orchestrator. `MVPOrchestrator._next_due_entries(now)` now normalizes timestamps to UTC, tracks the previous check time per schedule-entry index, returns enabled entries whose cron fired in the `(last_check, now]` window, and advances each entry's last-check timestamp on every poll.
+
+Added deterministic tests for first-call initialization, fired-since-last-check behavior, independent tracking across multiple schedule entries, and disabled-entry suppression. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (589 passed).

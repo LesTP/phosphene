@@ -49,7 +49,7 @@ state: execute
 
 2. **Config and ModuleRefs validation** — Complete. Validates schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter, ModuleRefs non-None, Memory Store required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), and Gateway `send`. Validation performs attribute checks only and does not call module methods.
 
-3. **Cron evaluation** — `_next_due_entries(now) -> list[ScheduleEntry]` using croniter to determine which schedule entries have fired since the last check. Track last-check timestamp per entry. Handle disabled entries. Focused tests with deterministic timestamps — no real sleeps.
+3. **Cron evaluation** — Complete. `_next_due_entries(now) -> list[ScheduleEntry]` uses croniter to determine which schedule entries have fired since the last check. Tracks last-check timestamp per entry, handles disabled entries, and has focused tests with deterministic timestamps and no real sleeps.
 
 4. **Main loop and lifecycle** — `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
 
