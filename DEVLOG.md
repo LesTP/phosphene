@@ -89,3 +89,14 @@ DEVPLAN cleanup: reduced Phase MVP.1 to a one-line completion summary, updated C
 ARCHITECTURE.md: MVP Orchestrator status updated from in progress to Phase MVP.1 complete.
 
 (Entries before MVP.1 archived to DEVLOG_archive.md on 2026-05-08.)
+
+### Phase MVP.2 Plan: Activation wiring
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Planned MVP Orchestrator Phase 2 as a Build phase with five testable activation-wiring steps: ingestion, distillation, generation/bootstrap, respond/listener, and decay. The phase remains inside `ARCH_orchestrator_mvp.md`: no lateral freedom, no ambient context, no feedback collector, no Explorer integration, and no Phase 3 error/logging hardening.
+
+Recorded D-50 for the one-activation-per-step scope decision. DEVPLAN frontmatter now advances to `state: execute` with the invocation budget decremented to 4; the next action is MVP.2.1 ingestion activation.

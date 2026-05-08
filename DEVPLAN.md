@@ -1,7 +1,8 @@
 ---
 phase: MVP.1
-blocked: "awaiting-human-audit"
-state: close
+blocked: false
+state: execute
+steps_remaining: 4
 ---
 
 # Phosphene — Development Plan
@@ -30,8 +31,8 @@ state: close
 ## Current Status
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
-- **Phase** — MVP.1 complete: Contract and cron loop.
-- **Focus** — Phase close complete.
+- **Phase** — MVP.2: Activation wiring.
+- **Focus** — Step 1: Ingestion activation.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
