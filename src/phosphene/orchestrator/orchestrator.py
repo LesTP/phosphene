@@ -111,6 +111,8 @@ class MVPOrchestrator:
             return self._run_distillation()
         if task_type == "generation":
             return self._run_generation()
+        if task_type == "decay":
+            return self._run_decay()
 
         return ActivationResult(
             task_type=task_type,
@@ -206,6 +208,14 @@ class MVPOrchestrator:
             task_type="generation",
             success=True,
             outputs_delivered=delivered,
+        )
+
+    def _run_decay(self) -> ActivationResult:
+        self.modules.memory_store.run_decay()
+        return ActivationResult(
+            task_type="decay",
+            success=True,
+            outputs_delivered=0,
         )
 
     def _run_respond(self, message: object) -> ActivationResult:

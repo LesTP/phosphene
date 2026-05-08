@@ -53,9 +53,11 @@ class RecordingMemoryStore(ValidMemoryStore):
         super().__init__()
         self.store_note = self._store_note
         self.get_personality_context = self._get_personality_context
+        self.run_decay = self._run_decay
         self.notes: list[object] = []
         self.personality_files = [] if personality_files is None else personality_files
         self.personality_context_calls = 0
+        self.decay_calls = 0
 
     def _store_note(self, note_input: object) -> None:
         self.notes.append(note_input)
@@ -63,6 +65,9 @@ class RecordingMemoryStore(ValidMemoryStore):
     def _get_personality_context(self) -> object:
         self.personality_context_calls += 1
         return SimpleNamespace(personality_files=self.personality_files)
+
+    def _run_decay(self) -> None:
+        self.decay_calls += 1
 
 
 class FakeSourceIngestion:
@@ -350,9 +355,12 @@ def test_constructor_validation_does_not_call_module_methods() -> None:
     assert modules.gateway.send.called is False
 
 
-def test_trigger_runs_unwired_decay_stub_without_calling_modules() -> None:
-    modules = build_modules()
-    instance = MVPOrchestrator(modules, build_config())
+def test_trigger_decay_calls_run_decay_and_returns_success() -> None:
+    memory_store = RecordingMemoryStore()
+    instance = MVPOrchestrator(
+        build_modules(memory_store=memory_store),
+        build_config(),
+    )
 
     result = instance.trigger("decay")
 
@@ -360,11 +368,7 @@ def test_trigger_runs_unwired_decay_stub_without_calling_modules() -> None:
     assert result.success is True
     assert result.outputs_delivered == 0
     assert result.error is None
-    assert modules.memory_store.store_note.called is False
-    assert modules.memory_store.get_density_metrics.called is False
-    assert modules.memory_store.get_personality_context.called is False
-    assert modules.memory_store.run_decay.called is False
-    assert modules.gateway.send.called is False
+    assert memory_store.decay_calls == 1
 
 
 def test_trigger_ingestion_polls_filters_and_stores_accepted_fragments() -> None:

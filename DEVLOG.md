@@ -144,3 +144,14 @@ Added fake-module orchestrator tests for empty personality bootstrap detection, 
 Implemented `_run_respond(message)` for inbound Gateway messages. The activation now mirrors generation bootstrap behavior, calls `generator.respond(message, {}, config.generator_config)` when personality files exist, routes the output through `route(output, config.router_config, gateway)`, and counts only successful deliveries. `EmptyPersonalityError` is treated as a bootstrap drop.
 
 Updated `start()` to register `_run_respond` as the Gateway `on_message` callback before starting the listener. Added fake-module tests for bootstrap drops, inline listener dispatch to respond, successful response routing, and `EmptyPersonalityError` handling. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (608 passed). DEVPLAN now keeps `state: execute`, sets `steps_remaining` to 0, and moves focus to MVP.2.5 decay activation.
+
+### Step MVP.2.5: Decay activation
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `_run_decay()` behind `trigger("decay")`. The activation calls `memory_store.run_decay()` and returns `ActivationResult(task_type="decay", success=True, outputs_delivered=0)`. No bootstrap check, no conditionals — the simplest activation in the suite.
+
+Replaced the stub test `test_trigger_runs_unwired_decay_stub_without_calling_modules` with `test_trigger_decay_calls_run_decay_and_returns_success`, which verifies `run_decay()` is called exactly once and the result fields are correct. Extended `RecordingMemoryStore` with `decay_calls` tracking. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (608 passed). All five Phase MVP.2 activation steps are now complete — DEVPLAN transitions to `state: review`.

@@ -1,7 +1,7 @@
 ---
 phase: MVP.2
 blocked: false
-state: execute
+state: review
 steps_remaining: 0
 ---
 
