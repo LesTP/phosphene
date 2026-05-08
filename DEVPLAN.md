@@ -47,7 +47,7 @@ state: execute
 
 1. **Public package contract** — Complete. Created `src/phosphene/orchestrator/` with ARCH-aligned `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, `ModuleRefs` exports. Added error types: `OrchestratorError`, `ConfigError`, `UnknownTaskTypeError`. Constructor shell stores modules and config without validation.
 
-2. **Config and ModuleRefs validation** — Validate schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter. Validate ModuleRefs: all fields non-None, Memory Store has required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), Gateway has `send`. No module calls during validation — just attribute checks.
+2. **Config and ModuleRefs validation** — Complete. Validates schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter, ModuleRefs non-None, Memory Store required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), and Gateway `send`. Validation performs attribute checks only and does not call module methods.
 
 3. **Cron evaluation** — `_next_due_entries(now) -> list[ScheduleEntry]` using croniter to determine which schedule entries have fired since the last check. Track last-check timestamp per entry. Handle disabled entries. Focused tests with deterministic timestamps — no real sleeps.
 
