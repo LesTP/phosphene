@@ -1,7 +1,7 @@
 ---
 phase: MVP.1
 blocked: null
-state: execute
+state: review
 ---
 
 # Phosphene — Development Plan
@@ -31,7 +31,7 @@ state: execute
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.1 planned: Contract and cron loop.
-- **Focus** — Phase MVP.1 implementation.
+- **Focus** — Phase MVP.1 review.
 - **Blocked/Broken** — None
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -53,7 +53,7 @@ state: execute
 
 4. **Main loop and lifecycle** — Complete. `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
 
-5. **Foundation tests** — Package export coverage, config validation boundaries, cron evaluation with fake timestamps, start/stop lifecycle (using a short-circuit flag or threading to avoid blocking), trigger dispatch. Verify no module methods are called during construction, validation, or stub dispatch.
+5. **Foundation tests** — Complete. Package export coverage, config validation boundaries, cron evaluation with fake timestamps, start/stop lifecycle using short-circuit monkeypatches to avoid blocking, and trigger dispatch. Verified no module methods are called during construction, validation, or stub dispatch.
 
 **Boundary:** Phase 1 proves the scheduling and lifecycle contract without touching any module's runtime API. All 6 modules are held as references but never invoked.
 

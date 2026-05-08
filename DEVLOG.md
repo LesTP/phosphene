@@ -703,3 +703,14 @@ Added deterministic tests for first-call initialization, fired-since-last-check 
 Implemented the MVP Orchestrator lifecycle shell. `start()` now blocks in the 60-second sleep-poll loop, checks due cron entries, and dispatches each due entry sequentially through the Phase 1 stub dispatcher. `stop()` requests loop shutdown after the current activation, and `trigger(task_type)` runs a single activation synchronously.
 
 Added `_run_activation(task_type)` as the Phase 1 dispatch stub: allowed scheduled task types return successful `ActivationResult` objects with zero delivered outputs, while unknown task types raise `UnknownTaskTypeError`. Focused tests cover trigger dispatch without module calls, unknown trigger rejection, sequential start-loop dispatch with no real sleep, and stop-before-poll shutdown. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (593 passed).
+
+### Step MVP.1.5: Foundation tests
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Completed the Phase MVP.1 foundation test sweep for the public contract, constructor validation, cron evaluation, lifecycle loop, stop handling, trigger dispatch, and no-runtime-module-call boundary. The existing orchestrator coverage exercises package exports, dataclass fields and defaults, validation failures, fake-timestamp cron behavior, disabled schedule entries, no-real-sleep lifecycle dispatch, and stub activation behavior.
+
+No production code changes were needed in this step. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (593 passed). Because this was the final Phase MVP.1 step, DEVPLAN frontmatter now advances to `state: review`; the next action is the Phase MVP.1 review.
