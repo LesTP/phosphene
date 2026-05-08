@@ -133,3 +133,14 @@ Added fake-module orchestrator tests for gate-not-ready behavior, successful dua
 Implemented `_run_generation()` behind `trigger("generation")`. The activation now loads `memory_store.get_personality_context()`, skips cleanly when no personality files exist, calls `generator.generate(config.generation_prompt, {}, config.generator_config)` when bootstrapped, routes the resulting output through `route(output, config.router_config, gateway)`, and reports `outputs_delivered=1` only for successful delivery results. `EmptyPersonalityError` is treated as a bootstrap skip.
 
 Added fake-module orchestrator tests for empty personality bootstrap detection, `EmptyPersonalityError` bootstrap skip, successful generation→route→send delivery, and delivery failure isolation. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (31 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (605 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.2.4 respond activation.
+
+### Step MVP.2.4: Respond activation
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `_run_respond(message)` for inbound Gateway messages. The activation now mirrors generation bootstrap behavior, calls `generator.respond(message, {}, config.generator_config)` when personality files exist, routes the output through `route(output, config.router_config, gateway)`, and counts only successful deliveries. `EmptyPersonalityError` is treated as a bootstrap drop.
+
+Updated `start()` to register `_run_respond` as the Gateway `on_message` callback before starting the listener. Added fake-module tests for bootstrap drops, inline listener dispatch to respond, successful response routing, and `EmptyPersonalityError` handling. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (608 passed). DEVPLAN now keeps `state: execute`, sets `steps_remaining` to 0, and moves focus to MVP.2.5 decay activation.

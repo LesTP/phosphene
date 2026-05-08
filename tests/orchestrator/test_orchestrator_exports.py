@@ -10,7 +10,7 @@ from phosphene.distillation import (
     InsufficientDataError,
     NoPatternDataError,
 )
-from phosphene.gateway import DeliveryResult
+from phosphene.gateway import DeliveryResult, InboundMessage
 from phosphene.generator import EmptyPersonalityError, GeneratorOutput, RouterConfig
 from phosphene.generator.types import TokenUsage
 from phosphene.orchestrator import (
@@ -128,6 +128,7 @@ class FakeGenerator:
         self.output = output
         self.error = error
         self.generate_calls: list[tuple[object, object, object]] = []
+        self.respond_calls: list[tuple[object, object, object]] = []
 
     def generate(self, prompt: object, ambient: object, config: object) -> object:
         self.generate_calls.append((prompt, ambient, config))
@@ -135,13 +136,26 @@ class FakeGenerator:
             raise self.error
         return self.output
 
+    def respond(self, message: object, ambient: object, config: object) -> object:
+        self.respond_calls.append((message, ambient, config))
+        if self.error is not None:
+            raise self.error
+        return self.output
+
 
 class RoutingGateway(ValidGateway):
-    def __init__(self, delivery_success: bool = True) -> None:
+    def __init__(
+        self,
+        delivery_success: bool = True,
+        inbound_message: object | None = None,
+    ) -> None:
         super().__init__()
         self.config = SimpleNamespace(default_platform="telegram")
         self.delivery_success = delivery_success
+        self.inbound_message = inbound_message
         self.sent_messages: list[object] = []
+        self.listener_started = False
+        self.on_message = lambda message: None
         self.send = self._send
 
     def _send(self, message: object) -> DeliveryResult:
@@ -152,6 +166,11 @@ class RoutingGateway(ValidGateway):
             message_id="msg-1" if self.delivery_success else None,
             error=None if self.delivery_success else "delivery failed",
         )
+
+    def start_listener(self) -> None:
+        self.listener_started = True
+        if self.inbound_message is not None:
+            self.on_message(self.inbound_message)
 
 
 def build_modules(
@@ -612,6 +631,77 @@ def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
     assert result.success is True
     assert result.outputs_delivered == 0
     assert len(gateway.sent_messages) == 1
+
+
+def test_run_respond_skips_bootstrap_without_generator_call() -> None:
+    memory_store = RecordingMemoryStore(personality_files=[])
+    generator = FakeGenerator(make_generator_output())
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=RoutingGateway(),
+        ),
+        build_config(),
+    )
+
+    result = instance._run_respond(object())
+
+    assert result.task_type == "respond"
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert generator.respond_calls == []
+
+
+def test_start_listener_dispatches_inbound_message_to_respond(monkeypatch) -> None:
+    message = InboundMessage(
+        content="hello",
+        platform="telegram",
+        message_id="in-1",
+        sender="human",
+        timestamp=datetime(2026, 5, 8, 12, 0),
+    )
+    memory_store = RecordingMemoryStore(personality_files=[object()])
+    generator = FakeGenerator(make_generator_output("reply"))
+    gateway = RoutingGateway(inbound_message=message)
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    def fake_sleep(seconds: int) -> None:
+        instance.stop()
+
+    monkeypatch.setattr(orchestrator_module, "sleep", fake_sleep)
+
+    instance.start()
+
+    assert gateway.listener_started is True
+    assert generator.respond_calls == [(message, {}, config.generator_config)]
+    assert len(gateway.sent_messages) == 1
+    assert gateway.sent_messages[0].content == "reply"
+
+
+def test_run_respond_catches_empty_personality_error_as_bootstrap_drop() -> None:
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=RecordingMemoryStore(personality_files=[object()]),
+            generator=FakeGenerator(error=EmptyPersonalityError("empty")),
+            gateway=RoutingGateway(),
+        ),
+        build_config(),
+    )
+
+    result = instance._run_respond(object())
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert result.error is None
 
 
 def test_trigger_rejects_unknown_task_type() -> None:

@@ -60,6 +60,7 @@ class MVPOrchestrator:
     def start(self) -> None:
         """Block in the sleep-poll lifecycle loop until stop is requested."""
         self._stop_requested = False
+        self._start_gateway_listener()
 
         while not self._stop_requested:
             sleep(60)
@@ -206,6 +207,47 @@ class MVPOrchestrator:
             success=True,
             outputs_delivered=delivered,
         )
+
+    def _run_respond(self, message: object) -> ActivationResult:
+        try:
+            context = self.modules.memory_store.get_personality_context()
+            if not context.personality_files:
+                return ActivationResult(
+                    task_type="respond",
+                    success=True,
+                    outputs_delivered=0,
+                )
+
+            output = self.modules.generator.respond(
+                message,
+                {},
+                self.config.generator_config,
+            )
+        except EmptyPersonalityError:
+            return ActivationResult(
+                task_type="respond",
+                success=True,
+                outputs_delivered=0,
+            )
+
+        delivery = route(output, self.config.router_config, self.modules.gateway)
+        delivered = 1 if delivery is not None and delivery.success else 0
+
+        return ActivationResult(
+            task_type="respond",
+            success=True,
+            outputs_delivered=delivered,
+        )
+
+    def _start_gateway_listener(self) -> None:
+        start_listener = getattr(self.modules.gateway, "start_listener", None)
+        if not callable(start_listener):
+            return
+
+        if hasattr(self.modules.gateway, "on_message"):
+            self.modules.gateway.on_message = self._run_respond
+
+        start_listener()
 
     @staticmethod
     def _validate_config(config: MVPOrchestratorConfig) -> None:

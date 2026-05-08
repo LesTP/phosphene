@@ -2,7 +2,7 @@
 phase: MVP.2
 blocked: false
 state: execute
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 1
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.2: Activation wiring.
-- **Focus** — Step 4: Respond activation.
+- **Focus** — Step 5: Decay activation.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -56,7 +56,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 3. **Generation activation + bootstrap** — Complete. `_run_generation()` now checks personality context, skips bootstrap, calls `generator.generate(prompt, {}, config.generator_config)`, routes output through the Output Router, counts successful deliveries, and treats `EmptyPersonalityError` as a bootstrap skip. Verified with fake-module tests.
 
-4. **Respond activation** — `_run_respond(message)`: same as generation but calls `generator.respond(message, {}, config.generator_config)`. Wire Gateway listener callback in `start()` via `gateway.start_listener()` with an `on_message` callback that dispatches respond activations inline. Bootstrap skip applies. Tests verify inbound message dispatch and bootstrap drop.
+4. **Respond activation** — Complete. `_run_respond(message)` now checks personality context, skips bootstrap, calls `generator.respond(message, {}, config.generator_config)`, routes output through the Output Router, and Gateway listener startup registers inbound messages for inline respond dispatch. Verified with fake-module tests.
 
 5. **Decay activation** — `_run_decay()`: call `memory_store.run_decay()`. Return `ActivationResult`. Simplest activation — one call, no conditionals.
 
