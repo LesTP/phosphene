@@ -68,6 +68,18 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 | 8 | Explorer | Link-following, source evaluation. Adds depth to ingestion but not required for core loop. | Not started |
 | 9 | Orchestrator | Full activation lifecycle: tension-responsive scheduling, lateral-freedom budget, ambient stream injection. Last because it requires all other modules. | Not started |
 
+### MVP Path
+
+Modules 1–6 are complete. The MVP path (see PROJECT.md MVP Definition) requires a **minimal Orchestrator** (ARCH_orchestrator_mvp.md) — cron-triggered activation loop without lateral freedom, tension-responsive scheduling, or ambient context. This can be built before Feedback Collector Phase 7.2 and Explorer, allowing the system to run and produce real output while the remaining modules are developed.
+
+| Order | Module | MVP? | Status |
+|-------|--------|------|--------|
+| 7.1 | Feedback Collector (immediate) | No | Complete |
+| 7.2 | Feedback Collector (delayed) | No | Not started |
+| MVP | Orchestrator (minimal) | **Yes** | Not started — ARCH_orchestrator_mvp.md |
+| 8 | Explorer | No | Not started |
+| 9 | Orchestrator (full) | No | Not started — ARCH_orchestrator.md |
+
 ### Flexible / Deferred Components
 
 The following are in PROJECT.md's flexible-scope `[in]` set but have no numbered slot in the Implementation Sequence above. They will be promoted (assigned a build order, given an `ARCH_*.md` file, and added to the active sequence) when the operational pressure that motivates them becomes real.

@@ -1,7 +1,7 @@
 # Codex Worker Adapter — Phosphene
 
-> **Contract:** Follow `WORKER_SPEC.md` for iteration lifecycle, allowed actions,
-> one-action rule, escalation conditions, and output contract. This file covers
+> **Contract:** Follow `WORKER_SPEC.md` for the 4-state machine, one-action
+> rule, escalation conditions, and output contract. This file covers
 > Codex-specific mechanics only.
 
 ## Framework
@@ -25,39 +25,26 @@ cat CODEX.md && echo '---SPLIT---' && cat WORKER_SPEC.md && echo '---SPLIT---' &
 ```
 
 **DEVLOG.md fence:** When reading or writing to DEVLOG.md, stop at the
-HISTORY fence (a multi-line `<!-- HISTORY ... -->` block). Insert new entries
-**above** the fence block. Do not read or patch content below it.
+HISTORY fence. Insert new entries **above** the fence block. Do not read or
+patch content below it.
 
-```bash
-awk '/HISTORY/{exit} {print}' DEVLOG.md
-```
-
-### Tier 2 — Current module (mandatory for step/review/complete actions)
+### Tier 2 — Current module (mandatory for execute/review/close actions)
 
 After determining the active module from DEVPLAN's Current Status, read the
 relevant `ARCH_*.md` file (see table below). Combine with any source files
-you need in the **same command**:
-
-```bash
-cat ARCH_memory_store.md && echo '---SPLIT---' && cat src/phosphene/memory_store/store.py
-```
+you need in the **same command**.
 
 ### Tier 3 — On demand (read only when needed)
-- `PROJECT.md` — only during Phase Plan actions
-- `ARCHITECTURE.md` — only during Phase Plan or cross-module wiring
+- `PROJECT.md` — only during phase plan actions
+- `ARCHITECTURE.md` — only during phase plan or cross-module wiring
 - `GOVERNANCE.md` — only if unsure about process
 
 ### Read efficiency rules
 - **Combine related reads** into one `cat A && echo '---' && cat B` command
 - **Never read one file per tool call** when you need multiple files
-- **Combine source + test reads**: `cat src/phosphene/memory_store/foo.py && echo '---' && cat tests/memory_store/test_foo.py`
-- **Use `sed -n` ranges** only when you need a specific section, not the whole file
 - **Fresh reads before edits** — re-read immediately before editing, not at iteration start
 
 ## Load for Current Module
-After reading DEVPLAN, determine the active track and module from its Current
-Status section. Then read the relevant `ARCH_*.md` file for the layer contract
-and module dependencies:
 
 | Module | ARCH file |
 |--------|-----------|
@@ -78,7 +65,7 @@ and module dependencies:
 
 **Track B — Core Loop (content in):**
 - Module 2: Attention Filter — personality-driven content selection
-- Module 3: Source Ingestion — adapters for content sources (including human-share and corpus import)
+- Module 3: Source Ingestion — adapters for content sources
 
 **Track C — Core Loop (content out):**
 - Module 4: Gateway — multi-platform message bus
@@ -96,79 +83,57 @@ and module dependencies:
 
 ## Project-Specific Notes
 - **Language:** Python 3.12+
-- **External dependency:** toolkit/ (sibling project). Import from toolkit — never modify it. All five toolkit modules are complete (embedding, clustering, llm_client, telegram_client, json_rpc).
-- **Storage format:** Obsidian-compatible markdown with YAML frontmatter. Memory Store writes `.md` files to a vault directory.
-- **Test strategy:** pytest. Unit tests per module. Integration tests at module boundaries (Type compatibility → Boundary tests → Bridge logic per GOVERNANCE.md cross-module pattern).
-- **Key constraint:** Memory Store is a leaf dependency. It stores and searches embedding vectors but never computes them — consumers provide embeddings via toolkit/embedding.
+- **External dependency:** toolkit/ (sibling project). Import from toolkit — never modify it.
+- **Storage format:** Obsidian-compatible markdown with YAML frontmatter.
+- **Test command:** `PYTHONPATH=src:.python_deps python3 -m pytest tests/`
+- **Key constraint:** Memory Store is a leaf dependency — stores/searches embeddings but never computes them.
 - **Model policy:** D-5 in DECISIONS.md — single primary model during establishment phase (~90 days).
 - **Gotchas:**
   - toolkit/ is an external dependency — import from it, never modify it.
   - All 9 ARCH files define contracts — implementation must match signatures exactly.
   - NTFS drives: use `bash script.sh`, not `./script.sh`.
+  - **No ripgrep** — `rg` is not installed. Use `find` and `grep` instead.
+  - **Test environment** — `.python_deps/` contains pip dependencies (gitignored, persists). Do NOT recreate `.venv`.
+  - **Subagent context** — when spawning subagents, include: source tree is `src/phosphene/<module>/`, test command is `PYTHONPATH=src:.python_deps python3 -m pytest`, `.python_deps/` has all deps.
 
 ## Codex-Specific Tool Rules
 - **No `@` references.** Read files explicitly using CLI.
-  When a file contains `@FILENAME` references, treat them as file paths to read.
-- **Minimize tool calls.** Every tool call re-processes the full context. Combine
-  multiple file reads, greps, and short commands into single shell invocations.
-  Bad: `sed -n '1,100p' A.py` then `sed -n '1,100p' B.py` (2 calls).
-  Good: `cat A.py && echo '---' && cat B.py` (1 call).
-- **Command files shared with Claude.** Action procedures live in
-  `.claude/commands/*.md`. Read these files and follow their instructions the
-  same way Claude does — the content is backend-agnostic.
-- **Fresh reads before edits.** Before editing any file (especially DEVPLAN.md),
-  read it immediately before the edit — not at the start of the iteration.
-- **Shell usage.** Use CLI tools directly for builds, tests, git operations,
-  file discovery, and search.
-- **Search tool availability.** This loop environment may not have `rg`
-  installed. Before using `rg`, check availability with `command -v rg`. If it
-  is absent, use portable fallbacks instead: `find` for file discovery,
-  `grep -RIn` for text search, and `sed -n` for bounded file reads. Do not
-  repeatedly attempt `rg` after it has failed in the same iteration.
+- **Minimize tool calls.** Combine reads into single shell commands.
+- **Command files shared with Claude.** Read `.claude/commands/*.md` and follow their instructions.
+- **Search tool availability.** Use `find` for discovery, `grep -RIn` for search. Do not attempt `rg`.
 
 ## Action Instructions
 
-WORKER_SPEC.md defines four allowed actions. Here is how to execute each one
-in Codex. Perform **exactly one** per iteration.
+WORKER_SPEC.md defines four states. Read `state` from DEVPLAN frontmatter
+and execute the matching action. Perform **exactly one** per iteration.
 
-### Phase Plan
-**When:** No active phase for the current module.
+### state: plan
 1. Read `.claude/commands/phase-plan.md` and follow its instructions.
-2. Commit with message: `phase-plan: <module>.<phase> — <summary>`.
+2. Set DEVPLAN frontmatter `state: execute`. Commit.
 3. Emit exit signal and stop.
 
-### Step Execution
-**When:** A phase is in progress with remaining steps.
+### state: execute
 1. Pick the next step from DEVPLAN. Do all file read/write work.
-2. Run builds, tests, and git operations as needed.
-3. Read `.claude/commands/step-done.md` and follow its instructions.
-4. Emit exit signal and stop. Do **not** start the next step.
+2. Run tests. Read `.claude/commands/step-done.md` and follow its instructions.
+3. Emit exit signal and stop. Do **not** start the next step.
 
-### Phase Review
-**When:** All steps in the current phase are complete.
+### state: review
 1. Read `.claude/commands/phase-review.md` and follow its instructions.
-2. Emit exit signal and stop.
+2. Set DEVPLAN frontmatter `state: close`. Commit.
+3. Emit exit signal and stop.
 
-### Phase Complete
-**When:** Review is done and fixes (if any) are applied.
+### state: close
 1. Read `.claude/commands/phase-complete.md` and follow its instructions.
-2. Emit exit signal and stop.
+2. Set DEVPLAN frontmatter `blocked: "awaiting-human-audit"`. Commit.
+3. Emit exit signal with ESCALATE and stop.
 
 ## Output Contract
 
-End every iteration with exactly these four lines — no additional text after:
+End every iteration with exactly these four lines:
 
 ```
 LOOP_SIGNAL: CONTINUE | ESCALATE
 REASON: <one-line summary>
-ACTION_TYPE: PHASE_PLAN | STEP | REVIEW | COMPLETE
-ACTION_ID: <module.phase.step>
+ACTION_TYPE: PLAN | EXECUTE | REVIEW | CLOSE
+ACTION_ID: <phase.step>
 ```
-
-## Autonomy
-
-When invoked in autonomous mode, execute the action and emit the exit signal
-without waiting for human input. In supervised mode, surface proposed changes
-for approval before committing.
-
-See WORKER_SPEC.md §8 for full mode definitions.

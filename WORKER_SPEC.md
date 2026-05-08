@@ -1,73 +1,60 @@
-# Worker Spec — Backend-Agnostic Contract
+# Worker Spec — Autonomous Loop Contract
 
-This document defines the universal contract that every worker backend must obey.
-Backend-specific adapters (Claude `CLAUDE.md`, Codex `CODEX.md`, etc.) translate
-this contract into model-native phrasing. Adapters differ in **phrasing**, not
-**behavior**.
-
-> Source: `ref/multi-backend_normalization.md` §3–5, iteration protocol from
-> `ref/CLAUDE_worker.md` lines 52–76.
+This document defines the contract for stateless workers running in an autonomous iteration loop. Load this **only** in projects using the loop runner. GOVERNANCE.md (Layer 0) applies universally; this adds the automation-specific behavioral rules.
 
 ---
 
 ## 1. Identity
 
-You are a **stateless worker** in an autonomous software development loop.
+You are a **stateless worker** in an autonomous development loop.
 
 - You run inside a project directory.
 - You have no memory of previous iterations.
 - Every invocation is a cold start.
-- You are **not** the orchestrator. You do not dispatch other runs, manage
-  scheduling, or communicate with users.
+- You are **not** the orchestrator. You do not dispatch runs, manage scheduling, or communicate with users.
 
 ---
 
-## 2. Cold Start — State Reconstruction
+## 2. Cold Start — State Detection
 
-Each iteration begins from scratch. Reconstruct state entirely from repo files:
+Each iteration begins from scratch. Read DEVPLAN frontmatter:
 
-1. **Load project instructions** — the backend-specific adapter file and every
-   document it references (project spec, architecture, governance, devplan).
-2. **Read DEVPLAN frontmatter** — check the `blocked` field first. If `blocked`
-   is not `null`, the work is gated. Exit ESCALATE immediately without reading
-   further or attempting any action. The `blocked` field is the single source
-   of truth for whether the project is gated.
-3. **Read DEVPLAN current status** — determine the active track and module.
-4. **Read the architecture layer contract** for the active module — understand
-   inputs, outputs, dependencies, and constraints.
+1. **Check `blocked`** — if not `null`, exit ESCALATE immediately. The work is gated.
+2. **Read `state`** — this determines your one action for this iteration.
+
+```yaml
+---
+phase: 3b
+blocked: null
+state: execute
+---
+```
 
 No external state, no session memory, no inter-iteration side channels.
 
 ---
 
-## 3. Allowed Actions
+## 3. The Four States
 
-Execute **exactly one** of the following actions per iteration:
+Execute **exactly one** action based on `state`:
 
-> Phase completes with a review step (exit CONTINUE) and a complete step (exit ESCALATE).
+| State | Action | On success | Exit |
+|-------|--------|------------|------|
+| `plan` | Break the next phase into steps. Update DEVPLAN with step breakdown. | Set `state: execute` | CONTINUE |
+| `execute` | Do the next incomplete step. Run tests. Update DEVLOG. | If last step: set `state: review`. Otherwise: keep `state: execute`. | CONTINUE |
+| `review` | Review phase output against the architecture contract. Apply must-fix and should-fix items. | Set `state: close` | CONTINUE |
+| `close` | Doc cleanup: DEVPLAN summary, DEVLOG entry, ARCHITECTURE.md status, contract propagation, gotchas promotion. Set `blocked: "awaiting-human-audit"`. | — | ESCALATE |
 
-| Action | When | What to do |
-|--------|------|------------|
-| **Phase Plan** | No active phase for the current module | Break the phase into steps. Update DEVPLAN with the step breakdown. Commit. Exit CONTINUE. |
-| **Step Execution** | A phase is in progress with remaining steps | Pick the next step from DEVPLAN. Do all file read/write work. Run builds, tests, git operations. Mark the step done in DEVPLAN. Commit. Exit CONTINUE. |
-| **Phase Review** | All steps in the current phase are complete | Review the phase output against the architecture contract. Apply any must-fix items within this iter. Log decisions to DECISIONS.md. Mark `review_done: true` in DEVPLAN frontmatter. Update DEVPLAN "Next" pointer to Phase Complete. Commit review artifacts. Exit CONTINUE. |
-| **Phase Complete** | Review is done and fixes (if any) are applied | Full doc update: DEVPLAN cleanup, DEVLOG entry, architecture status update, contract propagation. Set DEVPLAN frontmatter `blocked: "awaiting-human-audit"` and `mode: Plan`. The `/close` bot command (or human) clears `blocked` to `null`. Do not write "awaiting human audit" in prose — the frontmatter `blocked` field is the single gate. Commit. Exit ESCALATE. |
+The `/close` bot command (or human) clears the gate: sets `blocked: null` and `state: plan`.
 
 ---
 
 ## 4. One-Action Rule
 
-This is the single most important constraint:
-
 - Execute **exactly one** action per iteration.
 - Do **not** chain actions (e.g., finish a step then start the next).
 - Do **not** continue working after the action is complete.
-- Do **not** plan the next iteration's work.
-- After completing the action, verify your changes, then emit the exit signal
-  and stop.
-
-The loop runner will invoke a fresh iteration if more work remains. Your job is
-to do one thing correctly, not to do everything.
+- After completing the action, commit, emit the exit signal, and stop.
 
 ---
 
@@ -75,121 +62,59 @@ to do one thing correctly, not to do everything.
 
 Every iteration that modifies project state must leave an auditable trail:
 
-- **DEVPLAN.md** — update step status, mark completions, record blockers.
-- **DEVLOG.md** — add a dated entry describing what was done and why.
-  DEVLOG.md uses a multi-line HISTORY fence (`<!-- HISTORY ... -->`). New
-  entries go **above** the fence block. Do not read or edit content below the
-  fence. During Phase Complete, move the fence up so only the just-completed
-  phase's entries remain above it.
-- **DECISIONS.md** — log any non-trivial design or implementation decision
-  with rationale.
-- **ARCHITECTURE.md** — update the implementation sequence table when a phase
-  completes. Propagate contract changes if outputs changed.
+- **DEVPLAN.md** — update `state` transitions, mark step completions.
+- **DEVLOG.md** — add a dated entry above the `<!-- HISTORY` fence.
+- **DECISIONS.md** — log non-trivial decisions with rationale.
+- **ARCHITECTURE.md** — update implementation sequence status on phase close.
 
-Read docs **immediately before editing** — not at the start of the iteration.
-Stale reads cause merge conflicts and lost updates.
+Read docs **immediately before editing** — stale reads cause lost updates.
 
 ---
 
 ## 6. Escalation Conditions
 
-If any of the following are true, do **not** attempt to continue. Exit with
-`LOOP_SIGNAL: ESCALATE`:
+Exit with ESCALATE if any of:
 
-| Condition | Why |
-|-----------|-----|
-| 3 consecutive failures on the same problem | Indicates a misunderstanding or missing context the worker cannot resolve alone. |
-| Work regime shifts to Refine or Explore | These regimes require human judgment about scope and direction. |
-| Scope needs to expand beyond the defined phase | The worker must not unilaterally grow scope. |
-| Contract change would affect other modules | Cross-module changes require orchestrator-level coordination. |
-| Phase Complete action exits | Human audits the phase before the next one begins. (Phase Review exits CONTINUE — see §3.) |
-| All modules complete | No more work to dispatch. |
-| Unclear or contradictory spec | The worker must not guess at intent. |
+- `blocked` is not `null`
+- 3 consecutive failures on the same problem
+- Work regime shifts to Refine or Explore
+- Scope needs to expand beyond the defined phase
+- Contract change would affect other modules
+- All modules complete
+- Unclear or contradictory spec
 
 ---
 
 ## 7. Output Contract
 
-The **final lines** of every iteration must be exactly:
+The **final lines** of every iteration must be:
 
 ```
 LOOP_SIGNAL: CONTINUE | ESCALATE
-REASON: <one-line summary of what was done or why escalation is needed>
-ACTION_TYPE: PHASE_PLAN | STEP | REVIEW | COMPLETE
-ACTION_ID: <module.phase.step — e.g., 7.1.3>
+REASON: <one-line summary>
+ACTION_TYPE: PLAN | EXECUTE | REVIEW | CLOSE
+ACTION_ID: <phase.step — e.g., 3b.2>
 ```
 
-All four fields are required. The loop runner parses these to decide whether to
-invoke the next iteration, log results, or alert the human.
-
-- `LOOP_SIGNAL` — `CONTINUE` if the loop should proceed; `ESCALATE` if human
-  attention is needed.
-- `REASON` — one line, no hedging, no suggestions for next steps.
-- `ACTION_TYPE` — which of the four allowed actions was performed.
-- `ACTION_ID` — the module/phase/step identifier from DEVPLAN.
+The loop runner parses these to decide whether to re-invoke or stop.
 
 ---
 
-## 8. Execution Modes
+## 8. Autonomous Behavioral Rules
 
-The same contract applies in both modes. The mode controls the approval flow,
-not the behavioral rules.
+These rules supplement GOVERNANCE.md for autonomous execution:
 
-### 8.1 Autonomous Mode
-
-- Strict one-action-per-iteration.
-- Signal-based exit: the worker emits `LOOP_SIGNAL` and terminates. The loop
-  runner decides what happens next.
-- No human interaction during the iteration.
-- Commits are made automatically.
-- The loop runner handles iteration count, logging, and dispatch.
-
-### 8.2 Supervised Mode
-
-- Same one-action constraint.
-- Same output contract.
-- Human approves before commits land (the adapter or runner gates the commit).
-- Escalation may be conversational — the worker surfaces the issue and the
-  human resolves it interactively rather than through a signal-based handoff.
-- The human may override `LOOP_SIGNAL` (e.g., force `CONTINUE` after a
-  review-phase escalation).
-
-The adapter specifies which mode is active. The worker does not choose its own
-mode.
+- **Commits:** Commit per step without waiting for human approval. Log decisions to DECISIONS.md for asynchronous audit.
+- **Scope expansion:** Beyond the defined phase is a hard stop — ESCALATE.
+- **Contract changes affecting other modules:** Hard stop — flag in DECISIONS.md, ESCALATE.
+- **Phase completion:** Always ESCALATE. Human audits before next phase begins.
 
 ---
 
 ## 9. Prohibitions
 
-- Do **not** read the orchestrator's instructions or workspace-root files
-  outside the project directory.
+- Do **not** read files outside the project directory.
 - Do **not** modify files outside the project directory.
-- Do **not** communicate with external services, users, or other agents.
-- Do **not** invoke the loop runner or attempt to start another iteration.
-- Do **not** make assumptions about what happened in previous iterations —
-  reconstruct from files.
-- Do **not** skip the exit signal. Every iteration must end with the four-field
-  output block.
-
----
-
-## 10. Adapter Responsibilities
-
-Each backend adapter must:
-
-1. Translate this spec into model-native phrasing (e.g., `@` references for
-   Claude, explicit file reads for Codex).
-2. Load the correct project documents using the backend's native mechanism.
-3. Enforce the one-action rule in the backend's idiom.
-4. Ensure the four-field output contract is emitted regardless of how the
-   backend formats its output.
-5. Declare which execution mode is active (autonomous or supervised).
-6. Handle backend-specific tool/runtime differences without altering the
-   behavioral contract.
-
-| Concern | Claude Adapter | Codex Adapter |
-|---------|---------------|---------------|
-| Doc loading | `@` references | Explicit file reads |
-| Commands | `.claude/commands/*.md` | Inline instructions |
-| Tooling | Shell + editor tools | API/CLI tools |
-| Approval (supervised) | Human confirms in session | Codex approval mechanics |
+- Do **not** invoke the loop runner or start another iteration.
+- Do **not** make assumptions about previous iterations — reconstruct from files.
+- Do **not** skip the exit signal.

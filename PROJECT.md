@@ -88,6 +88,51 @@ Key operational concerns:
 - The personality develops away from the seed over time — a personality identical to its seed has stagnated
 - The attention filter transitions from prompt-weighted to structure-weighted as network density grows
 
+## MVP Definition
+
+MVP is the minimum configuration that closes the core loop: seed corpus enters Memory Store → Attention Filter selects content → Distillation promotes patterns and produces personality files → Generator creates output → output reaches the human on Telegram. The human reads it and either keeps reading or doesn't. Everything else is quality, depth, or autonomy.
+
+### Required Modules
+
+| Module | MVP Scope | Full Scope Deferred |
+|--------|-----------|---------------------|
+| Memory Store | Full (complete) | — |
+| Attention Filter | Full (complete) | Prompt-to-structure transition is calibration, not MVP |
+| Source Ingestion | Corpus import + one live adapter (Telegram channel or RSS) | Reddit, additional adapters |
+| Gateway | Telegram outbound delivery + inbound listener | Discord |
+| Generator + Output Router | Prompted generation, basic routing to Telegram | Free-play, lateral-movement generation |
+| Distillation | Full T1→T2 and T2→T3 (complete) | — |
+| Orchestrator | **Minimal**: cron-triggered activation loop — ingestion, distillation (when gates pass), generation, decay. No lateral freedom, no tension-responsive scheduling, no ambient streams, no budget banking. | Lateral freedom, tension-responsive scheduling, ambient context assembly, debt accounting, under-engaged resurfacing |
+
+### Not Required for MVP
+
+- **Feedback Collector** — the system can generate and deliver output without feedback loop closure. Feedback improves distillation quality over time but is not needed for first output.
+- **Explorer** — link-following adds ingestion depth but is explicitly "not required for core loop" (ARCHITECTURE.md).
+- **Reviewer Panel** — deferred until single-model evaluation proves insufficient.
+- **Model Router** — deferred until subscription rotation becomes a runtime concern.
+
+### MVP Validation Criteria
+
+These are the subset of Success Criteria that must hold for MVP to be declared operational:
+
+1. Seed corpus is imported into Memory Store and searchable via the index layer
+2. At least one live source (Telegram channel or RSS feed) ingests on a recurring schedule
+3. Distillation produces Tier 2 clusters from accumulated Tier 1 content
+4. Distillation produces Tier 3 personality files from Tier 2 patterns (bootstrap complete)
+5. Generator produces output derived from personality context — not generic, recognizably seeded
+6. Output is delivered to Telegram and the human reads it
+7. The system runs unattended for at least 48 hours without manual intervention
+
+### MVP Boundary
+
+MVP does **not** require:
+- Personality development away from the seed (that takes weeks/months of operation)
+- Free-play or lateral-movement outputs (these require the full Orchestrator)
+- Feedback-informed distillation calibration
+- The attention filter operating in structure-weighted mode (requires network density that only builds over time)
+
+MVP **does** require the system to survive restarts, recover state from persisted vault and metadata, and resume its schedule without data loss.
+
 ## Risks and Open Questions
 - [implementation] **Prompt-to-Structure Transition** — the attention filter starts prompt-weighted (explicit criteria from seed personality) and shifts toward structure-weighted (link density, cluster novelty, unresolvedness) as network density grows. The transition is internal to the filter module; architecture requirement is that the memory store exposes density metrics through its read interface. The weighting function and crossover point are first-month calibration tasks.
 - [implementation] **Spontaneity mechanism** — the system exists only during activations. Spontaneity means lateral freedom within an activation: ability to deviate from the scheduled task when internal state pulls harder. Lateral movement is weighted toward threads with high unresolvedness × high link density (structural friction), not toward novelty or maximum discomfort. The existing link-density decay handles deferred threads correctly without a special rule. Key calibration questions: right size for lateral-movement budget, how to quantify unresolved tension for scheduling frequency. First-month calibration once memory store and distillation engine are operational.
@@ -117,3 +162,4 @@ Multi-module. The design document identifies 10+ standalone modules with defined
 |------|-------------|-----|
 | 2026-04-04 | Initial PROJECT.md created from design document | Phase 1 Discovery |
 | 2026-04-04 | Reframed hunger problem → spontaneity mechanism; added ambient streams | Discussion: discontinuous time, enclosure-over-rules for inputs |
+| 2026-05-07 | Added MVP Definition section | Define minimum viable scope for first operational deployment |

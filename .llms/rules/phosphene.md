@@ -3,10 +3,13 @@
 ## Framework
 This project follows the From Idea to Code governance framework.
 
-## Always Loaded
+## Always Loaded (Layer 0)
 - @PROJECT.md — scope, audience, constraints
 - @ARCHITECTURE.md — component map, data flow, sequence
 - @GOVERNANCE.md — development process reference
+
+## Autonomous (Layer 1)
+- @WORKER_SPEC.md — 4-state worker contract (plan → execute → review → close)
 
 ## Load for Current Module
 Determine the active module from ARCHITECTURE.md's Implementation Sequence table — first module without "Complete" status. Then load:
@@ -15,9 +18,7 @@ Determine the active module from ARCHITECTURE.md's Implementation Sequence table
 - DEVLOG.md — history (load when debugging or reviewing)
 
 ## Available Modules
-<!-- Update this list as ARCH files are created -->
 - Memory Store — three-tier hierarchical memory (ARCH_memory_store.md)
-- Attention Filter
 - Attention Filter — personality-driven content selection and annotation (ARCH_attention_filter.md)
 - Source Ingestion — adapters for content sources including human-share channel (ARCH_source_ingestion.md)
 - Gateway — multi-platform message bus for inbound and outbound (ARCH_gateway.md)

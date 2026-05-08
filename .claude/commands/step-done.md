@@ -12,16 +12,14 @@ Parse $ARGUMENTS for --amend or --commit (default is --commit).
    - Header: `### Step [N]: [short title]`
    - Structured fields: Mode, Outcome, Contract changes
    - Followed by prose: what was done, decisions, issues
-3. If this step modified a shared contract, list affected documents in the Contract changes field
+3. If this step modified a shared contract, list affected documents in the
+   Contract changes field
 4. If --commit: create a new commit with a descriptive message
-   If --amend: amend the previous commit, updating its message to
-   include this step's changes
-5. Update DEVPLAN frontmatter to reflect new current state
-   (phase, step, mode, blocked)
+   If --amend: amend the previous commit
+5. Update DEVPLAN frontmatter:
+   - If this was the last step in the phase: set `state: review`
+   - Otherwise: keep `state: execute`
 6. Briefly state what the next step is according to the DEVPLAN
 
-**If autonomous:**
-Commit. Update DEVPLAN. Exit — next iteration picks up next step.
-
-**If not autonomous** (default):
-Do not start the next step until I say so.
+**If autonomous:** Commit and exit.
+**If supervised:** Do not start the next step until I say so.

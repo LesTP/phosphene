@@ -17,13 +17,10 @@ sequence:
 If this is the first phase of a module, update the module's Status in
 ARCHITECTURE.md's Implementation Sequence table to "In progress".
 
-**If autonomous:**
-Update DEVPLAN with the phase plan directly. Log scope decisions to
-DECISIONS.md. Commit and exit.
+Update DEVPLAN with the phase plan. Set frontmatter `state: execute`.
+Log scope decisions to DECISIONS.md. Commit.
 
-**If not autonomous** (default):
-Present the plan for my review. After I approve, update DEVPLAN with
-the phase plan and update the DEVPLAN frontmatter block (phase,
-phase_title, step, regime, review_done: false).
+**If autonomous:** Exit after commit.
+**If supervised:** Present the plan for human review before committing.
 
 Do not write code. This is Discuss mode only.
