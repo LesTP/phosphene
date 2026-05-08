@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from time import sleep
 
 from croniter import croniter
 
-from phosphene.orchestrator.errors import ConfigError
-from phosphene.orchestrator.types import ModuleRefs, MVPOrchestratorConfig, ScheduleEntry
+from phosphene.orchestrator.errors import ConfigError, UnknownTaskTypeError
+from phosphene.orchestrator.types import (
+    ActivationResult,
+    ModuleRefs,
+    MVPOrchestratorConfig,
+    ScheduleEntry,
+)
 
 
 ALLOWED_TASK_TYPES = frozenset({"ingestion", "generation", "distillation", "decay"})
@@ -42,6 +48,30 @@ class MVPOrchestrator:
         self.modules = modules
         self.config = config
         self._last_check_by_entry_index: dict[int, datetime] = {}
+        self._stop_requested = False
+
+    def start(self) -> None:
+        """Block in the sleep-poll lifecycle loop until stop is requested."""
+        self._stop_requested = False
+
+        while not self._stop_requested:
+            sleep(60)
+            if self._stop_requested:
+                break
+
+            due_entries = self._next_due_entries(datetime.now(timezone.utc))
+            for entry in due_entries:
+                self._run_activation(entry.task_type)
+                if self._stop_requested:
+                    break
+
+    def stop(self) -> None:
+        """Signal the lifecycle loop to exit after the current activation."""
+        self._stop_requested = True
+
+    def trigger(self, task_type: str) -> ActivationResult:
+        """Run a single activation synchronously for testing and operations."""
+        return self._run_activation(task_type)
 
     def _next_due_entries(self, now: datetime) -> list[ScheduleEntry]:
         """Return enabled schedule entries that fired since their last check."""
@@ -61,6 +91,17 @@ class MVPOrchestrator:
                 due_entries.append(entry)
 
         return due_entries
+
+    def _run_activation(self, task_type: str) -> ActivationResult:
+        """Dispatch an activation through the Phase 1 stub implementation."""
+        if task_type not in ALLOWED_TASK_TYPES:
+            raise UnknownTaskTypeError(f"unknown task type: {task_type}")
+
+        return ActivationResult(
+            task_type=task_type,
+            success=True,
+            outputs_delivered=0,
+        )
 
     @staticmethod
     def _validate_config(config: MVPOrchestratorConfig) -> None:

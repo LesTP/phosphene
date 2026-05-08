@@ -14,6 +14,7 @@ from phosphene.orchestrator import (
     ScheduleEntry,
     UnknownTaskTypeError,
 )
+from phosphene.orchestrator import orchestrator as orchestrator_module
 
 
 class CallableProbe:
@@ -207,6 +208,78 @@ def test_constructor_validation_does_not_call_module_methods() -> None:
     assert memory_store.get_personality_context.called is False
     assert memory_store.run_decay.called is False
     assert modules.gateway.send.called is False
+
+
+def test_trigger_runs_stub_activation_without_calling_modules() -> None:
+    modules = build_modules()
+    instance = MVPOrchestrator(modules, build_config())
+
+    result = instance.trigger("generation")
+
+    assert result.task_type == "generation"
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert result.error is None
+    assert modules.memory_store.store_note.called is False
+    assert modules.memory_store.get_density_metrics.called is False
+    assert modules.memory_store.get_personality_context.called is False
+    assert modules.memory_store.run_decay.called is False
+    assert modules.gateway.send.called is False
+
+
+def test_trigger_rejects_unknown_task_type() -> None:
+    instance = MVPOrchestrator(build_modules(), build_config())
+
+    with pytest.raises(UnknownTaskTypeError, match="unknown task type"):
+        instance.trigger("respond")
+
+
+def test_start_sleep_poll_dispatches_due_entries_sequentially(monkeypatch: pytest.MonkeyPatch) -> None:
+    ingestion = ScheduleEntry(task_type="ingestion", cron="0 * * * *")
+    decay = ScheduleEntry(task_type="decay", cron="0 * * * *")
+    instance = MVPOrchestrator(
+        build_modules(),
+        build_config(schedule=[ingestion, decay]),
+    )
+    dispatched: list[str] = []
+
+    def fake_sleep(seconds: int) -> None:
+        assert seconds == 60
+
+    def fake_next_due_entries(now: datetime) -> list[ScheduleEntry]:
+        assert now.tzinfo is not None
+        return [ingestion, decay]
+
+    def fake_run_activation(task_type: str) -> ActivationResult:
+        dispatched.append(task_type)
+        if task_type == "decay":
+            instance.stop()
+        return ActivationResult(task_type=task_type, success=True, outputs_delivered=0)
+
+    monkeypatch.setattr(orchestrator_module, "sleep", fake_sleep)
+    monkeypatch.setattr(instance, "_next_due_entries", fake_next_due_entries)
+    monkeypatch.setattr(instance, "_run_activation", fake_run_activation)
+
+    instance.start()
+
+    assert dispatched == ["ingestion", "decay"]
+
+
+def test_stop_before_poll_exits_start_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = MVPOrchestrator(build_modules(), build_config())
+
+    def fake_sleep(seconds: int) -> None:
+        assert seconds == 60
+        instance.stop()
+
+    monkeypatch.setattr(orchestrator_module, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        instance,
+        "_next_due_entries",
+        lambda now: pytest.fail("stop after sleep should exit before polling"),
+    )
+
+    instance.start()
 
 
 def test_next_due_entries_initializes_without_returning_due_entries() -> None:

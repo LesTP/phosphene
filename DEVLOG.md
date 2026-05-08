@@ -1,13 +1,10 @@
 # Phosphene — Development Log
 
 <!-- Chronological record of what happened during development.
-     Each step gets a structured entry. This is the audit trail.
+     Append new entries at the bottom (newest last).
+     During phase close, archive the previous phase's entries to DEVLOG_archive.md. -->
 
-     Archival rule: When this file exceeds ~500 lines, move completed
-     module entries to DEVLOG_archive.md during phase completion cleanup.
-     Add a boundary marker: <!-- Entries above archived from Module N, YYYY-MM-DD --> -->
-
-<!-- Module 1 (Memory Store) entries archived 2026-04-29 — see DEVLOG_archive.md -->
+<!-- Earlier entries archived — see DEVLOG_archive.md -->
 
 ### Phase 7.1 Completion: Feedback Collector contract and immediate feedback foundation
 
@@ -188,11 +185,6 @@ depends on later graph/reference heuristics rather than the immediate
 Gateway callback path. Updated ARCHITECTURE.md to mark Feedback Collector
 in progress and logged scope decision D-48. No tests were run because this
 was a planning-only action.
-
-<!--
-HISTORY — Do not read past this marker.
-Completed entries kept for audit.
--->
 
 ### Phase REVIEW_HARDENING.1 Completion: Attention Filter additions
 
@@ -700,3 +692,14 @@ Validation remains limited to constructor-time shape checks. The Memory Store an
 Implemented private cron evaluation for the MVP Orchestrator. `MVPOrchestrator._next_due_entries(now)` now normalizes timestamps to UTC, tracks the previous check time per schedule-entry index, returns enabled entries whose cron fired in the `(last_check, now]` window, and advances each entry's last-check timestamp on every poll.
 
 Added deterministic tests for first-call initialization, fired-since-last-check behavior, independent tracking across multiple schedule entries, and disabled-entry suppression. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (15 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (589 passed).
+
+### Step MVP.1.4: Main loop and lifecycle
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented the MVP Orchestrator lifecycle shell. `start()` now blocks in the 60-second sleep-poll loop, checks due cron entries, and dispatches each due entry sequentially through the Phase 1 stub dispatcher. `stop()` requests loop shutdown after the current activation, and `trigger(task_type)` runs a single activation synchronously.
+
+Added `_run_activation(task_type)` as the Phase 1 dispatch stub: allowed scheduled task types return successful `ActivationResult` objects with zero delivered outputs, while unknown task types raise `UnknownTaskTypeError`. Focused tests cover trigger dispatch without module calls, unknown trigger rejection, sequential start-loop dispatch with no real sleep, and stop-before-poll shutdown. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (593 passed).

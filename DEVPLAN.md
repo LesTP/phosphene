@@ -51,7 +51,7 @@ state: execute
 
 3. **Cron evaluation** — Complete. `_next_due_entries(now) -> list[ScheduleEntry]` uses croniter to determine which schedule entries have fired since the last check. Tracks last-check timestamp per entry, handles disabled entries, and has focused tests with deterministic timestamps and no real sleeps.
 
-4. **Main loop and lifecycle** — `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
+4. **Main loop and lifecycle** — Complete. `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
 
 5. **Foundation tests** — Package export coverage, config validation boundaries, cron evaluation with fake timestamps, start/stop lifecycle (using a short-circuit flag or threading to avoid blocking), trigger dispatch. Verify no module methods are called during construction, validation, or stub dispatch.
 
