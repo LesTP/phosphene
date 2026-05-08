@@ -7,6 +7,7 @@ from time import sleep
 
 from croniter import croniter
 
+from phosphene.memory_store import NoteInput
 from phosphene.orchestrator.errors import ConfigError, UnknownTaskTypeError
 from phosphene.orchestrator.types import (
     ActivationResult,
@@ -93,12 +94,40 @@ class MVPOrchestrator:
         return due_entries
 
     def _run_activation(self, task_type: str) -> ActivationResult:
-        """Dispatch an activation through the Phase 1 stub implementation."""
+        """Dispatch an activation through its MVP implementation."""
         if task_type not in ALLOWED_TASK_TYPES:
             raise UnknownTaskTypeError(f"unknown task type: {task_type}")
 
+        if task_type == "ingestion":
+            return self._run_ingestion()
+
         return ActivationResult(
             task_type=task_type,
+            success=True,
+            outputs_delivered=0,
+        )
+
+    def _run_ingestion(self) -> ActivationResult:
+        results = self.modules.source_ingestion.poll()
+        items = [item for result in results for item in result.items]
+
+        if not items:
+            return ActivationResult(
+                task_type="ingestion",
+                success=True,
+                outputs_delivered=0,
+            )
+
+        filter_result = self.modules.attention_filter.filter_content(
+            items,
+            self.config.attention_filter_config,
+        )
+
+        for fragment in filter_result.accepted:
+            self.modules.memory_store.store_note(_note_input_from_fragment(fragment))
+
+        return ActivationResult(
+            task_type="ingestion",
             success=True,
             outputs_delivered=0,
         )
@@ -140,3 +169,31 @@ def _normalize_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _note_input_from_fragment(fragment: object) -> NoteInput:
+    friction_target = getattr(fragment, "friction_target", None)
+    unresolvedness = (
+        float(getattr(fragment, "unresolvedness", 0.0)) if friction_target else 0.0
+    )
+
+    return NoteInput(
+        tier=1,
+        content=getattr(fragment, "content"),
+        title=_fragment_title(fragment),
+        importance=float(getattr(fragment, "importance_score", 0.0)),
+        unresolvedness=unresolvedness,
+        links=list(getattr(fragment, "connections", [])),
+        tags=list(getattr(fragment, "retention_criteria", [])),
+        source=getattr(fragment, "source", None),
+        friction_target=friction_target,
+        embedding=getattr(fragment, "embedding", None),
+    )
+
+
+def _fragment_title(fragment: object) -> str:
+    annotation = getattr(fragment, "annotation", "")
+    content = getattr(fragment, "content")
+    title_source = annotation or content
+    title = " ".join(title_source.split())
+    return title[:150] if title else "Untitled"

@@ -1,5 +1,6 @@
 from dataclasses import fields
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -39,15 +40,47 @@ class ValidGateway:
         self.send = CallableProbe()
 
 
+class RecordingMemoryStore(ValidMemoryStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.store_note = self._store_note
+        self.notes: list[object] = []
+
+    def _store_note(self, note_input: object) -> None:
+        self.notes.append(note_input)
+
+
+class FakeSourceIngestion:
+    def __init__(self, results: list[object]) -> None:
+        self.results = results
+        self.poll_count = 0
+
+    def poll(self) -> list[object]:
+        self.poll_count += 1
+        return self.results
+
+
+class FakeAttentionFilter:
+    def __init__(self, accepted: list[object]) -> None:
+        self.accepted = accepted
+        self.calls: list[tuple[list[object], object]] = []
+
+    def filter_content(self, items: list[object], config: object) -> object:
+        self.calls.append((items, config))
+        return SimpleNamespace(accepted=self.accepted)
+
+
 def build_modules(
     *,
     memory_store: object | None = None,
+    attention_filter: object | None = None,
+    source_ingestion: object | None = None,
     gateway: object | None = None,
 ) -> ModuleRefs:
     return ModuleRefs(
         memory_store=ValidMemoryStore() if memory_store is None else memory_store,
-        attention_filter=object(),
-        source_ingestion=object(),
+        attention_filter=object() if attention_filter is None else attention_filter,
+        source_ingestion=object() if source_ingestion is None else source_ingestion,
         distillation_engine=object(),
         generator=object(),
         gateway=ValidGateway() if gateway is None else gateway,
@@ -225,6 +258,111 @@ def test_trigger_runs_stub_activation_without_calling_modules() -> None:
     assert modules.memory_store.get_personality_context.called is False
     assert modules.memory_store.run_decay.called is False
     assert modules.gateway.send.called is False
+
+
+def test_trigger_ingestion_polls_filters_and_stores_accepted_fragments() -> None:
+    item_a = SimpleNamespace(content="first", source="rss")
+    item_b = SimpleNamespace(content="second", source="telegram")
+    fragment = SimpleNamespace(
+        content="A precise fragment worth retaining.",
+        annotation="Retain this fragment",
+        importance_score=0.72,
+        unresolvedness=0.61,
+        retention_criteria=["precision_surplus", "friction"],
+        friction_target="unresolved claim",
+        connections=["note-1", "note-2"],
+        source="rss",
+        embedding=object(),
+    )
+    memory_store = RecordingMemoryStore()
+    source_ingestion = FakeSourceIngestion(
+        [
+            SimpleNamespace(items=[item_a], adapter_label="rss"),
+            SimpleNamespace(items=[item_b], adapter_label="telegram"),
+        ]
+    )
+    attention_filter = FakeAttentionFilter([fragment])
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            attention_filter=attention_filter,
+            source_ingestion=source_ingestion,
+        ),
+        config,
+    )
+
+    result = instance.trigger("ingestion")
+
+    assert result.task_type == "ingestion"
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert source_ingestion.poll_count == 1
+    assert attention_filter.calls == [([item_a, item_b], config.attention_filter_config)]
+    assert len(memory_store.notes) == 1
+    note = memory_store.notes[0]
+    assert note.tier == 1
+    assert note.content == fragment.content
+    assert note.title == "Retain this fragment"
+    assert note.importance == 0.72
+    assert note.unresolvedness == 0.61
+    assert note.tags == ["precision_surplus", "friction"]
+    assert note.links == ["note-1", "note-2"]
+    assert note.source == "rss"
+    assert note.friction_target == "unresolved claim"
+    assert note.embedding is fragment.embedding
+
+
+def test_trigger_ingestion_with_no_items_skips_filter_and_store() -> None:
+    memory_store = RecordingMemoryStore()
+    source_ingestion = FakeSourceIngestion([SimpleNamespace(items=[], adapter_label="rss")])
+    attention_filter = FakeAttentionFilter([])
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            attention_filter=attention_filter,
+            source_ingestion=source_ingestion,
+        ),
+        build_config(),
+    )
+
+    result = instance.trigger("ingestion")
+
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert source_ingestion.poll_count == 1
+    assert attention_filter.calls == []
+    assert memory_store.notes == []
+
+
+def test_ingestion_note_title_falls_back_to_content_and_truncates() -> None:
+    long_content = " ".join(["word"] * 40)
+    fragment = SimpleNamespace(
+        content=long_content,
+        annotation="",
+        importance_score=0.5,
+        unresolvedness=0.9,
+        retention_criteria=[],
+        friction_target=None,
+        connections=[],
+        source="rss",
+        embedding=None,
+    )
+    memory_store = RecordingMemoryStore()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            attention_filter=FakeAttentionFilter([fragment]),
+            source_ingestion=FakeSourceIngestion([SimpleNamespace(items=[object()])]),
+        ),
+        build_config(),
+    )
+
+    instance.trigger("ingestion")
+
+    note = memory_store.notes[0]
+    assert note.title == long_content[:150]
+    assert note.unresolvedness == 0.0
 
 
 def test_trigger_rejects_unknown_task_type() -> None:

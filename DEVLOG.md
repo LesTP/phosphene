@@ -100,3 +100,14 @@ ARCHITECTURE.md: MVP Orchestrator status updated from in progress to Phase MVP.1
 Planned MVP Orchestrator Phase 2 as a Build phase with five testable activation-wiring steps: ingestion, distillation, generation/bootstrap, respond/listener, and decay. The phase remains inside `ARCH_orchestrator_mvp.md`: no lateral freedom, no ambient context, no feedback collector, no Explorer integration, and no Phase 3 error/logging hardening.
 
 Recorded D-50 for the one-activation-per-step scope decision. DEVPLAN frontmatter now advances to `state: execute` with the invocation budget decremented to 4; the next action is MVP.2.1 ingestion activation.
+
+### Step MVP.2.1: Ingestion activation
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Implemented `_run_ingestion()` behind `trigger("ingestion")`. The activation now polls Source Ingestion, flattens returned items, calls `attention_filter.filter_content(items, config.attention_filter_config)`, maps accepted fragments to Tier 1 `NoteInput`, and stores them through `memory_store.store_note()`. Empty polls skip filtering and storage while still returning a successful `ActivationResult`.
+
+Added fake-module orchestrator tests for the poll→filter→store path, empty-poll skip behavior, title fallback/truncation, tags, links, source, embedding, importance, and friction-gated unresolvedness mapping. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (22 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (596 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 3, and moves focus to MVP.2.2 distillation activation.

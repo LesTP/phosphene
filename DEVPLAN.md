@@ -1,8 +1,8 @@
 ---
-phase: MVP.1
+phase: MVP.2
 blocked: false
 state: execute
-steps_remaining: 4
+steps_remaining: 3
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 4
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.2: Activation wiring.
-- **Focus** — Step 1: Ingestion activation.
+- **Focus** — Step 2: Distillation activation.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -50,7 +50,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 **Steps:**
 
-1. **Ingestion activation** — `_run_ingestion()`: call `source_ingestion.poll()`, flatten items, call `attention_filter.filter_content(items, config.attention_filter_config)`, store accepted fragments as Tier 1 `NoteInput` via `memory_store.store_note()`. Fragment-to-NoteInput mapping: title from content truncation or annotation, tags from `retention_criteria`, importance from `importance_score`, unresolvedness from friction target presence. Return `ActivationResult` with `outputs_delivered=0`. Tests use fake modules (same pattern as Generator/Distillation phases).
+1. **Ingestion activation** — Complete. `_run_ingestion()` now polls Source Ingestion, flattens items, filters them through Attention Filter, maps accepted fragments to Tier 1 `NoteInput`, and stores them in Memory Store. Verified with fake-module tests.
 
 2. **Distillation activation** — `_run_distillation()`: call `distillation_engine.check_gates(config.distillation_config)`. If `gates.t1_to_t2_ready`, call `distill_t1_to_t2()`. If `gates.t2_to_t3_ready`, call `distill_t2_to_t3()`. Catch `DistillationLockError` as skip (success=True). Catch `InsufficientDataError` / `NoPatternDataError` as skip. Return `ActivationResult`. Tests verify gate-not-ready skips, lock contention skips, and successful dispatch.
 
