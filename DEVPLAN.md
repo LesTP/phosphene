@@ -1,6 +1,6 @@
 ---
 phase: MVP.1
-blocked: null
+blocked: "awaiting-human-audit"
 state: close
 ---
 
@@ -30,9 +30,9 @@ state: close
 ## Current Status
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
-- **Phase** — MVP.1 planned: Contract and cron loop.
-- **Focus** — Phase MVP.1 review.
-- **Blocked/Broken** — None
+- **Phase** — MVP.1 complete: Contract and cron loop.
+- **Focus** — Phase close complete.
+- **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
 ## MVP Orchestrator
@@ -41,21 +41,7 @@ state: close
 
 ### Phase MVP.1: Contract and cron loop
 
-**Goal:** Public types, config validation, cron evaluation, main loop lifecycle — with dispatch stubs, no module wiring.
-
-**Steps:**
-
-1. **Public package contract** — Complete. Created `src/phosphene/orchestrator/` with ARCH-aligned `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, `ModuleRefs` exports. Added error types: `OrchestratorError`, `ConfigError`, `UnknownTaskTypeError`. Constructor shell stores modules and config without validation.
-
-2. **Config and ModuleRefs validation** — Complete. Validates schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter, ModuleRefs non-None, Memory Store required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), and Gateway `send`. Validation performs attribute checks only and does not call module methods.
-
-3. **Cron evaluation** — Complete. `_next_due_entries(now) -> list[ScheduleEntry]` uses croniter to determine which schedule entries have fired since the last check. Tracks last-check timestamp per entry, handles disabled entries, and has focused tests with deterministic timestamps and no real sleeps.
-
-4. **Main loop and lifecycle** — Complete. `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
-
-5. **Foundation tests** — Complete. Package export coverage, config validation boundaries, cron evaluation with fake timestamps, start/stop lifecycle using short-circuit monkeypatches to avoid blocking, and trigger dispatch. Verified no module methods are called during construction, validation, or stub dispatch.
-
-**Boundary:** Phase 1 proves the scheduling and lifecycle contract without touching any module's runtime API. All 6 modules are held as references but never invoked.
+Complete. Delivered the MVP Orchestrator public contract, constructor validation, cron due-entry evaluation, start/stop/trigger lifecycle, Phase 1 stub dispatch, and foundation tests. See `DEVLOG.md` Phase MVP.1 entries for details.
 
 ### Phase MVP.2: Activation wiring
 
@@ -115,7 +101,7 @@ Extends MVP Orchestrator with lateral freedom, tension-responsive scheduling, am
 - **Module 6: Distillation** — Three phases, all complete. T1→T2 RAPTOR clustering, T2→T3 reflect-evolve, personality supersession, criteria adjustments.
 - **Module 7: Feedback Collector** — Phase 7.1 complete (immediate feedback). Phase 7.2 (delayed engagement) deferred to post-MVP.
 
-574 tests passing, 98% total coverage as of Phase 7.1 completion.
+593 tests passing as of Phase MVP.1 completion.
 
 <!--
 HISTORY — Do not read past this marker.
