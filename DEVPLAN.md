@@ -1,7 +1,7 @@
 ---
-phase: 7.1
+phase: MVP.1
 blocked: null
-state: close
+state: execute
 ---
 
 # Phosphene — Development Plan
@@ -25,116 +25,97 @@ state: close
   - **Test environment** — system Python is 3.11.2 with no pytest; `pip install --user` is blocked (externally-managed-environment); `python3 -m venv .venv` creates binaries that can't run on this NTFS-3G mount (no exec bits, can't chmod). Working pattern: `pip install --target .python_deps` (already pre-installed in repo root) and run with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`. Do NOT recreate `.venv` or reinstall — `.python_deps/` is gitignored and persists.
   - **No ripgrep** — `rg` is not installed in the Codex container. Use `find` and `grep` instead. Do not attempt `rg` on first command.
   - **Subagent context** — when spawning Explore or review subagents, include in the prompt: (1) source tree layout is `src/phosphene/<module>/`, not `src/<module>/`; (2) the working test command is `PYTHONPATH=src:.python_deps python3 -m pytest`; (3) `.python_deps/` contains all pip dependencies. Subagents have no memory of the parent's environment discovery.
+  - **New dependency** — `croniter` needed for cron expression parsing. Install to `.python_deps` before Phase 1 implementation: `pip install --target .python_deps croniter`.
 
 ## Current Status
 
-- **Module** — 7: Feedback Collector.
-- **Phase** — 7.1 complete: Feedback Collector contract and immediate feedback foundation.
-- **Focus** — Phase 7.1 closed; Phase 7.2 planning is next.
+- **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
+- **Phase** — MVP.1 planned: Contract and cron loop.
+- **Focus** — Phase MVP.1 implementation.
 - **Blocked/Broken** — None
+- **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
-## Pre-Module-7 Hardening
+## MVP Orchestrator
 
-*These two phases implement the "Now" items from the external review (phosphene.md Section 7.10). They harden the existing codebase before Module 7 (Feedback Collector) begins.*
+*The MVP Orchestrator wires Modules 1–6 into a running system. It is the minimum needed to satisfy PROJECT.md MVP Definition: cron-triggered ingestion, distillation, generation, and decay — no lateral freedom, no tension-responsive scheduling, no ambient context, no feedback loop. See ARCH_orchestrator_mvp.md for the full contract.*
 
-### Phase A (complete): Attention Filter additions
+### Phase MVP.1: Contract and cron loop
 
-Delivered ARCH-specified wild-card accepts and near-miss recording for the Attention Filter, with config/type validation, filter partitioning, export coverage, review, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.1 Completion" entry.
+**Goal:** Public types, config validation, cron evaluation, main loop lifecycle — with dispatch stubs, no module wiring.
 
-### Phase B (complete): Unresolvedness composite utility + network diagnostics tool
+**Steps:**
 
-Delivered the pure `phosphene.scoring.compute_unresolvedness()` utility, the standalone `tools/network_diagnostics.py` Memory Store report, review cleanups, and full-suite verification. See DEVLOG "Phase REVIEW_HARDENING.2 Completion" entry.
+1. **Public package contract** — Create `src/phosphene/orchestrator/` with ARCH-aligned `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, `ModuleRefs` exports. Add error types: `OrchestratorError`, `ConfigError`, `UnknownTaskTypeError`. Constructor shell that stores modules and config without validation.
 
-## Module 1: Memory Store (complete)
+2. **Config and ModuleRefs validation** — Validate schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter. Validate ModuleRefs: all fields non-None, Memory Store has required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), Gateway has `send`. No module calls during validation — just attribute checks.
 
-Four-phase plan (matching ARCH_memory_store.md public API surface) — all phases complete.
+3. **Cron evaluation** — `_next_due_entries(now) -> list[ScheduleEntry]` using croniter to determine which schedule entries have fired since the last check. Track last-check timestamp per entry. Handle disabled entries. Focused tests with deterministic timestamps — no real sleeps.
 
-- **Phase 1 (complete)** — Core data model and CRUD: types, errors, vault I/O, store/get/update for individual notes. See DEVLOG "Phase 1 Completion" entry.
-- **Phase 2 (complete)** — Index layer and queries: `get_index`, `query_notes`, inbound link counting, and index-backed `get_note` / `update_note`. See DEVLOG "Phase 2 Completion" entry.
-- **Phase 3 (complete)** — Embedding search and graph operations: `search_by_embedding`, `add_links`, `get_linked`, `get_personality_context`, plus sidecar embedding persistence on read paths. See DEVLOG "Phase 3 Completion" entry.
-- **Phase 4 (complete)** — Decay, supersession, and density metrics: `supersede`, `run_decay`, `get_density_metrics`. See DEVLOG "Phase 4 Completion" entry.
+4. **Main loop and lifecycle** — `start()` enters a sleep-poll loop: sleep 60s, check cron, dispatch due entries sequentially, repeat. `stop()` sets a flag that exits the loop after the current dispatch completes. `trigger(task_type)` runs a single activation synchronously. Dispatch calls a private `_run_activation(task_type) -> ActivationResult` that returns a stub result (success=True, outputs_delivered=0) for all task types.
 
-## Module 2: Attention Filter (complete)
+5. **Foundation tests** — Package export coverage, config validation boundaries, cron evaluation with fake timestamps, start/stop lifecycle (using a short-circuit flag or threading to avoid blocking), trigger dispatch. Verify no module methods are called during construction, validation, or stub dispatch.
 
-Planned phases follow `ARCH_attention_filter.md`: first stabilize the public contract (including `ScoringConfig`) and deterministic geometric scoring helpers, then add Memory Store retrieval/embedding integration, then LLM Phase 1 scoring (precision_surplus) and assertion extraction (friction), then full batch orchestration with triple-gate blend.
+**Boundary:** Phase 1 proves the scheduling and lifecycle contract without touching any module's runtime API. All 6 modules are held as references but never invoked.
 
-### Phase 1 (audited complete): Attention Filter contract and scoring foundation
+### Phase MVP.2: Activation wiring
 
-Delivered ARCH-aligned public dataclasses/exports, default precision-surplus criteria, config validation, triple-gate blend helpers, deterministic Phase 2 geometric scoring helpers, and focused tests. Audited complete. See DEVLOG "Phase 2.1 Completion" and "Phase 2.1 Audit Closure" entries.
+**Goal:** Wire each activation type to the real module APIs. Each step adds one activation type.
 
-### Phase 2 (reviewed complete): Memory Store retrieval and embedding integration
+**Steps:**
 
-Delivered embedding boundary integration, Memory Store density reads, similar-note retrieval contexts, Memory Store-backed structural preparation, and non-LLM public-path wiring without Memory Store writes or premature LLM/annotation behavior. Reviewed complete. See DEVLOG "Phase 2.2 Completion" and "Phase 2.2 Audit Closure".
+1. **Ingestion activation** — `_run_ingestion()`: call `source_ingestion.poll()`, flatten items, call `attention_filter.filter_content(items, config.attention_filter_config)`, store accepted fragments as Tier 1 `NoteInput` via `memory_store.store_note()`. Fragment-to-NoteInput mapping: title from content truncation or annotation, tags from `retention_criteria`, importance from `importance_score`, unresolvedness from friction target presence. Return `ActivationResult` with `outputs_delivered=0`. Tests use fake modules (same pattern as Generator/Distillation phases).
 
-### Phase 3 (complete): LLM Phase 1 scoring and assertion extraction
+2. **Distillation activation** — `_run_distillation()`: call `distillation_engine.check_gates(config.distillation_config)`. If `gates.t1_to_t2_ready`, call `distill_t1_to_t2()`. If `gates.t2_to_t3_ready`, call `distill_t2_to_t3()`. Catch `DistillationLockError` as skip (success=True). Catch `InsufficientDataError` / `NoPatternDataError` as skip. Return `ActivationResult`. Tests verify gate-not-ready skips, lock contention skips, and successful dispatch.
 
-Delivered private LLM prompt scoring, precision-surplus composite integration, incoming assertion extraction, friction-preparation records, and public-path regression coverage while preserving the no-accepted-fragments boundary before orchestration. Reviewed and completed. See DEVLOG "Phase 2.3 Review" and "Phase 2.3 Completion" entries.
+3. **Generation activation + bootstrap** — `_run_generation()`: call `memory_store.get_personality_context()`. If empty personality files, return early (bootstrap skip). Otherwise call `generator.generate(prompt, {}, config.generator_config)`, route via `route(output, config.router_config, gateway)`, return `ActivationResult` with `outputs_delivered` count. Catch `EmptyPersonalityError` as bootstrap skip. Tests verify bootstrap detection, successful generation→route→send path, and delivery failure isolation.
 
-### Phase 4 (complete): Full batch orchestration and annotation output
+4. **Respond activation** — `_run_respond(message)`: same as generation but calls `generator.respond(message, {}, config.generator_config)`. Wire Gateway listener callback in `start()` via `gateway.start_listener()` with an `on_message` callback that dispatches respond activations inline. Bootstrap skip applies. Tests verify inbound message dispatch and bootstrap drop.
 
-Delivered annotation generation, acceptance and auto-accept decisions, public `AnnotatedFragment` assembly, rejected counts, batch metadata, and Phase 2 assertion-extraction gating while preserving read-only Memory Store behavior. Reviewed and completed. See DEVLOG "Phase 2.4 Review" and "Phase 2.4 Completion" entries.
+5. **Decay activation** — `_run_decay()`: call `memory_store.run_decay()`. Return `ActivationResult`. Simplest activation — one call, no conditionals.
 
-## Module 3: Source Ingestion (complete)
+**Boundary:** After Phase 2, `trigger("ingestion")` runs the full poll→filter→store pipeline through fake modules. Each activation type is independently testable. No error isolation beyond what individual modules provide — that's Phase 3.
 
-Planned phases follow `ARCH_source_ingestion.md`: first stabilize the public contract, manager orchestration, adapter registry boundary, shared content normalization, and state-marker abstraction without live network adapters; then add concrete autonomous adapters, human-share handling, corpus import adapters, and persistence/integration hardening.
+### Phase MVP.3: Integration hardening
 
-### Phase 1 (complete): Source Ingestion contract and adapter foundation
+**Goal:** Error isolation, logging, restart resilience, and end-to-end proof.
 
-Delivered ARCH-aligned public dataclasses/exports, config validation, adapter protocol/registry, manager polling orchestration, per-adapter error reporting, in-memory last-seen marker handoff, deterministic normalization helpers, and focused unit tests. Reviewed and completed. See DEVLOG "Phase 3.1 Review" and "Phase 3.1 Completion" entries.
+**Steps:**
 
-### Phase 1.5 (complete): Coverage tooling infra
+1. **Error isolation** — Wrap each `_run_*` call in try/except at the dispatch level. Any unhandled exception from a module produces `ActivationResult(success=False, error=str(exc))`. The main loop continues — one failed activation never stops the system. Tests verify that a throwing module doesn't prevent subsequent activations in the same loop iteration.
 
-Added `pytest-cov` dev tooling and captured the full-suite baseline: 310 tests pass, 98% total coverage, no tracked module below 80%. Reviewed and completed. See DEVLOG "Phase 3.1.5 Review" and "Phase 3.1.5 Completion" entries.
+2. **Activation logging** — When `config.log_path` is set, append a JSON-serialized `ActivationResult` line after each activation. Use atomic write (write to temp, rename) to avoid partial lines on crash. Tests verify log file content after multiple activations, and that missing log_path means no file I/O.
 
-### Phase 2 (complete): Concrete adapters, human-share, and corpus import
+3. **Bootstrap transition** — Verify the system correctly transitions from bootstrap (skip generation) to active (generate output) within a single run session when distillation produces the first personality files. Test: trigger ingestion (stores notes) → trigger distillation (produces Tier 2 + Tier 3) → trigger generation (now succeeds). This is the proof that the bootstrap arc works end-to-end.
 
-Delivered shared adapter utilities, RSS/Atom, local and structured corpus adapters, human-share, Telegram channel, Reddit, Source Ingestion-owned durable marker persistence, and cross-adapter manager coverage while keeping public dataclasses stable and avoiding a Memory Store dependency. Reviewed and completed. See DEVLOG "Phase 3.2 Completion" entry.
+4. **End-to-end integration test** — Single test using fake modules wired through real `MVPOrchestrator`. Proves the full content path: configure source ingestion with a fake adapter returning content items → trigger ingestion → verify Tier 1 notes stored → trigger distillation (fake gates ready) → verify distillation called → trigger generation → verify output routed through Gateway. This is the MVP validation test.
 
-## Module 4: Gateway (complete)
+5. **Restart recovery** — Verify that constructing a new `MVPOrchestrator` with the same config and the same Memory Store vault resumes correctly: schedule re-derives from config, distillation metadata persists in vault, stored notes survive. No orchestrator-owned state file needed — all durable state lives in Memory Store. Test: construct → trigger ingestion → construct new instance → trigger generation → verify personality context is still available.
 
-Planned phases followed `ARCH_gateway.md`: first stabilize the public Gateway contract, validation, adapter registry, outbound routing, local log adapter, and listener callback semantics with fake/local adapters; then add concrete Telegram delivery and polling behavior through the toolkit boundary.
+**Boundary:** After Phase 3, the MVP Orchestrator is deployable as a systemd service. The full ingestion→distillation→generation→delivery path works, errors are isolated, activations are logged, and the system survives restarts.
 
-### Phase 1 (complete): Gateway contract and adapter foundation
+## Deferred Work
 
-Delivered ARCH-aligned Gateway dataclasses/errors/exports, config validation, internal adapter registry/lifecycle, outbound routing, local log delivery, fake inbound/feedback dispatch, callback exception isolation, and bounded in-memory delivery tracking. Reviewed and completed. See DEVLOG "Phase 4.1 Completion" entry.
+### Feedback Collector Phase 7.2 (post-MVP)
+Delayed engagement checks and retention hardening. Will be wired into the Orchestrator after MVP is running and producing real output.
 
-### Phase 2 (complete): Telegram adapter delivery and polling
+### Module 8: Explorer (post-MVP)
+Link-following with pre-fetch scoring. Adds depth to ingestion but not required for MVP core loop.
 
-Delivered concrete Telegram adapter construction behind an injectable toolkit boundary, outbound text/markdown/thread/telegraph delivery, non-blocking polling and inbound normalization, feedback normalization for replies/reactions/edits, mixed Telegram/log integration hardening, and regression coverage for unsupported Telegraph delivery. Reviewed and completed. See DEVLOG "Phase 4.2 Completion" entry.
+### Full Orchestrator — Module 9 (post-MVP)
+Extends MVP Orchestrator with lateral freedom, tension-responsive scheduling, ambient context assembly, budget tracking, and task arbitration per ARCH_orchestrator.md.
 
-## Module 5: Generator + Output Router (complete)
+## Completed Modules (summary)
 
-Planned phases followed `ARCH_generator.md`: first stabilize the public contract, errors, exports, Memory Store context-loading boundary, empty-personality behavior, and deterministic Output Router behavior without live generation; then add LLM generation/response/free-play behavior, skeptical memory verification, and prompt/parse hardening.
+- **Pre-Module-7 Hardening** — Phase A (Attention Filter additions) and Phase B (unresolvedness composite + network diagnostics). Both complete.
+- **Module 1: Memory Store** — Four phases, all complete. Three-tier CRUD, index, embedding search, decay, density metrics.
+- **Module 2: Attention Filter** — Four phases, all complete. Prompt scoring, structural scoring, assertion extraction, batch orchestration, wild-card/near-miss partitioning.
+- **Module 3: Source Ingestion** — Two phases + coverage tooling, all complete. Adapter framework, RSS, Telegram channel, Reddit, human-share, corpus import, durable markers.
+- **Module 4: Gateway** — Two phases, all complete. Adapter framework, Telegram delivery/polling, feedback signal dispatch.
+- **Module 5: Generator + Output Router** — Two phases, all complete. Prompted/response/free-play generation, skeptical memory, output routing.
+- **Module 6: Distillation** — Three phases, all complete. T1→T2 RAPTOR clustering, T2→T3 reflect-evolve, personality supersession, criteria adjustments.
+- **Module 7: Feedback Collector** — Phase 7.1 complete (immediate feedback). Phase 7.2 (delayed engagement) deferred to post-MVP.
 
-### Phase 1 (complete): Contract and routing foundation
-
-Delivered ARCH-aligned public dataclasses/errors/exports, stateless Memory Store personality context loading, empty-personality behavior, optional Tier 2 enrichment behind Memory Store boundaries, deterministic Output Router delivery decisions, and credential-free fake integration coverage. Reviewed and completed. See DEVLOG "Phase 5.1 Completion" entry.
-
-### Phase 2 (complete): LLM generation modes and skeptical memory
-
-Delivered prompted, response, and free-play generation behind fakeable toolkit/llm_client boundaries; skeptical memory verification with read-only recent Tier 1 checks; provider-failure rotation fallback; parse hard stops; source attribution and response threading preservation; and cross-mode integration coverage. Reviewed and completed. See DEVLOG "Phase 5.2 Review" and "Phase 5.2 Completion" entries.
-
-## Module 6: Distillation (complete)
-
-Planned phases follow `ARCH_distillation.md`: first stabilize the public contract, validation, Memory Store read/write boundary helpers, in-process lock, persisted run metadata, and deterministic gate evaluation without live clustering or LLM synthesis; then add T1->T2 RAPTOR promotion and assertion cache; then add T2->T3 reflect-evolve with supersession and criteria-adjustment output.
-
-- **Phase 1 (complete)** — Delivered ARCH-aligned public dataclasses/errors/exports, config and Memory Store boundary validation, persisted run metadata, in-process locking, deterministic gate evaluation, deferred public distillation method stubs, and integration coverage proving no toolkit calls or Memory Store note writes outside metadata. Reviewed and completed. See DEVLOG "Phase 6.1 Review" and "Phase 6.1 Completion" entries.
-
-- **Phase 2 (complete)** — Delivered ARCH-aligned `distill_t1_to_t2(config)`: toolkit boundary seams, feedback-aware Tier 1 selection, RAPTOR coherence gating, Tier 2 Memory Store writes with cluster links, assertion-cache JSON persistence, and successful-run metadata updates. Reviewed and completed. See DEVLOG "Phase 6.2 Completion" entry.
-
-- **Phase 3 (complete)** — Delivered ARCH-aligned `distill_t2_to_t3(config)`: audited reflection output, evolution proposal parsing with version-count inertia, personality supersession and unchanged-version writeback, compression limits, feedback-derived criteria adjustments, success-only metadata updates, and end-to-end integration coverage. Reviewed and completed. See DEVLOG "Phase 6.3 Completion" entry.
-
-## Module 7: Feedback Collector (in progress)
-
-Planned phases follow `ARCH_feedback_collector.md`: first stabilize the public contract, in-memory output tracking, immediate Gateway feedback normalization, Memory Store feedback-note writes, silence detection, and Tier 1 unresolvedness updates; then add delayed-engagement checks and retention/pruning hardening.
-
-### Phase 1 (complete): Contract and immediate feedback foundation
-
-Delivered the Feedback Collector public contract, in-memory output tracking, immediate Gateway feedback normalization, Tier 1 Memory Store feedback-note writes, silence detection, bounded pruning, positive-feedback unresolvedness updates, and integration regression coverage. Reviewed and completed. See DEVLOG "Phase 7.1 Completion" entry.
-
-### Phase 2 (planned): Delayed engagement and retention hardening
-
-Will implement `check_delayed_engagement()`, durable-engagement heuristics over linked notes and subsequent feedback, delayed-positive event storage, and final record-retention behavior.
+574 tests passing, 98% total coverage as of Phase 7.1 completion.
 
 <!--
 HISTORY — Do not read past this marker.
