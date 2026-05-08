@@ -1,7 +1,7 @@
 ---
 phase: MVP.1
 blocked: null
-state: review
+state: close
 ---
 
 # Phosphene — Development Plan
