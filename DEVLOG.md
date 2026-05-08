@@ -667,3 +667,14 @@ ARCHITECTURE.md: Distillation row in the Implementation Sequence table updated f
 
 
 (Module 5 Phase 2 and earlier entries archived to DEVLOG_archive.md on 2026-05-06.)
+
+### Step MVP.1.1: Public package contract
+
+**Date:** 2026-05-08
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Created the MVP Orchestrator package surface under `src/phosphene/orchestrator/`. Added ARCH-aligned public dataclasses for `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, and `ModuleRefs`; added the Orchestrator error hierarchy with `OrchestratorError`, `ConfigError`, and `UnknownTaskTypeError`; and exported the public API through `phosphene.orchestrator`.
+
+Added the initial `MVPOrchestrator` constructor shell. It stores `modules` and `config` exactly as provided and intentionally performs no validation or module attribute inspection, leaving validation for MVP.1 step 2. Focused tests cover package exports, dataclass field order/defaults, error inheritance, and the no-validation constructor boundary. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator/test_orchestrator_exports.py` (4 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (578 passed).

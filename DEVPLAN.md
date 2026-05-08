@@ -45,7 +45,7 @@ state: execute
 
 **Steps:**
 
-1. **Public package contract** — Create `src/phosphene/orchestrator/` with ARCH-aligned `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, `ModuleRefs` exports. Add error types: `OrchestratorError`, `ConfigError`, `UnknownTaskTypeError`. Constructor shell that stores modules and config without validation.
+1. **Public package contract** — Complete. Created `src/phosphene/orchestrator/` with ARCH-aligned `MVPOrchestratorConfig`, `ScheduleEntry`, `ActivationResult`, `ModuleRefs` exports. Added error types: `OrchestratorError`, `ConfigError`, `UnknownTaskTypeError`. Constructor shell stores modules and config without validation.
 
 2. **Config and ModuleRefs validation** — Validate schedule non-empty, task types in allowed set (`ingestion`, `generation`, `distillation`, `decay`), cron expressions parseable by croniter. Validate ModuleRefs: all fields non-None, Memory Store has required methods (`store_note`, `get_density_metrics`, `get_personality_context`, `run_decay`), Gateway has `send`. No module calls during validation — just attribute checks.
 
