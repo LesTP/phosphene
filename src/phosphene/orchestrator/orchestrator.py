@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from time import perf_counter, sleep
 from typing import Callable
@@ -130,16 +133,42 @@ class MVPOrchestrator:
         try:
             result = runner()
         except Exception as exc:
-            return ActivationResult(
+            result = ActivationResult(
                 task_type=task_type,
                 success=False,
                 outputs_delivered=0,
                 error=str(exc),
                 duration_ms=_elapsed_ms(started_at),
             )
+            self._append_activation_log(result)
+            return result
 
         result.duration_ms = _elapsed_ms(started_at)
+        self._append_activation_log(result)
         return result
+
+    def _append_activation_log(self, result: ActivationResult) -> None:
+        if self.config.log_path is None:
+            return
+
+        log_path = self.config.log_path
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(_activation_result_to_json(result), sort_keys=True) + "\n"
+        existing = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+        if existing and not existing.endswith("\n"):
+            existing += "\n"
+
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=log_path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_file.write(existing)
+            temp_file.write(line)
+            temp_name = temp_file.name
+
+        os.replace(temp_name, log_path)
 
     def _run_ingestion(self) -> ActivationResult:
         results = self.modules.source_ingestion.poll()
@@ -327,6 +356,17 @@ def _normalize_datetime(value: datetime) -> datetime:
 
 def _elapsed_ms(started_at: float) -> int:
     return int((perf_counter() - started_at) * 1000)
+
+
+def _activation_result_to_json(result: ActivationResult) -> dict[str, object]:
+    return {
+        "task_type": result.task_type,
+        "success": result.success,
+        "outputs_delivered": result.outputs_delivered,
+        "error": result.error,
+        "duration_ms": result.duration_ms,
+        "timestamp": result.timestamp.isoformat(),
+    }
 
 
 def _note_input_from_fragment(fragment: object) -> NoteInput:

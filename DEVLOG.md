@@ -123,3 +123,14 @@ DEVPLAN now transitions to `state: execute`, decrements `steps_remaining` to 7, 
 Added dispatch-level activation isolation for scheduled/manual activations and inbound respond handling. Unexpected module exceptions now return `ActivationResult(success=False, outputs_delivered=0, error=str(exc))` with duration populated instead of escaping the activation.
 
 Added orchestrator tests proving a throwing source ingestion module returns a failed activation result and does not prevent a subsequent decay activation in the same loop iteration. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (36 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (610 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 6, and moves focus to MVP.3.2 activation logging.
+
+### Step MVP.3.2: Activation logging
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added activation logging at the shared activation wrapper. When `config.log_path` is set, successful and failed activations serialize the public `ActivationResult` fields as JSON lines with ISO timestamps; writes use a same-directory temporary file followed by `os.replace()` so the log file is not left partially written.
+
+Added tests for multiple activation log records across a failed ingestion and successful decay activation, and for the no-log-path case producing no file output. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (38 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (612 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 5, and moves focus to MVP.3.3 bootstrap transition.

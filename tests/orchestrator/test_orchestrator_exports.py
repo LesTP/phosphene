@@ -1,5 +1,7 @@
+import json
 from dataclasses import fields
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -206,6 +208,7 @@ def build_modules(
 
 def build_config(
     *,
+    log_path: Path | None = None,
     schedule: list[ScheduleEntry] | None = None,
 ) -> MVPOrchestratorConfig:
     return MVPOrchestratorConfig(
@@ -217,6 +220,7 @@ def build_config(
         distillation_config=object(),
         generator_config=object(),
         router_config=RouterConfig(),
+        log_path=log_path,
     )
 
 
@@ -427,6 +431,48 @@ def test_start_continues_to_next_due_activation_after_module_error(
     instance.start()
 
     assert memory_store.decay_calls == 1
+
+
+def test_activation_log_appends_json_lines_after_multiple_activations(
+    tmp_path,
+) -> None:
+    log_path = tmp_path / "activation.jsonl"
+    memory_store = RecordingMemoryStore()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            source_ingestion=ThrowingSourceIngestion(),
+        ),
+        build_config(log_path=log_path),
+    )
+
+    failed = instance.trigger("ingestion")
+    succeeded = instance.trigger("decay")
+
+    lines = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(lines) == 2
+    assert lines[0]["task_type"] == "ingestion"
+    assert lines[0]["success"] is False
+    assert lines[0]["error"] == failed.error
+    assert lines[0]["outputs_delivered"] == 0
+    assert isinstance(lines[0]["duration_ms"], int)
+    assert isinstance(lines[0]["timestamp"], str)
+    assert lines[1]["task_type"] == "decay"
+    assert lines[1]["success"] is True
+    assert lines[1]["error"] is None
+    assert lines[1]["outputs_delivered"] == succeeded.outputs_delivered
+
+
+def test_activation_log_is_not_written_when_log_path_missing(tmp_path) -> None:
+    instance = MVPOrchestrator(
+        build_modules(memory_store=RecordingMemoryStore()),
+        build_config(),
+    )
+
+    result = instance.trigger("decay")
+
+    assert result.success is True
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_trigger_ingestion_polls_filters_and_stores_accepted_fragments() -> None:

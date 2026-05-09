@@ -2,7 +2,7 @@
 phase: MVP.3
 blocked: false
 state: execute
-steps_remaining: 6
+steps_remaining: 5
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 6
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Step 2: Activation logging.
+- **Focus** — Step 3: Bootstrap transition.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -56,7 +56,7 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 1. **Error isolation** — Complete. Dispatch wraps `_run_*` calls in try/except, unhandled module exceptions produce `ActivationResult(success=False, error=str(exc))`, and loop tests verify a failed activation does not prevent subsequent activations in the same iteration.
 
-2. **Activation logging** — When `config.log_path` is set, append a JSON-serialized `ActivationResult` line after each activation. Use atomic write (write to temp, rename) to avoid partial lines on crash. Tests verify log file content after multiple activations, and that missing log_path means no file I/O.
+2. **Activation logging** — Complete. When `config.log_path` is set, activations append JSON-serialized `ActivationResult` lines via same-directory temp write and rename; tests verify multiple records and no file I/O when `log_path` is missing.
 
 3. **Bootstrap transition** — Verify the system correctly transitions from bootstrap (skip generation) to active (generate output) within a single run session when distillation produces the first personality files. Test: trigger ingestion (stores notes) → trigger distillation (produces Tier 2 + Tier 3) → trigger generation (now succeeds). This is the proof that the bootstrap arc works end-to-end.
 
