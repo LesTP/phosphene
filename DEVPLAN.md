@@ -2,7 +2,7 @@
 phase: MVP.3
 blocked: false
 state: execute
-steps_remaining: 5
+steps_remaining: 4
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 5
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Step 3: Bootstrap transition.
+- **Focus** — Step 4: End-to-end integration test.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -58,7 +58,7 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 2. **Activation logging** — Complete. When `config.log_path` is set, activations append JSON-serialized `ActivationResult` lines via same-directory temp write and rename; tests verify multiple records and no file I/O when `log_path` is missing.
 
-3. **Bootstrap transition** — Verify the system correctly transitions from bootstrap (skip generation) to active (generate output) within a single run session when distillation produces the first personality files. Test: trigger ingestion (stores notes) → trigger distillation (produces Tier 2 + Tier 3) → trigger generation (now succeeds). This is the proof that the bootstrap arc works end-to-end.
+3. **Bootstrap transition** — Complete. Tests verify one orchestrator instance skips generation during bootstrap, stores notes through ingestion, runs T1→T2 and T2→T3 distillation, then generates and delivers output after personality files appear.
 
 4. **End-to-end integration test** — Single test using fake modules wired through real `MVPOrchestrator`. Proves the full content path: configure source ingestion with a fake adapter returning content items → trigger ingestion → verify Tier 1 notes stored → trigger distillation (fake gates ready) → verify distillation called → trigger generation → verify output routed through Gateway. This is the MVP validation test.
 

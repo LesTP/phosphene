@@ -134,3 +134,14 @@ Added orchestrator tests proving a throwing source ingestion module returns a fa
 Added activation logging at the shared activation wrapper. When `config.log_path` is set, successful and failed activations serialize the public `ActivationResult` fields as JSON lines with ISO timestamps; writes use a same-directory temporary file followed by `os.replace()` so the log file is not left partially written.
 
 Added tests for multiple activation log records across a failed ingestion and successful decay activation, and for the no-log-path case producing no file output. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (38 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (612 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 5, and moves focus to MVP.3.3 bootstrap transition.
+
+### Step MVP.3.3: Bootstrap transition
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the bootstrap transition proof for a single `MVPOrchestrator` run session. The test first confirms scheduled generation skips while the Memory Store has no personality files, then triggers ingestion to store a Tier 1 note, triggers distillation through fake T1→T2 and T2→T3 promotion, and verifies the next generation activation delivers output through Gateway without reconstructing the orchestrator.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (39 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (613 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 4, and moves focus to MVP.3.4 end-to-end integration test.

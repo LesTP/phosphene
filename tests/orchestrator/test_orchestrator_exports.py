@@ -720,6 +720,64 @@ def test_trigger_generation_routes_output_and_counts_successful_delivery() -> No
     assert gateway.sent_messages[0].content == "send this"
 
 
+def test_bootstrap_transitions_to_generation_after_distillation_produces_personality() -> None:
+    item = SimpleNamespace(content="seed fragment", source="corpus")
+    fragment = SimpleNamespace(
+        content="A seed fragment with enough charge to keep.",
+        annotation="Seed fragment",
+        importance_score=0.8,
+        unresolvedness=0.4,
+        retention_criteria=["seed"],
+        friction_target="open question",
+        connections=[],
+        source="corpus",
+        embedding=None,
+    )
+    memory_store = RecordingMemoryStore(personality_files=[])
+
+    class BootstrapDistillationEngine(FakeDistillationEngine):
+        def distill_t2_to_t3(self, config: object) -> None:
+            super().distill_t2_to_t3(config)
+            memory_store.personality_files.append(object())
+
+    gates = SimpleNamespace(ready=True, t1_to_t2_ready=True, t2_to_t3_ready=True)
+    engine = BootstrapDistillationEngine(gates)
+    generator = FakeGenerator(make_generator_output("now active"))
+    gateway = RoutingGateway()
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            source_ingestion=FakeSourceIngestion([SimpleNamespace(items=[item])]),
+            attention_filter=FakeAttentionFilter([fragment]),
+            distillation_engine=engine,
+            generator=generator,
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    bootstrap_generation = instance.trigger("generation")
+    ingestion = instance.trigger("ingestion")
+    distillation = instance.trigger("distillation")
+    active_generation = instance.trigger("generation")
+
+    assert bootstrap_generation.success is True
+    assert bootstrap_generation.outputs_delivered == 0
+    assert ingestion.success is True
+    assert len(memory_store.notes) == 1
+    assert distillation.success is True
+    assert engine.t1_configs == [config.distillation_config]
+    assert engine.t2_configs == [config.distillation_config]
+    assert active_generation.success is True
+    assert active_generation.outputs_delivered == 1
+    assert generator.generate_calls == [
+        (config.generation_prompt, {}, config.generator_config)
+    ]
+    assert len(gateway.sent_messages) == 1
+    assert gateway.sent_messages[0].content == "now active"
+
+
 def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
     memory_store = RecordingMemoryStore(personality_files=[object()])
     gateway = RoutingGateway(delivery_success=False)
