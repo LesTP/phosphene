@@ -1,7 +1,7 @@
 ---
 phase: MVP.2
 blocked: false
-state: review
+state: close
 steps_remaining: 0
 ---
 
@@ -58,7 +58,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 4. **Respond activation** — Complete. `_run_respond(message)` now checks personality context, skips bootstrap, calls `generator.respond(message, {}, config.generator_config)`, routes output through the Output Router, and Gateway listener startup registers inbound messages for inline respond dispatch. Verified with fake-module tests.
 
-5. **Decay activation** — `_run_decay()`: call `memory_store.run_decay()`. Return `ActivationResult`. Simplest activation — one call, no conditionals.
+5. **Decay activation** — Complete. `_run_decay()` now calls `memory_store.run_decay()` and returns a successful `ActivationResult` with zero delivered outputs. Verified with fake-module tests.
 
 **Boundary:** After Phase 2, `trigger("ingestion")` runs the full poll→filter→store pipeline through fake modules. Each activation type is independently testable. No error isolation beyond what individual modules provide — that's Phase 3.
 

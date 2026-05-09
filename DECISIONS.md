@@ -352,7 +352,7 @@ Rationale: `PROJECT.md` defines MVP as the smallest unattended loop that can eve
 Revisit if: Phase MVP.1 cannot validate required module references or prove scheduling behavior without invoking module APIs, or if `croniter` cannot satisfy deterministic cron evaluation under the existing test environment.
 
 D-50: MVP Orchestrator Phase 2 wires activations one path at a time
-Date: 2026-05-08 | Status: Open
+Date: 2026-05-08 | Status: Closed
 Priority: Important
 Decision: Phase MVP.2 will replace the Phase 1 activation stubs with real module wiring in five independent Build steps: ingestion, distillation, generation/bootstrap, respond/listener, and decay. Each step adds tests against fake module references and preserves the MVP boundary of no lateral freedom, no ambient context, no feedback collector, and no Explorer integration.
 Rationale: `ARCH_orchestrator_mvp.md` defines the minimum loop needed to connect completed Modules 1-6, but each activation touches a different module contract and failure surface. Wiring one activation type per step keeps the integration diagnosable, lets trigger-based tests prove each path independently, and avoids mixing Phase 3 concerns like dispatch-level error isolation and activation logging into the first runtime-wiring phase.

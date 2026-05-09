@@ -155,3 +155,14 @@ Updated `start()` to register `_run_respond` as the Gateway `on_message` callbac
 Implemented `_run_decay()` behind `trigger("decay")`. The activation calls `memory_store.run_decay()` and returns `ActivationResult(task_type="decay", success=True, outputs_delivered=0)`. No bootstrap check, no conditionals — the simplest activation in the suite.
 
 Replaced the stub test `test_trigger_runs_unwired_decay_stub_without_calling_modules` with `test_trigger_decay_calls_run_decay_and_returns_success`, which verifies `run_decay()` is called exactly once and the result fields are correct. Extended `RecordingMemoryStore` with `decay_calls` tracking. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (34 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (608 passed). All five Phase MVP.2 activation steps are now complete — DEVPLAN transitions to `state: review`.
+
+### Phase MVP.2 Review: Activation wiring
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Reviewed MVP.2 implementation against `ARCH_orchestrator_mvp.md`. Must fix: none. Should fix: none. Optional: none. The phase wires ingestion, distillation, generation/bootstrap, respond/listener dispatch, and decay within the MVP boundary; Phase 3 error isolation, activation logging, restart recovery, and end-to-end hardening remain deferred as planned.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (34 passed). DEVPLAN now transitions to `state: close`.
