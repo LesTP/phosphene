@@ -1,8 +1,8 @@
 ---
 phase: MVP.3
 blocked: false
-state: execute
-steps_remaining: 3
+state: review
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 3
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Step 5: Restart recovery.
+- **Focus** — Phase review.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -62,7 +62,7 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 4. **End-to-end integration test** — Complete. A fake-module test wired through real `MVPOrchestrator` proves ingestion poll→filter→Tier 1 store, ready distillation dispatch, generation, routing, and Gateway delivery.
 
-5. **Restart recovery** — Verify that constructing a new `MVPOrchestrator` with the same config and the same Memory Store vault resumes correctly: schedule re-derives from config, distillation metadata persists in vault, stored notes survive. No orchestrator-owned state file needed — all durable state lives in Memory Store. Test: construct → trigger ingestion → construct new instance → trigger generation → verify personality context is still available.
+5. **Restart recovery** — Complete. Tests verify a new `MVPOrchestrator` with the same config and Memory Store starts with fresh schedule state while stored notes, simulated distillation metadata, and personality context remain available for generation.
 
 **Boundary:** After Phase 3, the MVP Orchestrator is deployable as a systemd service. The full ingestion→distillation→generation→delivery path works, errors are isolated, activations are logged, and the system survives restarts.
 

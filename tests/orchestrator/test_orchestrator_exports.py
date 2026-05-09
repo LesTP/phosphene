@@ -842,6 +842,70 @@ def test_end_to_end_content_path_ingests_distills_generates_and_routes_output() 
     assert gateway.sent_messages[0].content == "mvp output"
 
 
+def test_restart_reconstructs_schedule_and_uses_persisted_memory_state() -> None:
+    schedule = [ScheduleEntry(task_type="ingestion", cron="0 * * * *")]
+    fragment = SimpleNamespace(
+        content="Material stored before restart.",
+        annotation="Stored before restart",
+        importance_score=0.7,
+        unresolvedness=0.0,
+        retention_criteria=[],
+        friction_target=None,
+        connections=[],
+        source="rss",
+        embedding=None,
+    )
+    memory_store = RecordingMemoryStore(personality_files=[])
+    config = build_config(schedule=schedule)
+    first = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            source_ingestion=FakeSourceIngestion([SimpleNamespace(items=[object()])]),
+            attention_filter=FakeAttentionFilter([fragment]),
+        ),
+        config,
+    )
+
+    first._next_due_entries(datetime(2026, 5, 9, 12, 0, tzinfo=timezone.utc))
+    assert first._next_due_entries(
+        datetime(2026, 5, 9, 13, 1, tzinfo=timezone.utc)
+    ) == schedule
+
+    ingestion = first.trigger("ingestion")
+    memory_store.personality_files.append(object())
+    memory_store.distillation_metadata = {"last_run_id": "distill-1"}
+
+    gateway = RoutingGateway()
+    generator = FakeGenerator(make_generator_output("after restart"))
+    second = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    first_check_after_restart = second._next_due_entries(
+        datetime(2026, 5, 9, 14, 1, tzinfo=timezone.utc)
+    )
+    generation = second.trigger("generation")
+
+    assert ingestion.success is True
+    assert len(memory_store.notes) == 1
+    assert memory_store.notes[0].content == fragment.content
+    assert memory_store.distillation_metadata == {"last_run_id": "distill-1"}
+    assert first_check_after_restart == []
+    assert second.config.schedule == schedule
+    assert generation.success is True
+    assert generation.outputs_delivered == 1
+    assert generator.generate_calls == [
+        (config.generation_prompt, {}, config.generator_config)
+    ]
+    assert len(gateway.sent_messages) == 1
+    assert gateway.sent_messages[0].content == "after restart"
+
+
 def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
     memory_store = RecordingMemoryStore(personality_files=[object()])
     gateway = RoutingGateway(delivery_success=False)

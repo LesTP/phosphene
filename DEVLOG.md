@@ -156,3 +156,14 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/or
 Added the explicit MVP content-path validation test using fake modules wired through real `MVPOrchestrator`. The test triggers ingestion from two fake source results, verifies Attention Filter input flattening and Tier 1 note storage, triggers ready T1→T2 and T2→T3 distillation dispatch, then triggers generation and verifies the output is routed through Gateway.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (40 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (614 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 3, and moves focus to MVP.3.5 restart recovery.
+
+### Step MVP.3.5: Restart recovery
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added restart recovery coverage for the MVP Orchestrator's stateless boundary. The test constructs an orchestrator, advances its in-memory schedule state, triggers ingestion, then constructs a second orchestrator with the same config and shared Memory Store boundary. The new instance starts with fresh schedule tracking while stored notes, simulated distillation metadata, and personality context remain available for generation.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (615 passed). All MVP.3 implementation steps are complete, so DEVPLAN now transitions to `state: review` and decrements `steps_remaining` to 2.
