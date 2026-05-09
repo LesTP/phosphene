@@ -359,7 +359,7 @@ Rationale: `ARCH_orchestrator_mvp.md` defines the minimum loop needed to connect
 Revisit if: A module's implemented public API does not match the MVP Orchestrator contract closely enough to wire without cross-module contract changes.
 
 D-51: MVP Orchestrator Phase 3 hardens integration without expanding scope
-Date: 2026-05-09 | Status: Open
+Date: 2026-05-09 | Status: Closed
 Priority: Important
 Decision: Phase MVP.3 will run as Build work in five testable steps: dispatch-level error isolation, activation logging, bootstrap transition proof, end-to-end fake-module validation, and restart recovery verification. The phase remains inside `ARCH_orchestrator_mvp.md`: no lateral freedom, no ambient context, no Feedback Collector integration, no Explorer integration, and no orchestrator-owned durable state beyond the optional activation log.
 Rationale: MVP.2 established each activation path independently. MVP.3 needs to prove those paths can run unattended as one system: one failing activation must not stop later work, logs must be recoverable enough for monitoring, bootstrap must transition during a live session, the content path must be covered end to end, and restart behavior must derive from config plus Memory Store durability rather than hidden scheduler state.

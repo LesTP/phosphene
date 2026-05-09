@@ -1,8 +1,8 @@
 ---
 phase: MVP.3
-blocked: false
+blocked: true
 state: close
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 1
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Phase close.
+- **Focus** — Phase complete.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -46,25 +46,11 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 ### Phase MVP.2: Activation wiring
 
-Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener dispatch, and decay activations to Modules 1–6 with fake-module verification. See `DEVLOG.md` Phase MVP.2 entries for details.
+Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener dispatch, and decay activations to Modules 1-6 with fake-module verification. See `DEVLOG_archive.md` Phase MVP.2 entries for details.
 
 ### Phase MVP.3: Integration hardening
 
-**Goal:** Error isolation, logging, restart resilience, and end-to-end proof.
-
-**Steps:**
-
-1. **Error isolation** — Complete. Dispatch wraps `_run_*` calls in try/except, unhandled module exceptions produce `ActivationResult(success=False, error=str(exc))`, and loop tests verify a failed activation does not prevent subsequent activations in the same iteration.
-
-2. **Activation logging** — Complete. When `config.log_path` is set, activations append JSON-serialized `ActivationResult` lines via same-directory temp write and rename; tests verify multiple records and no file I/O when `log_path` is missing.
-
-3. **Bootstrap transition** — Complete. Tests verify one orchestrator instance skips generation during bootstrap, stores notes through ingestion, runs T1→T2 and T2→T3 distillation, then generates and delivers output after personality files appear.
-
-4. **End-to-end integration test** — Complete. A fake-module test wired through real `MVPOrchestrator` proves ingestion poll→filter→Tier 1 store, ready distillation dispatch, generation, routing, and Gateway delivery.
-
-5. **Restart recovery** — Complete. Tests verify a new `MVPOrchestrator` with the same config and Memory Store starts with fresh schedule state while stored notes, simulated distillation metadata, and personality context remain available for generation.
-
-**Boundary:** After Phase 3, the MVP Orchestrator is deployable as a systemd service. The full ingestion→distillation→generation→delivery path works, errors are isolated, activations are logged, and the system survives restarts.
+Complete. Hardened the MVP Orchestrator with activation-level error isolation, JSONL activation logging, bootstrap transition proof, end-to-end fake-module integration coverage, restart recovery verification, and log-write failure isolation. See `DEVLOG.md` Phase MVP.3 entries for details.
 
 ## Deferred Work
 
@@ -88,7 +74,7 @@ Extends MVP Orchestrator with lateral freedom, tension-responsive scheduling, am
 - **Module 6: Distillation** — Three phases, all complete. T1→T2 RAPTOR clustering, T2→T3 reflect-evolve, personality supersession, criteria adjustments.
 - **Module 7: Feedback Collector** — Phase 7.1 complete (immediate feedback). Phase 7.2 (delayed engagement) deferred to post-MVP.
 
-608 tests passing as of Phase MVP.2 completion.
+616 tests passing as of Phase MVP.3 completion.
 
 <!--
 HISTORY — Do not read past this marker.
