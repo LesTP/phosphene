@@ -101,3 +101,14 @@ ARCHITECTURE.md: MVP Orchestrator status updated from Phase MVP.1 complete to Ph
 DECISIONS.md and PROJECT.md: no open decisions or project risks were resolved by this phase.
 
 (MVP.1 entries archived to DEVLOG_archive.md on 2026-05-09.)
+
+### Phase MVP.3 Plan: Integration hardening
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Planned MVP Orchestrator Phase 3 as Build work under `ARCH_orchestrator_mvp.md`: dispatch-level error isolation, activation logging, bootstrap transition proof, end-to-end fake-module validation, and restart recovery verification. The phase stays inside the MVP boundary with no lateral freedom, ambient context, Feedback Collector integration, Explorer integration, or orchestrator-owned durable state beyond the optional activation log.
+
+DEVPLAN now transitions to `state: execute`, decrements `steps_remaining` to 7, and keeps focus on MVP.3.1 error isolation.

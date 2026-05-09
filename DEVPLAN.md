@@ -1,8 +1,8 @@
 ---
 phase: MVP.3
-blocked: true
-state: plan
-steps_remaining: 2
+blocked: false
+state: execute
+steps_remaining: 7
 ---
 
 # Phosphene — Development Plan
