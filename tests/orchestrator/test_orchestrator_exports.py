@@ -778,6 +778,70 @@ def test_bootstrap_transitions_to_generation_after_distillation_produces_persona
     assert gateway.sent_messages[0].content == "now active"
 
 
+def test_end_to_end_content_path_ingests_distills_generates_and_routes_output() -> None:
+    rss_item = SimpleNamespace(content="rss item", source="rss")
+    telegram_item = SimpleNamespace(content="telegram item", source="telegram")
+    fragment = SimpleNamespace(
+        content="Filtered material that should enter memory.",
+        annotation="Filtered material",
+        importance_score=0.74,
+        unresolvedness=0.2,
+        retention_criteria=["precision_surplus"],
+        friction_target=None,
+        connections=["note-prior"],
+        source="rss",
+        embedding=None,
+    )
+    memory_store = RecordingMemoryStore(personality_files=[object()])
+    source_ingestion = FakeSourceIngestion(
+        [
+            SimpleNamespace(items=[rss_item], adapter_label="rss"),
+            SimpleNamespace(items=[telegram_item], adapter_label="telegram"),
+        ]
+    )
+    attention_filter = FakeAttentionFilter([fragment])
+    gates = SimpleNamespace(ready=True, t1_to_t2_ready=True, t2_to_t3_ready=True)
+    engine = FakeDistillationEngine(gates)
+    generator = FakeGenerator(make_generator_output("mvp output"))
+    gateway = RoutingGateway()
+    config = build_config()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            source_ingestion=source_ingestion,
+            attention_filter=attention_filter,
+            distillation_engine=engine,
+            generator=generator,
+            gateway=gateway,
+        ),
+        config,
+    )
+
+    ingestion = instance.trigger("ingestion")
+    distillation = instance.trigger("distillation")
+    generation = instance.trigger("generation")
+
+    assert ingestion.success is True
+    assert source_ingestion.poll_count == 1
+    assert attention_filter.calls == [
+        ([rss_item, telegram_item], config.attention_filter_config)
+    ]
+    assert len(memory_store.notes) == 1
+    assert memory_store.notes[0].content == fragment.content
+    assert memory_store.notes[0].links == ["note-prior"]
+    assert distillation.success is True
+    assert engine.check_configs == [config.distillation_config]
+    assert engine.t1_configs == [config.distillation_config]
+    assert engine.t2_configs == [config.distillation_config]
+    assert generation.success is True
+    assert generation.outputs_delivered == 1
+    assert generator.generate_calls == [
+        (config.generation_prompt, {}, config.generator_config)
+    ]
+    assert len(gateway.sent_messages) == 1
+    assert gateway.sent_messages[0].content == "mvp output"
+
+
 def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
     memory_store = RecordingMemoryStore(personality_files=[object()])
     gateway = RoutingGateway(delivery_success=False)

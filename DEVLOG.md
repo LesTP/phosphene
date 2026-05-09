@@ -145,3 +145,14 @@ Added tests for multiple activation log records across a failed ingestion and su
 Added the bootstrap transition proof for a single `MVPOrchestrator` run session. The test first confirms scheduled generation skips while the Memory Store has no personality files, then triggers ingestion to store a Tier 1 note, triggers distillation through fake T1→T2 and T2→T3 promotion, and verifies the next generation activation delivers output through Gateway without reconstructing the orchestrator.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (39 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (613 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 4, and moves focus to MVP.3.4 end-to-end integration test.
+
+### Step MVP.3.4: End-to-end integration test
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added the explicit MVP content-path validation test using fake modules wired through real `MVPOrchestrator`. The test triggers ingestion from two fake source results, verifies Attention Filter input flattening and Tier 1 note storage, triggers ready T1→T2 and T2→T3 distillation dispatch, then triggers generation and verifies the output is routed through Gateway.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (40 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (614 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 3, and moves focus to MVP.3.5 restart recovery.

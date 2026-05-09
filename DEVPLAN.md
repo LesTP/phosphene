@@ -2,7 +2,7 @@
 phase: MVP.3
 blocked: false
 state: execute
-steps_remaining: 4
+steps_remaining: 3
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 4
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Step 4: End-to-end integration test.
+- **Focus** — Step 5: Restart recovery.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -60,7 +60,7 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 3. **Bootstrap transition** — Complete. Tests verify one orchestrator instance skips generation during bootstrap, stores notes through ingestion, runs T1→T2 and T2→T3 distillation, then generates and delivers output after personality files appear.
 
-4. **End-to-end integration test** — Single test using fake modules wired through real `MVPOrchestrator`. Proves the full content path: configure source ingestion with a fake adapter returning content items → trigger ingestion → verify Tier 1 notes stored → trigger distillation (fake gates ready) → verify distillation called → trigger generation → verify output routed through Gateway. This is the MVP validation test.
+4. **End-to-end integration test** — Complete. A fake-module test wired through real `MVPOrchestrator` proves ingestion poll→filter→Tier 1 store, ready distillation dispatch, generation, routing, and Gateway delivery.
 
 5. **Restart recovery** — Verify that constructing a new `MVPOrchestrator` with the same config and the same Memory Store vault resumes correctly: schedule re-derives from config, distillation metadata persists in vault, stored notes survive. No orchestrator-owned state file needed — all durable state lives in Memory Store. Test: construct → trigger ingestion → construct new instance → trigger generation → verify personality context is still available.
 
