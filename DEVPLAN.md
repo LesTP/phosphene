@@ -1,8 +1,8 @@
 ---
-phase: MVP.2
-blocked: false
-state: close
-steps_remaining: 0
+phase: MVP.3
+blocked: true
+state: plan
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -26,13 +26,13 @@ steps_remaining: 0
   - **Test environment** — system Python is 3.11.2 with no pytest; `pip install --user` is blocked (externally-managed-environment); `python3 -m venv .venv` creates binaries that can't run on this NTFS-3G mount (no exec bits, can't chmod). Working pattern: `pip install --target .python_deps` (already pre-installed in repo root) and run with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store`. Do NOT recreate `.venv` or reinstall — `.python_deps/` is gitignored and persists.
   - **No ripgrep** — `rg` is not installed in the Codex container. Use `find` and `grep` instead. Do not attempt `rg` on first command.
   - **Subagent context** — when spawning Explore or review subagents, include in the prompt: (1) source tree layout is `src/phosphene/<module>/`, not `src/<module>/`; (2) the working test command is `PYTHONPATH=src:.python_deps python3 -m pytest`; (3) `.python_deps/` contains all pip dependencies. Subagents have no memory of the parent's environment discovery.
-  - **New dependency** — `croniter` needed for cron expression parsing. Install to `.python_deps` before Phase 1 implementation: `pip install --target .python_deps croniter`.
+  - **Turn health check** — Codex iterations include `ITERATION_JSONL` in the prompt. At step-done, the worker checks `grep -c '"item.completed"' $ITERATION_JSONL` and escalates if total turns exceed `steps_completed × 50` (spiraling detection). See WORKER_SPEC.md §4.
 
 ## Current Status
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
-- **Phase** — MVP.2: Activation wiring.
-- **Focus** — Step 5: Decay activation.
+- **Phase** — MVP.3: Integration hardening.
+- **Focus** — Step 1: Error isolation.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -46,21 +46,7 @@ Complete. Delivered the MVP Orchestrator public contract, constructor validation
 
 ### Phase MVP.2: Activation wiring
 
-**Goal:** Wire each activation type to the real module APIs. Each step adds one activation type.
-
-**Steps:**
-
-1. **Ingestion activation** — Complete. `_run_ingestion()` now polls Source Ingestion, flattens items, filters them through Attention Filter, maps accepted fragments to Tier 1 `NoteInput`, and stores them in Memory Store. Verified with fake-module tests.
-
-2. **Distillation activation** — Complete. `_run_distillation()` now checks distillation gates, dispatches ready T1→T2 and T2→T3 promotions, and treats lock contention / insufficient data / missing pattern data as successful skips. Verified with fake-module tests.
-
-3. **Generation activation + bootstrap** — Complete. `_run_generation()` now checks personality context, skips bootstrap, calls `generator.generate(prompt, {}, config.generator_config)`, routes output through the Output Router, counts successful deliveries, and treats `EmptyPersonalityError` as a bootstrap skip. Verified with fake-module tests.
-
-4. **Respond activation** — Complete. `_run_respond(message)` now checks personality context, skips bootstrap, calls `generator.respond(message, {}, config.generator_config)`, routes output through the Output Router, and Gateway listener startup registers inbound messages for inline respond dispatch. Verified with fake-module tests.
-
-5. **Decay activation** — Complete. `_run_decay()` now calls `memory_store.run_decay()` and returns a successful `ActivationResult` with zero delivered outputs. Verified with fake-module tests.
-
-**Boundary:** After Phase 2, `trigger("ingestion")` runs the full poll→filter→store pipeline through fake modules. Each activation type is independently testable. No error isolation beyond what individual modules provide — that's Phase 3.
+Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener dispatch, and decay activations to Modules 1–6 with fake-module verification. See `DEVLOG.md` Phase MVP.2 entries for details.
 
 ### Phase MVP.3: Integration hardening
 
@@ -102,7 +88,7 @@ Extends MVP Orchestrator with lateral freedom, tension-responsive scheduling, am
 - **Module 6: Distillation** — Three phases, all complete. T1→T2 RAPTOR clustering, T2→T3 reflect-evolve, personality supersession, criteria adjustments.
 - **Module 7: Feedback Collector** — Phase 7.1 complete (immediate feedback). Phase 7.2 (delayed engagement) deferred to post-MVP.
 
-593 tests passing as of Phase MVP.1 completion.
+608 tests passing as of Phase MVP.2 completion.
 
 <!--
 HISTORY — Do not read past this marker.

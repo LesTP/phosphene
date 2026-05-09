@@ -76,7 +76,7 @@ Modules 1–6 are complete. The MVP path (see PROJECT.md MVP Definition) require
 |-------|--------|------|--------|
 | 7.1 | Feedback Collector (immediate) | No | Complete |
 | 7.2 | Feedback Collector (delayed) | No | Not started |
-| MVP | Orchestrator (minimal) | **Yes** | Phase MVP.1 complete — ARCH_orchestrator_mvp.md |
+| MVP | Orchestrator (minimal) | **Yes** | Phase MVP.2 complete — ARCH_orchestrator_mvp.md |
 | 8 | Explorer | No | Not started |
 | 9 | Orchestrator (full) | No | Not started — ARCH_orchestrator.md |
 
