@@ -9,8 +9,9 @@
 #   bash run-iteration.sh --backend codex       # single iteration, Codex backend
 #   bash run-iteration.sh -n 5                  # run up to 5 iterations (stops on ESCALATE)
 #   bash run-iteration.sh -n 5 --start 3        # start from iteration 3
-#   bash run-iteration.sh --model opus           # single iteration, Opus model
+#   bash run-iteration.sh --model opus          # single iteration, Opus model
 #   bash run-iteration.sh --backend codex -n 3  # 3 Codex iterations
+#   bash run-iteration.sh --multi-step 5        # one invocation, up to 5 steps
 #
 # Output:
 #   logs/loop/iteration_NNN.jsonl  — full stream-json transcript (Claude) or JSONL (Codex)
@@ -50,6 +51,7 @@ MAX_ITERATIONS=1
 START_ITER=""
 BACKEND="claude"
 MODEL="sonnet"
+MULTI_STEP=0
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -57,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --start)         START_ITER="$2"; shift 2 ;;
     --backend)       BACKEND="$2"; shift 2 ;;
     --model)         MODEL="$2"; shift 2 ;;
+    --multi-step)    MULTI_STEP="$2"; shift 2 ;;
     *)               echo "Unknown option: $1"; exit 2 ;;
   esac
 done
@@ -87,13 +90,32 @@ PROMPT="MANDATORY FIRST STEP: Read ${ADAPTER_FILE} now. It contains references t
 
 You are a stateless worker. You have no memory of previous iterations. Reconstruct all state from files.
 
-After reading ${ADAPTER_FILE} and its references, determine current state from DEVPLAN.md. Execute exactly one action per the Worker Spec.
+After reading ${ADAPTER_FILE} and its references, determine current state from DEVPLAN.md. Follow the Worker Spec step budget rules."
 
-Your final output MUST end with exactly these four lines — no text after:
+# Add multi-step budget to prompt if requested
+if [[ $MULTI_STEP -gt 1 ]]; then
+  PROMPT="$PROMPT
+
+STEPS_REMAINING: $MULTI_STEP"
+fi
+
+# Add JSONL path for per-step turn health check (Codex only)
+if [[ "$BACKEND" == "codex" ]]; then
+  ITER_PAD_PROMPT=$(printf "%03d" "${START_ITER:-1}")
+  JSONL_PATH="$LOG_DIR/iteration_${ITER_PAD_PROMPT}.jsonl"
+  PROMPT="$PROMPT
+
+ITERATION_JSONL: $JSONL_PATH"
+fi
+
+PROMPT="$PROMPT
+
+Your final output MUST end with exactly these five lines — no text after:
 LOOP_SIGNAL: CONTINUE | ESCALATE
 REASON: <one line — what was done or why stopping>
-ACTION_TYPE: PHASE_PLAN | STEP | REVIEW | COMPLETE
-ACTION_ID: <module.phase.step>"
+ACTION_TYPE: PLAN | EXECUTE | REVIEW | CLOSE
+ACTION_ID: <phase.step>
+STEPS_COMPLETED: <number of actions performed in this invocation>"
 
 mkdir -p "$LOG_DIR"
 cd "$PROJECT_DIR"
@@ -181,13 +203,14 @@ while [[ $ITER -le $END_ITER ]]; do
   REASON=$(echo "$RESULT_TEXT" | grep -oP 'REASON: \K.+' || echo "")
   ACTION_TYPE=$(echo "$RESULT_TEXT" | grep -oP 'ACTION_TYPE: \K\w+' || echo "")
   ACTION_ID=$(echo "$RESULT_TEXT" | grep -oP 'ACTION_ID: \K\S+' || echo "")
+  STEPS_COMPLETED=$(echo "$RESULT_TEXT" | grep -oP 'STEPS_COMPLETED: \K[0-9]+' || echo "1")
 
   # Write summary line
   TIMESTAMP=$(date -Iseconds)
-  echo "$TIMESTAMP | iter=$ITER | backend=$BACKEND | signal=$SIGNAL | exit=$EXIT_CODE | cost=\$$COST | turns=$TURNS | duration=$DURATION | action=$ACTION_TYPE | id=$ACTION_ID | reason=$REASON" >> "$SUMMARY_FILE"
+  echo "$TIMESTAMP | iter=$ITER | backend=$BACKEND | signal=$SIGNAL | exit=$EXIT_CODE | cost=\$$COST | turns=$TURNS | duration=$DURATION | action=$ACTION_TYPE | id=$ACTION_ID | steps=$STEPS_COMPLETED | reason=$REASON" >> "$SUMMARY_FILE"
 
   # Print summary to stdout for orchestrator
-  echo "Backend=$BACKEND | Signal=$SIGNAL | Cost=\$$COST | Turns=$TURNS | Duration=$DURATION"
+  echo "Backend=$BACKEND | Signal=$SIGNAL | Cost=\$$COST | Turns=$TURNS | Duration=$DURATION | Steps=$STEPS_COMPLETED"
   echo "Action: $ACTION_TYPE ($ACTION_ID)"
   echo "Reason: $REASON"
 
@@ -197,11 +220,7 @@ while [[ $ITER -le $END_ITER ]]; do
 
   # Decide whether to continue
   if [[ "$SIGNAL" == "ESCALATE" ]]; then
-    # Distinguish clean phase-boundary escalations (ACTION_TYPE=COMPLETE — the
-    # worker finished a phase and is handing off for human audit per WORKER_SPEC
-    # §6) from problem escalations (3 failures, regime shift, scope creep,
-    # contract change, unclear spec — same signal, but a real problem).
-    if [[ "$ACTION_TYPE" == "COMPLETE" ]]; then
+    if [[ "$ACTION_TYPE" == "CLOSE" ]]; then
       echo "=== Phase-boundary at iteration $ITER (awaiting human audit): $REASON ==="
       FINAL_EXIT=0
     else

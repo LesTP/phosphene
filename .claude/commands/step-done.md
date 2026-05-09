@@ -19,7 +19,19 @@ Parse $ARGUMENTS for --amend or --commit (default is --commit).
 5. Update DEVPLAN frontmatter:
    - If this was the last step in the phase: set `state: review`
    - Otherwise: keep `state: execute`
-6. Briefly state what the next step is according to the DEVPLAN
+   - If `steps_remaining` is present: decrement it by 1
+6. **Turn health check** (Codex only):
+   If `ITERATION_JSONL` was provided in the prompt, check total turns:
+   ```bash
+   grep -c '"item.completed"' "$ITERATION_JSONL"
+   ```
+   Compare to `steps_completed × 50`. If exceeded: ESCALATE — the worker
+   is spiraling. This is a safety check, not the budget mechanism.
+7. Briefly state what the next step is according to the DEVPLAN
 
-**If autonomous:** Commit and exit.
+**If autonomous:**
+Commit. If `steps_remaining > 0` and state is `plan` or `execute`
+and turn health check passed: continue to next action.
+Otherwise: emit exit signal.
+
 **If supervised:** Do not start the next step until I say so.

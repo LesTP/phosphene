@@ -151,6 +151,7 @@ MVP **does** require the system to survive restarts, recover state from persiste
 - Dynamic affordance expansion (agent proposes new capabilities during free play)
 - Temporal knowledge graph (Zep-style) for explicit personality development tracking
 - Expanded ambient streams — arbitrary environmental feeds as enclosure enrichment
+- **curl.md URL-to-markdown** — route URL fetching through [curl.md](https://curl.md) (MIT, [source](https://github.com/wevm/curl.md)) for agent-optimized content extraction. Reduces token waste from HTML noise (nav, footers, ads) in human-share URL ingestion and future Explorer link-following. Two deployment options: (1) use the hosted service (free tier, sufficient for Phosphene volume); (2) self-host from open source if rate limits or offline operation matter. Integration point: `source_ingestion/normalization.fetch_url_text()` and future Explorer fetch path.
 
 ## Size Estimate
 Multi-module. The design document identifies 10+ standalone modules with defined interfaces: corpus pipeline, memory store, attention filter, gateway, source ingestion, generator, distillation engine, feedback collector, explorer, output router, model router, scheduler.

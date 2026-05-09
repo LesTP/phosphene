@@ -44,8 +44,8 @@ relevant ARCH file using the lookup table below.
 - `DECISIONS.md` — read during review to verify no contract drift
 - `DEVLOG.md` / `DEVLOG_archive.md` — read during close (learning review)
 
-**DEVLOG.md fence:** Stop at the `<!-- HISTORY` fence. Insert new entries
-above it. Do not read or edit content below it.
+**DEVLOG.md:** Append new entries at the bottom (newest last). During phase
+close, archive the previous phase's entries to `DEVLOG_archive.md`.
 
 ## Available Modules
 

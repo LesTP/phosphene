@@ -115,3 +115,50 @@ A single ingestion cycle with 10 content items where 3 are accepted and Phase 2 
 Where N = content items polled, A = items accepted, C = coherent clusters formed.
 
 The attention filter is by far the most API-intensive module on a per-activation basis. Most of the system's daily token budget goes to deciding what to pay attention to, not to the writing itself.
+
+## Project Status
+
+7 modules complete, 574 tests passing, 98% coverage.
+
+### What's Built
+
+**Memory Store** — Three-tier hierarchical memory (daily log → pattern layer → personality files). CRUD, index layer, embedding search, graph operations, decay with link-density weighting, supersession, density metrics API.
+
+**Attention Filter** — Personality-driven content selection. Prompt-criteria scoring (LLM), structural scoring (link density, unresolvedness, friction, cluster novelty), triple-gate blend that shifts from prompt-weighted to structure-weighted as network density grows, assertion extraction, annotation generation, wild-card sampling, near-miss recording.
+
+**Source Ingestion** — Adapter framework with RSS, Telegram channel, Reddit, human-share (DM the bot), and corpus import (LiveJournal, Twitter, blog, plain text). Durable last-seen markers. URL fetching for shared links.
+
+**Gateway** — Multi-platform message bus. Telegram outbound (text/markdown/telegraph), inbound polling, feedback signal dispatch (reactions/replies/forwards/edits). Adapter registry with local log fallback.
+
+**Generator + Output Router** — Prompted, response, and free-play generation from personality context. Skeptical memory verification (checks Tier 3 claims against recent Tier 1). Output routing by intent tag and content length. Provider-failure rotation.
+
+**Distillation** — T1→T2: RAPTOR clustering with coherence gating, assertion cache. T2→T3: two-step reflect-evolve with version-count inertia, personality supersession, compression caps, feedback-derived criteria adjustments. Gate evaluation, consolidation locking, persisted run metadata.
+
+**Feedback Collector (Phase 7.1)** — In-memory output tracking, immediate feedback normalization (reactions/replies/forwards → feedback events), Tier 1 feedback-note writes, silence detection, bounded pruning, positive-feedback unresolvedness bumps.
+
+### Pre-Module-7 Hardening
+
+Two hardening phases implemented recommendations from an external design review:
+
+- **Attention Filter additions** — Wild-card accepts (random below-threshold sampling to prevent filter tunnel vision) and near-miss recording (items that almost passed, annotated for later review).
+- **Unresolvedness + Diagnostics** — Pure `compute_unresolvedness()` utility decoupled from Memory Store, and `tools/network_diagnostics.py` for inspecting memory graph health (link density distribution, unresolved thread counts, cluster statistics).
+
+### What's Left to MVP
+
+**MVP Orchestrator** — 3 phases wiring all existing modules into a running system:
+
+1. Public types, config validation, croniter-based cron loop, start/stop/trigger lifecycle
+2. Activation wiring: ingestion (poll→filter→store), distillation (gates→distill), generation (bootstrap check→generate→route→send), respond (Gateway listener), decay
+3. Error isolation, activation logging, bootstrap transition proof, end-to-end integration test, restart recovery
+
+After that: seed corpus, configure adapters, deploy as systemd service.
+
+### What's Left to Full Features
+
+| Feature | What it adds |
+|---------|-------------|
+| Feedback Collector Phase 7.2 | Delayed engagement checks, durable engagement heuristics |
+| Explorer | Link-following from accepted content, pre-fetch scoring, source subscription proposals |
+| Full Orchestrator | Lateral freedom, tension-responsive scheduling, ambient context, budget banking, debt accounting, cool-down windows, under-engaged material resurfacing |
+| Reviewer Panel | Multi-model evaluation of outputs for feedback calibration |
+| Model Router | Runtime subscription rotation across providers |

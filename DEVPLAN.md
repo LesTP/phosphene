@@ -1,7 +1,7 @@
 ---
 phase: MVP.3
-blocked: true
-state: close
+blocked: false
+state: plan
 steps_remaining: 0
 ---
 

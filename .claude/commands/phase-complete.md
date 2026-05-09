@@ -9,13 +9,13 @@ Execute the phase completion protocol:
 2. Read each governance doc and identify needed updates:
    - **DEVPLAN.md**: Update Current Status. Reduce completed phase to a one-line
      summary with DEVLOG reference. Promote any new Gotchas (from steps 3–4 below).
-   - **DEVPLAN.md frontmatter**: Set `blocked: "awaiting-human-audit"`.
-     The `/close` bot command clears the gate by setting `blocked: null`
+   - **DEVPLAN.md frontmatter**: Set `blocked: true`.
+     The `/close` bot command clears the gate by setting `blocked: false`
      and `state: plan`. Do not write "awaiting human audit" in prose —
      the frontmatter `blocked` field is the single source of truth for gating.
-   - **DEVLOG.md**: Add phase completion entry. Move the `<!-- HISTORY` fence
-     up so only the just-completed phase's entries remain above it. If DEVLOG
-     exceeds ~500 lines below the fence, archive old entries to `DEVLOG_archive.md`.
+   - **DEVLOG.md**: Add phase completion entry at the bottom. Archive the
+     previous phase's DEVLOG entries to `DEVLOG_archive.md` (append at top
+     of archive, so archive reads newest-first).
    - **ARCHITECTURE.md**: Update Implementation Sequence table status.
      Format: "Phase N complete" after each phase, or "Complete" if this was
      the module's final phase.

@@ -18,9 +18,13 @@ If this is the first phase of a module, update the module's Status in
 ARCHITECTURE.md's Implementation Sequence table to "In progress".
 
 Update DEVPLAN with the phase plan. Set frontmatter `state: execute`.
+If `steps_remaining` is present, decrement it by 1.
 Log scope decisions to DECISIONS.md. Commit.
 
-**If autonomous:** Exit after commit.
+**If autonomous:**
+If `steps_remaining > 0` and state is `execute`: continue to first step.
+Otherwise: emit exit signal.
+
 **If supervised:** Present the plan for human review before committing.
 
 Do not write code. This is Discuss mode only.

@@ -138,9 +138,9 @@ Organize findings as:
 2. Apply remaining review fixes
 3. **DEVLOG learning review** — scan this phase's DEVLOG entries for trial-and-error patterns. Extract prescriptive one-liners and promote to DEVPLAN Gotchas.
 4. **Contract scan** — scan DEVLOG for Contract Changes markers. Propagate to upstream documents.
-5. **DEVPLAN cleanup** — reduce completed phase to a one-line summary with DEVLOG reference. If DEVLOG exceeds ~500 lines, archive completed module entries to `DEVLOG_archive.md`.
+5. **DEVPLAN cleanup** — reduce completed phase to a one-line summary with DEVLOG reference. Archive the previous phase's DEVLOG entries to `DEVLOG_archive.md`.
 6. Update module Status in ARCHITECTURE.md's Implementation Sequence table.
-7. Set DEVPLAN frontmatter: `blocked: "awaiting-human-audit"`. The `/close` bot command (or human) clears the gate by setting `blocked: null`.
+7. Set DEVPLAN frontmatter: `blocked: true`. The `/close` bot command (or human) clears the gate by setting `blocked: false`.
 
 ---
 
@@ -210,11 +210,11 @@ Every project maintains:
 ```yaml
 ---
 phase: 3b
-blocked: null
+blocked: false
 ---
 ```
 
-`blocked` is the single source of truth for whether work is gated. When set (e.g., `"awaiting-human-audit"`), no work should proceed until it is cleared to `null`.
+`blocked` is the single source of truth for whether work is gated. When `true`, no work should proceed until it is cleared to `false`.
 
 Projects using autonomous execution add a `state` field — see WORKER_SPEC.md.
 
@@ -241,7 +241,7 @@ Projects using autonomous execution add a `state` field — see WORKER_SPEC.md.
 [Free-form prose: what was done, decisions made, issues encountered]
 ```
 
-**Archival rule:** When DEVLOG exceeds ~500 lines, move completed module entries to `DEVLOG_archive.md`. Use a `<!-- HISTORY` fence to separate active from archived content.
+**Archival rule:** DEVLOG is append-only — new entries go at the bottom (newest last). During phase completion, move the previous phase's entries to `DEVLOG_archive.md`. The active DEVLOG should contain only the current phase's entries.
 
 ### Decision Log
 

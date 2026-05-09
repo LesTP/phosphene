@@ -24,9 +24,8 @@ fence) in a **single command**:
 cat CODEX.md && echo '---SPLIT---' && cat WORKER_SPEC.md && echo '---SPLIT---' && awk '/HISTORY/{exit} {print}' DEVPLAN.md
 ```
 
-**DEVLOG.md fence:** When reading or writing to DEVLOG.md, stop at the
-HISTORY fence. Insert new entries **above** the fence block. Do not read or
-patch content below it.
+**DEVLOG.md:** Append new entries at the bottom (newest last). During phase
+close, archive the previous phase's entries to `DEVLOG_archive.md`.
 
 ### Tier 2 — Current module (mandatory for execute/review/close actions)
 
@@ -105,17 +104,18 @@ you need in the **same command**.
 ## Action Instructions
 
 WORKER_SPEC.md defines four states. Read `state` from DEVPLAN frontmatter
-and execute the matching action. Perform **exactly one** per iteration.
+and execute the matching action. Perform **exactly one** per iteration
+unless `steps_remaining` > 0 (see WORKER_SPEC.md §4 for multi-step budget).
 
 ### state: plan
 1. Read `.claude/commands/phase-plan.md` and follow its instructions.
 2. Set DEVPLAN frontmatter `state: execute`. Commit.
-3. Emit exit signal and stop.
+3. Emit exit signal and stop (or continue to first step if steps_remaining > 0).
 
 ### state: execute
 1. Pick the next step from DEVPLAN. Do all file read/write work.
 2. Run tests. Read `.claude/commands/step-done.md` and follow its instructions.
-3. Emit exit signal and stop. Do **not** start the next step.
+3. Emit exit signal and stop. Do **not** start the next step unless `steps_remaining > 0`.
 
 ### state: review
 1. Read `.claude/commands/phase-review.md` and follow its instructions.
@@ -124,7 +124,7 @@ and execute the matching action. Perform **exactly one** per iteration.
 
 ### state: close
 1. Read `.claude/commands/phase-complete.md` and follow its instructions.
-2. Set DEVPLAN frontmatter `blocked: "awaiting-human-audit"`. Commit.
+2. Set DEVPLAN frontmatter `blocked: true`. Commit.
 3. Emit exit signal with ESCALATE and stop.
 
 ## Output Contract
