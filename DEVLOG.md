@@ -112,3 +112,14 @@ DECISIONS.md and PROJECT.md: no open decisions or project risks were resolved by
 Planned MVP Orchestrator Phase 3 as Build work under `ARCH_orchestrator_mvp.md`: dispatch-level error isolation, activation logging, bootstrap transition proof, end-to-end fake-module validation, and restart recovery verification. The phase stays inside the MVP boundary with no lateral freedom, ambient context, Feedback Collector integration, Explorer integration, or orchestrator-owned durable state beyond the optional activation log.
 
 DEVPLAN now transitions to `state: execute`, decrements `steps_remaining` to 7, and keeps focus on MVP.3.1 error isolation.
+
+### Step MVP.3.1: Error isolation
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added dispatch-level activation isolation for scheduled/manual activations and inbound respond handling. Unexpected module exceptions now return `ActivationResult(success=False, outputs_delivered=0, error=str(exc))` with duration populated instead of escaping the activation.
+
+Added orchestrator tests proving a throwing source ingestion module returns a failed activation result and does not prevent a subsequent decay activation in the same loop iteration. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (36 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (610 passed). DEVPLAN now keeps `state: execute`, decrements `steps_remaining` to 6, and moves focus to MVP.3.2 activation logging.

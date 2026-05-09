@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from time import sleep
+from time import perf_counter, sleep
+from typing import Callable
 
 from croniter import croniter
 
@@ -106,19 +107,39 @@ class MVPOrchestrator:
             raise UnknownTaskTypeError(f"unknown task type: {task_type}")
 
         if task_type == "ingestion":
-            return self._run_ingestion()
+            return self._run_isolated_activation(task_type, self._run_ingestion)
         if task_type == "distillation":
-            return self._run_distillation()
+            return self._run_isolated_activation(task_type, self._run_distillation)
         if task_type == "generation":
-            return self._run_generation()
+            return self._run_isolated_activation(task_type, self._run_generation)
         if task_type == "decay":
-            return self._run_decay()
+            return self._run_isolated_activation(task_type, self._run_decay)
 
         return ActivationResult(
             task_type=task_type,
             success=True,
             outputs_delivered=0,
         )
+
+    def _run_isolated_activation(
+        self,
+        task_type: str,
+        runner: Callable[[], ActivationResult],
+    ) -> ActivationResult:
+        started_at = perf_counter()
+        try:
+            result = runner()
+        except Exception as exc:
+            return ActivationResult(
+                task_type=task_type,
+                success=False,
+                outputs_delivered=0,
+                error=str(exc),
+                duration_ms=_elapsed_ms(started_at),
+            )
+
+        result.duration_ms = _elapsed_ms(started_at)
+        return result
 
     def _run_ingestion(self) -> ActivationResult:
         results = self.modules.source_ingestion.poll()
@@ -219,6 +240,12 @@ class MVPOrchestrator:
         )
 
     def _run_respond(self, message: object) -> ActivationResult:
+        return self._run_isolated_activation(
+            "respond",
+            lambda: self._run_respond_inner(message),
+        )
+
+    def _run_respond_inner(self, message: object) -> ActivationResult:
         try:
             context = self.modules.memory_store.get_personality_context()
             if not context.personality_files:
@@ -296,6 +323,10 @@ def _normalize_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((perf_counter() - started_at) * 1000)
 
 
 def _note_input_from_fragment(fragment: object) -> NoteInput:

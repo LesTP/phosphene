@@ -80,6 +80,11 @@ class FakeSourceIngestion:
         return self.results
 
 
+class ThrowingSourceIngestion:
+    def poll(self) -> list[object]:
+        raise RuntimeError("source unavailable")
+
+
 class FakeAttentionFilter:
     def __init__(self, accepted: list[object]) -> None:
         self.accepted = accepted
@@ -368,6 +373,59 @@ def test_trigger_decay_calls_run_decay_and_returns_success() -> None:
     assert result.success is True
     assert result.outputs_delivered == 0
     assert result.error is None
+    assert memory_store.decay_calls == 1
+
+
+def test_trigger_returns_failed_result_when_module_raises() -> None:
+    instance = MVPOrchestrator(
+        build_modules(source_ingestion=ThrowingSourceIngestion()),
+        build_config(),
+    )
+
+    result = instance.trigger("ingestion")
+
+    assert result.task_type == "ingestion"
+    assert result.success is False
+    assert result.outputs_delivered == 0
+    assert result.error == "source unavailable"
+    assert result.duration_ms >= 0
+
+
+def test_start_continues_to_next_due_activation_after_module_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingestion = ScheduleEntry(task_type="ingestion", cron="0 * * * *")
+    decay = ScheduleEntry(task_type="decay", cron="0 * * * *")
+    memory_store = RecordingMemoryStore()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            source_ingestion=ThrowingSourceIngestion(),
+        ),
+        build_config(schedule=[ingestion, decay]),
+    )
+
+    def fake_sleep(seconds: int) -> None:
+        assert seconds == 60
+
+    monkeypatch.setattr(orchestrator_module, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        instance,
+        "_next_due_entries",
+        lambda now: [ingestion, decay],
+    )
+    monkeypatch.setattr(instance, "stop", lambda: setattr(instance, "_stop_requested", True))
+
+    original_run_decay = memory_store.run_decay
+
+    def stop_after_decay() -> None:
+        original_run_decay()
+        instance.stop()
+
+    memory_store.run_decay = stop_after_decay
+
+    instance.start()
+
     assert memory_store.decay_calls == 1
 
 

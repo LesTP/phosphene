@@ -2,7 +2,7 @@
 phase: MVP.3
 blocked: false
 state: execute
-steps_remaining: 7
+steps_remaining: 6
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 7
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Step 1: Error isolation.
+- **Focus** — Step 2: Activation logging.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 
@@ -54,7 +54,7 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 **Steps:**
 
-1. **Error isolation** — Wrap each `_run_*` call in try/except at the dispatch level. Any unhandled exception from a module produces `ActivationResult(success=False, error=str(exc))`. The main loop continues — one failed activation never stops the system. Tests verify that a throwing module doesn't prevent subsequent activations in the same loop iteration.
+1. **Error isolation** — Complete. Dispatch wraps `_run_*` calls in try/except, unhandled module exceptions produce `ActivationResult(success=False, error=str(exc))`, and loop tests verify a failed activation does not prevent subsequent activations in the same iteration.
 
 2. **Activation logging** — When `config.log_path` is set, append a JSON-serialized `ActivationResult` line after each activation. Use atomic write (write to temp, rename) to avoid partial lines on crash. Tests verify log file content after multiple activations, and that missing log_path means no file I/O.
 
