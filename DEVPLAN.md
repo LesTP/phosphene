@@ -52,6 +52,15 @@ Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener 
 
 Complete. Hardened the MVP Orchestrator with activation-level error isolation, JSONL activation logging, bootstrap transition proof, end-to-end fake-module integration coverage, restart recovery verification, and log-write failure isolation. See `DEVLOG.md` Phase MVP.3 entries for details.
 
+## Immediate Todos
+
+*From network optimums analysis session (May 2026). Pick-one-next.*
+
+1. **Launch MVP** — Seed corpus import, configure adapters (Telegram, RSS), deploy as systemd service, validate 48hr unattended operation. The system can start churning now.
+2. **Louvain community detection** — Replace agglomerative clustering (in simulation and potentially in distillation) with Louvain. No need to specify k, has resolution parameter, supports weighted edges, hierarchical output maps to tier structure. Prototype in simulation first. See NETWORK_OPTIMUMS.md.
+3. **Multilingual embedding model** — Switch from `all-MiniLM-L6-v2` to a multilingual model (e.g., `paraphrase-multilingual-MiniLM-L12-v2`). Current model groups all Russian text together regardless of topic. Would change terrain significantly and may affect optimal `sim_threshold`.
+4. **Tuning panel** — Parameter control interface ("cobwebbed panel with staticky knobs") for live adjustment of sim_threshold, retention days, ingestion rate, prune cycle, unresolvedness weights. Observe network behavior changes in real time.
+
 ## Deferred Work
 
 ### Feedback Collector Phase 7.2 (post-MVP)
