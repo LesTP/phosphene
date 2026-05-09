@@ -140,11 +140,23 @@ class MVPOrchestrator:
                 error=str(exc),
                 duration_ms=_elapsed_ms(started_at),
             )
-            self._append_activation_log(result)
-            return result
+            return self._finalize_activation_result(result)
 
         result.duration_ms = _elapsed_ms(started_at)
-        self._append_activation_log(result)
+        return self._finalize_activation_result(result)
+
+    def _finalize_activation_result(self, result: ActivationResult) -> ActivationResult:
+        try:
+            self._append_activation_log(result)
+        except Exception as exc:
+            return ActivationResult(
+                task_type=result.task_type,
+                success=False,
+                outputs_delivered=result.outputs_delivered,
+                error=f"activation log failed: {exc}",
+                duration_ms=result.duration_ms,
+                timestamp=result.timestamp,
+            )
         return result
 
     def _append_activation_log(self, result: ActivationResult) -> None:

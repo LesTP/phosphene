@@ -475,6 +475,27 @@ def test_activation_log_is_not_written_when_log_path_missing(tmp_path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
+def test_activation_log_write_failure_returns_failed_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    instance = MVPOrchestrator(
+        build_modules(memory_store=RecordingMemoryStore()),
+        build_config(log_path=tmp_path / "activation.jsonl"),
+    )
+
+    def fail_replace(source: str, destination: Path) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(orchestrator_module.os, "replace", fail_replace)
+
+    result = instance.trigger("decay")
+
+    assert result.success is False
+    assert result.outputs_delivered == 0
+    assert result.error == "activation log failed: disk full"
+
+
 def test_trigger_ingestion_polls_filters_and_stores_accepted_fragments() -> None:
     item_a = SimpleNamespace(content="first", source="rss")
     item_b = SimpleNamespace(content="second", source="telegram")

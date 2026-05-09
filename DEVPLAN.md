@@ -1,8 +1,8 @@
 ---
 phase: MVP.3
 blocked: false
-state: review
-steps_remaining: 2
+state: close
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -32,7 +32,7 @@ steps_remaining: 2
 
 - **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
 - **Phase** — MVP.3: Integration hardening.
-- **Focus** — Phase review.
+- **Focus** — Phase close.
 - **Blocked/Broken** — See frontmatter gate.
 - **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
 

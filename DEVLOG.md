@@ -167,3 +167,14 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/or
 Added restart recovery coverage for the MVP Orchestrator's stateless boundary. The test constructs an orchestrator, advances its in-memory schedule state, triggers ingestion, then constructs a second orchestrator with the same config and shared Memory Store boundary. The new instance starts with fresh schedule tracking while stored notes, simulated distillation metadata, and personality context remain available for generation.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (41 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (615 passed). All MVP.3 implementation steps are complete, so DEVPLAN now transitions to `state: review` and decrements `steps_remaining` to 2.
+
+### Phase MVP.3 Review: Integration hardening
+
+**Date:** 2026-05-09
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Reviewed MVP.3 against `ARCH_orchestrator_mvp.md`. Must fix: activation log write failures could escape the isolation wrapper and stop the loop; fixed by finalizing activation results through a log-safe path that returns `success=False` with an activation-log error if logging fails. Should fix: none. Optional: none.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/orchestrator` (42 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (616 passed). DEVPLAN now transitions to `state: close` and decrements `steps_remaining` to 1.
