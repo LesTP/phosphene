@@ -1,5 +1,5 @@
 ---
-phase: MVP.3
+phase: MVP.4
 blocked: false
 state: plan
 steps_remaining: 0
@@ -30,11 +30,11 @@ steps_remaining: 0
 
 ## Current Status
 
-- **Module** — MVP Orchestrator (skipping ahead of Module 7 Phase 2 and Module 8 to reach MVP).
-- **Phase** — MVP.3: Integration hardening.
-- **Focus** — Phase complete.
+- **Module** — MVP Orchestrator
+- **Phase** — MVP.4: Bootstrap and first run
+- **Focus** — Write the bootstrap script that wires all modules and runs the system.
 - **Blocked/Broken** — See frontmatter gate.
-- **Contract** — ARCH_orchestrator_mvp.md (strict subset of ARCH_orchestrator.md)
+- **Contract** — ARCH_orchestrator_mvp.md
 
 ## MVP Orchestrator
 
@@ -42,15 +42,64 @@ steps_remaining: 0
 
 ### Phase MVP.1: Contract and cron loop
 
-Complete. Delivered the MVP Orchestrator public contract, constructor validation, cron due-entry evaluation, start/stop/trigger lifecycle, Phase 1 stub dispatch, and foundation tests. See `DEVLOG.md` Phase MVP.1 entries for details.
+Complete. See `DEVLOG_archive.md`.
 
 ### Phase MVP.2: Activation wiring
 
-Complete. Wired ingestion, distillation, generation/bootstrap, respond/listener dispatch, and decay activations to Modules 1-6 with fake-module verification. See `DEVLOG_archive.md` Phase MVP.2 entries for details.
+Complete. See `DEVLOG_archive.md`.
 
 ### Phase MVP.3: Integration hardening
 
-Complete. Hardened the MVP Orchestrator with activation-level error isolation, JSONL activation logging, bootstrap transition proof, end-to-end fake-module integration coverage, restart recovery verification, and log-write failure isolation. See `DEVLOG.md` Phase MVP.3 entries for details.
+Complete. See `DEVLOG.md`.
+
+### Phase MVP.4: Bootstrap and first run
+
+Write the entry-point script (`run.py`) that instantiates all 6 modules from real configs, reads secrets from `.env`, and starts the orchestrator. This is pure wiring — no new module code.
+
+**Work regime:** Build (testable — the script either starts and processes a cycle, or it doesn't).
+
+**Prerequisites already met:**
+- All 6 modules implemented and tested (616 tests, 98% coverage)
+- MVP Orchestrator complete with error isolation, logging, restart recovery
+- Corpus adapters for LJ (ljsm), Blogspot (atom), and plain text
+- Embedding model selected: `paraphrase-multilingual-MiniLM-L12-v2` (D-52)
+- Telegram bot configured (`.env` with token + chat ID)
+- Anthropic API key in `.env`
+
+**Steps:**
+
+1. **Create `run.py`** — Entry-point script that:
+   - Reads `.env` (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ANTHROPIC_API_KEY)
+   - Instantiates `MemoryStore` (vault path: `./vault/`)
+   - Instantiates `AttentionFilter` with `EmbeddingConfig(model='paraphrase-multilingual-MiniLM-L12-v2')`
+   - Instantiates `SourceIngestion` with adapter configs for: corpus_livejournal (ljsm, LJ Backup path), corpus_blogspot (2 atom files), corpus_text (seed/*.txt)
+   - Instantiates `DistillationEngine` with embedding and LLM configs
+   - Instantiates `Generator` with LLM config and `RouterConfig`
+   - Instantiates `Gateway` with Telegram adapter (bot token, chat ID)
+   - Builds `MVPOrchestratorConfig` with schedule entries (ingestion every 6h, distillation daily, generation every 12h, decay daily)
+   - Wires `ModuleRefs`, constructs `MVPOrchestrator`
+   - Adds CLI args: `--seed-only` (run one ingestion cycle and exit), `--once` (run one full activation cycle), default (cron loop)
+   - Test: script imports successfully and `--help` works
+
+2. **Test seed-only mode** — Run `python run.py --seed-only` against the real corpus archives:
+   - Verify adapters find and parse the HTML/atom files
+   - Verify embedding model loads and produces vectors
+   - Verify notes are written to `./vault/` as Obsidian-compatible markdown
+   - Count ingested notes vs expected (~3500 raw, filtered by attention filter)
+   - Test: vault directory contains tier-1 notes with frontmatter
+
+3. **Test single activation cycle** — Run `python run.py --once`:
+   - Ingestion: poll adapters (should be no-op after seed since markers are set)
+   - Distillation: check gates, run T1→T2 if volume threshold met
+   - Generation: load personality context, generate one output
+   - Decay: run decay cycle
+   - Test: activation log written, no crashes, generation output is non-empty
+
+4. **Test Telegram delivery** — Run generation and verify output reaches Telegram:
+   - Gateway sends generated text to configured chat ID
+   - Test: message received on Telegram (manual verification — ESCALATE for human check)
+
+**Note for autonomous loop:** Steps 1–3 are Build work, fully automatable. Step 4 requires manual verification of the Telegram message — ESCALATE at that point for human sign-off.
 
 ## Immediate Todos
 
