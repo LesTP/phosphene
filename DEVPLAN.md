@@ -57,6 +57,9 @@ Complete. Hardened the MVP Orchestrator with activation-level error isolation, J
 *From network optimums analysis session (May 2026). Pick-one-next.*
 
 1. **Launch MVP** — Seed corpus import, configure adapters (Telegram, RSS), deploy as systemd service, validate 48hr unattended operation. The system can start churning now.
+   - **Bulk seed**: LJ (ljsm, `format: "ljsm"`), Blogspot (2 atom files), seed text files. ~3500 chunks total.
+   - **Embedding model**: `paraphrase-multilingual-MiniLM-L12-v2` (D-52).
+   - **Model migration** (D-53): If model changes later, re-embed all living notes before scoring. Steps: (1) update `EmbeddingConfig.model` in orchestrator config, (2) iterate all notes with stored embeddings, (3) re-embed with new model, (4) update stored vectors, (5) clear embedding cache. Scriptable, ~minutes on CPU for <5K notes. Invalidates similarity-based metadata (link counts, unresolvedness) — run a full decay + recompute cycle after migration.
 2. **Leiden community detection (with A/B vs alternatives)** — Replace agglomerative clustering with Leiden (strict improvement over Louvain: same UX, no disconnected-community pathology, often higher modularity). Plan A/B against HDBSCAN-on-embeddings as a paradigm contrast (graph-modularity vs density-on-vectors). Prototype in simulation first. See `notebooks/CLUSTERING_AB_PLAN.md` and `notebooks/NETWORK_OPTIMUMS.md`.
 3. ~~**Multilingual embedding model**~~ — DONE (D-52). Using `paraphrase-multilingual-MiniLM-L12-v2`. Cross-lingual gap reduced 80%. Model switchable per D-53.
 4. **Tuning panel** — Parameter control interface ("cobwebbed panel with staticky knobs") for live adjustment of sim_threshold, retention days, ingestion rate, prune cycle, unresolvedness weights. Observe network behavior changes in real time.
