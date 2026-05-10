@@ -7,3 +7,4 @@ logs/
 seed/
 notebooks/*.py
 notebooks/*.ipynb
+.env
