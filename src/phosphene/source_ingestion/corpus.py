@@ -36,6 +36,27 @@ _HTML_CONTENT_RE = re.compile(r"content=[\"']([^\"']+)[\"']", re.IGNORECASE)
 _HTML_TIME_RE = re.compile(
     r"<time\s+[^>]*datetime=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE
 )
+_LJSM_DATE_RE = re.compile(
+    r"(\d{4})</a>-<a[^>]*>(\d{2})</a>-<a[^>]*>(\d{2})</a>\s+(\d{2}:\d{2}:\d{2})"
+)
+_LJSM_COMMENTS_RE = re.compile(
+    r"<div\s+id=[\"']Comments[\"'].*", re.DOTALL | re.IGNORECASE
+)
+_LJSM_CONTENT_RE = re.compile(
+    r"<div\s+style=[\"']margin-left:\s*30px[\"']>(.*?)(?:</div>\s*<br|</div>\s*$)",
+    re.DOTALL,
+)
+_LJSM_COMMENT_RE = re.compile(
+    r"<table\s+id=[\"']ljcmt(\d+)[\"'][^>]*>.*?</table>",
+    re.DOTALL,
+)
+_LJSM_COMMENT_USER_RE = re.compile(
+    r"lj:user=[\"']([^\"']+)[\"']",
+)
+_LJSM_COMMENT_PARENT_RE = re.compile(
+    r'<a\s+href=["\'][^"\']*thread=(\d+)[^"\']*["\'][^>]*>Parent</a>',
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -95,19 +116,30 @@ class CorpusBlogAdapter:
 
 
 class CorpusLiveJournalAdapter:
-    """Import LiveJournal-style HTML exports from a local path."""
+    """Import LiveJournal-style HTML exports from a local path.
+
+    Supports two formats via ``config.params["format"]``:
+
+    * ``"html"`` (default) — generic LJ HTML exports with ``<time>`` or
+      ``<meta>`` date tags.
+    * ``"ljsm"`` — ljsm (LiveJournal Suck Machine) backups.  Extracts
+      dates from the linked ``YYYY-MM-DD HH:MM:SS`` pattern in the page
+      body and strips the comments section.
+    """
 
     def __init__(self, config: AdapterConfig, ingestion_config: IngestionConfig) -> None:
         self.config = config
         self.ingestion_config = ingestion_config
         self.archive_path = Path(str(config.params["archive_path"]))
+        fmt = config.params.get("format", "html")
+        self._parser = _parse_ljsm_html_document if fmt == "ljsm" else _parse_html_document
 
     def poll(self, last_seen_marker: LastSeenMarker) -> AdapterPollResult:
         return _poll_local_corpus(
             archive_path=self.archive_path,
             source="corpus_livejournal",
             allowed_suffixes=_HTML_SUFFIXES,
-            parse_document=_parse_html_document,
+            parse_document=self._parser,
             last_seen_marker=last_seen_marker,
             ingestion_config=self.ingestion_config,
         )
@@ -323,6 +355,118 @@ def _parse_html_document(path: Path) -> _CorpusDocument:
         title=extracted.title or path.stem,
         author=None,
         parts=_split_text_parts(extracted.text),
+        linked_urls=extracted.linked_urls or [],
+    )
+
+
+def _extract_ljsm_comment_replies(
+    html: str, journal_user: str = "lestp",
+) -> list[str]:
+    """Extract the journal owner's comment replies with parent context.
+
+    Returns a list of text parts, each formatted as:
+        [context: username] parent comment text
+        [reply] your reply text
+    """
+    # Parse all comments into a dict: comment_id -> (user, body_html)
+    comments: dict[str, tuple[str, str]] = {}
+    for match in _LJSM_COMMENT_RE.finditer(html):
+        cmt_id = match.group(1)
+        cmt_html = match.group(0)
+        user_match = _LJSM_COMMENT_USER_RE.search(cmt_html)
+        if not user_match:
+            continue
+        user = user_match.group(1)
+        # Extract comment body: second <td> in the table (after the header row)
+        body_match = re.search(
+            r"</tr>\s*<tr[^>]*>\s*<td>(.*?)</td>\s*</tr>",
+            cmt_html,
+            re.DOTALL,
+        )
+        if not body_match:
+            continue
+        comments[cmt_id] = (user, body_match.group(1))
+
+    # Find parent relationships
+    parent_map: dict[str, str] = {}
+    for match in _LJSM_COMMENT_RE.finditer(html):
+        cmt_id = match.group(1)
+        parent_match = _LJSM_COMMENT_PARENT_RE.search(match.group(0))
+        if parent_match:
+            parent_map[cmt_id] = parent_match.group(1)
+
+    # Build reply parts: only for journal_user's comments that have a parent
+    parts: list[str] = []
+    for cmt_id, (user, body_html) in comments.items():
+        if user != journal_user:
+            continue
+        parent_id = parent_map.get(cmt_id)
+        if not parent_id or parent_id not in comments:
+            continue
+
+        parent_user, parent_body_html = comments[parent_id]
+        if parent_user == journal_user:
+            continue  # skip self-replies (threading artifacts)
+
+        parent_text = html_to_text(parent_body_html).text.strip()
+        reply_text = html_to_text(body_html).text.strip()
+
+        # Strip LJ navigation cruft from comment text
+        parent_text = re.sub(
+            r"\s*\(\s*(?:Reply to this|Thread|Parent)\s*\)\s*", "", parent_text
+        ).strip()
+        reply_text = re.sub(
+            r"\s*\(\s*(?:Reply to this|Thread|Parent)\s*\)\s*", "", reply_text
+        ).strip()
+
+        if not reply_text:
+            continue
+
+        if parent_text:
+            part = f"[context: {parent_user}] {parent_text}\n\n[reply] {reply_text}"
+        else:
+            part = reply_text
+        parts.append(part)
+
+    return parts
+
+
+def _parse_ljsm_html_document(path: Path) -> _CorpusDocument:
+    """Parse ljsm (LiveJournal Suck Machine) HTML exports.
+
+    Strips the comments section and extracts only the post body from
+    the ``margin-left: 30px`` content div.  Falls back to full-page
+    extraction if the content div is not found.
+    """
+    content = path.read_text(encoding="utf-8")
+    timestamp = _html_datetime(content) or _file_timestamp(path)
+
+    # Try to extract just the post body from the content div
+    body_match = _LJSM_CONTENT_RE.search(content)
+    if body_match:
+        body_html = body_match.group(1)
+        # Strip metadata table (Current mood, Current music, Entry tags)
+        body_html = re.sub(
+            r"<table\b[^>]*>.*?</table>", "", body_html, count=1, flags=re.DOTALL
+        )
+    else:
+        # Fall back: strip comments section if present, use full page
+        body_html = _LJSM_COMMENTS_RE.sub("", content)
+
+    extracted = html_to_text(body_html)
+    # Title from <title> of the full page (not the stripped body)
+    full_extracted = html_to_text(content)
+    title = full_extracted.title or path.stem
+    # Strip "username: " prefix from ljsm titles
+    if title and ": " in title:
+        title = title.split(": ", 1)[1]
+
+    return _CorpusDocument(
+        path=path,
+        timestamp=timestamp,
+        title=title,
+        author=None,
+        parts=_split_text_parts(extracted.text) + _extract_ljsm_comment_replies(content),
         linked_urls=extracted.linked_urls or [],
     )
 
@@ -712,12 +856,19 @@ def _html_datetime(content: str) -> datetime | None:
             return parsed
 
     meta_match = _HTML_META_RE.search(content)
-    if not meta_match:
-        return None
-    content_match = _HTML_CONTENT_RE.search(meta_match.group(0))
-    if not content_match:
-        return None
-    return _parse_datetime(content_match.group(1))
+    if meta_match:
+        content_match = _HTML_CONTENT_RE.search(meta_match.group(0))
+        if content_match:
+            parsed = _parse_datetime(content_match.group(1))
+            if parsed is not None:
+                return parsed
+
+    ljsm_match = _LJSM_DATE_RE.search(content)
+    if ljsm_match:
+        date_str = f"{ljsm_match.group(1)}-{ljsm_match.group(2)}-{ljsm_match.group(3)} {ljsm_match.group(4)}"
+        return _parse_datetime(date_str)
+
+    return None
 
 
 def _document_marker(path: Path, timestamp: datetime, index: int) -> str:
