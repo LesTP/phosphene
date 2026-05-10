@@ -364,3 +364,17 @@ Priority: Important
 Decision: Phase MVP.3 will run as Build work in five testable steps: dispatch-level error isolation, activation logging, bootstrap transition proof, end-to-end fake-module validation, and restart recovery verification. The phase remains inside `ARCH_orchestrator_mvp.md`: no lateral freedom, no ambient context, no Feedback Collector integration, no Explorer integration, and no orchestrator-owned durable state beyond the optional activation log.
 Rationale: MVP.2 established each activation path independently. MVP.3 needs to prove those paths can run unattended as one system: one failing activation must not stop later work, logs must be recoverable enough for monitoring, bootstrap must transition during a live session, the content path must be covered end to end, and restart behavior must derive from config plus Memory Store durability rather than hidden scheduler state.
 Revisit if: Integration hardening reveals a missing cross-module contract, or restart recovery cannot be proven without adding orchestrator-owned durable state.
+
+D-52: Use paraphrase-multilingual-MiniLM-L12-v2 as the embedding model
+Date: 2026-05-10 | Status: Closed
+Priority: Critical
+Decision: Switch from `all-MiniLM-L6-v2` (English-only, 384-dim) to `paraphrase-multilingual-MiniLM-L12-v2` (50+ languages, 384-dim) for all embedding operations.
+Rationale: Empirical terrain analysis on the full corpus (3532 chunks, 74% Russian / 25% English) showed the English-only model creates a language wall: cross-lingual similarity 0.105 vs within-Russian 0.480 (gap=0.375). The multilingual model reduces this gap by 80% (cross-lingual 0.193, within-Russian 0.269, gap=0.076). Same 384-dim output, drop-in replacement. The multilingual model also naturally produces more selective similarity distributions (`sim_threshold=0.4` passes 11.5% vs 37% of pairs), which matches the grid search findings. RPi5 compatible (~118MB INT8, ~3× slower than MiniLM-L6 but acceptable for 100-500 note operations).
+Revisit if: Cross-lingual clustering proves insufficient in production (Russian and English text about the same topic not landing in the same clusters), in which case test `ai-forever/ru-en-RoSBERTa` (768-dim, purpose-built for RU↔EN) or `multilingual-e5-small` (384-dim, 2024 training with query/passage prefixes).
+
+D-53: Embedding model is switchable, not permanent
+Date: 2026-05-10 | Status: Open
+Priority: Important
+Decision: The embedding model choice is a runtime configuration, not a permanent commitment. Switching models requires re-embedding all living notes (a batch operation, ~minutes on CPU). Mitigation: store the active model name in Memory Store metadata; on startup, if the configured model differs from the stored model, trigger a re-embedding pass before any scoring operations.
+Rationale: Embedding model quality improves over time. Phosphene should be able to benefit from better models without requiring a vault rebuild. The 384-dim constraint (shared by MiniLM-L12 and e5-small families) means no storage format changes for the most likely upgrade path.
+Revisit if: A model upgrade requires a dimension change (e.g., to 768-dim), which would require vector storage migration in addition to re-embedding.
