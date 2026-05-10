@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
+import xml.etree.ElementTree as ET
 
 from phosphene.source_ingestion.adapters import (
     AdapterItemError,
@@ -236,6 +237,68 @@ def corpus_livejournal_adapter_factory(
     config: AdapterConfig, ingestion_config: IngestionConfig
 ) -> CorpusLiveJournalAdapter:
     return CorpusLiveJournalAdapter(config, ingestion_config)
+
+
+class CorpusBlogspotAdapter:
+    """Import Blogger/Blogspot Atom XML exports.
+
+    Parses the Atom feed, extracts posts and (optionally) the journal
+    owner's comment replies with parent context.  Other people's comments
+    are skipped.
+
+    Config params:
+        archive_path: Path to the .atom file (or directory containing .atom files).
+        author_name: Name to match for identifying the journal owner's comments
+                     (default: inferred from the first POST entry's author).
+    """
+
+    def __init__(self, config: AdapterConfig, ingestion_config: IngestionConfig) -> None:
+        self.config = config
+        self.ingestion_config = ingestion_config
+        self.archive_path = Path(str(config.params["archive_path"]))
+        self._author_name: str | None = config.params.get("author_name")
+
+    def poll(self, last_seen_marker: LastSeenMarker) -> AdapterPollResult:
+        try:
+            if self.archive_path.is_file():
+                paths = [self.archive_path]
+            elif self.archive_path.is_dir():
+                paths = sorted(self.archive_path.glob("*.atom"))
+            else:
+                raise FileNotFoundError(f"not found: {self.archive_path}")
+        except OSError as exc:
+            return AdapterPollResult(
+                errors=[AdapterItemError(error=str(exc), url=str(self.archive_path))],
+                next_marker=last_seen_marker,
+            )
+
+        items: list[ContentItem] = []
+        errors: list[AdapterItemError] = []
+        newest_marker = last_seen_marker
+
+        for path in paths:
+            try:
+                new_items = _parse_blogspot_atom(
+                    path, self._author_name, last_seen_marker, self.ingestion_config
+                )
+                items.extend(new_items)
+            except (OSError, UnicodeError, ET.ParseError) as exc:
+                errors.append(AdapterItemError(error=str(exc), url=str(path)))
+                continue
+
+        # Compute newest marker from items
+        for item in items:
+            marker = f"{item.timestamp.timestamp():020.6f}:{item.url or ''}:000000"
+            if is_marker_newer(marker, newest_marker):
+                newest_marker = marker
+
+        return AdapterPollResult(items=items, errors=errors, next_marker=newest_marker)
+
+
+def corpus_blogspot_adapter_factory(
+    config: AdapterConfig, ingestion_config: IngestionConfig
+) -> CorpusBlogspotAdapter:
+    return CorpusBlogspotAdapter(config, ingestion_config)
 
 
 def corpus_twitter_adapter_factory(
@@ -868,6 +931,188 @@ def _html_datetime(content: str) -> datetime | None:
         date_str = f"{ljsm_match.group(1)}-{ljsm_match.group(2)}-{ljsm_match.group(3)} {ljsm_match.group(4)}"
         return _parse_datetime(date_str)
 
+    return None
+
+
+_ATOM_NS = {
+    "atom": "http://www.w3.org/2005/Atom",
+    "blogger": "http://schemas.google.com/blogger/2018",
+}
+
+
+def _parse_blogspot_atom(
+    path: Path,
+    author_name: str | None,
+    last_seen_marker: LastSeenMarker,
+    ingestion_config: IngestionConfig,
+) -> list[ContentItem]:
+    """Parse a Blogger Atom XML export into ContentItems.
+
+    Extracts POST entries as primary content and the journal owner's
+    COMMENT replies with parent context.
+    """
+    tree = ET.parse(path)
+    root = tree.getroot()
+
+    # Index all entries by ID
+    posts: dict[str, ET.Element] = {}
+    comments: list[ET.Element] = []
+
+    for entry in root.findall("atom:entry", _ATOM_NS):
+        btype = entry.find("blogger:type", _ATOM_NS)
+        if btype is None:
+            continue
+        entry_id = entry.findtext("atom:id", "", _ATOM_NS)
+        if btype.text == "POST":
+            posts[entry_id] = entry
+        elif btype.text == "COMMENT":
+            comments.append(entry)
+
+    # Infer author name from first post if not provided
+    if author_name is None:
+        for entry in posts.values():
+            name_el = entry.find("atom:author/atom:name", _ATOM_NS)
+            if name_el is not None and name_el.text:
+                author_name = name_el.text
+                break
+
+    items: list[ContentItem] = []
+
+    # Process posts
+    for entry_id, entry in posts.items():
+        timestamp = _blogspot_timestamp(entry)
+        if timestamp is None:
+            continue
+
+        content_el = entry.find("atom:content", _ATOM_NS)
+        if content_el is None or not content_el.text:
+            continue
+
+        title_el = entry.find("atom:title", _ATOM_NS)
+        title = title_el.text if title_el is not None and title_el.text else None
+
+        # Content is HTML — extract text
+        extracted = html_to_text(content_el.text)
+        text = extracted.text.strip()
+        if not text:
+            continue
+
+        # Categories as tags
+        categories = [
+            cat.get("term", "")
+            for cat in entry.findall("atom:category", _ATOM_NS)
+            if cat.get("term")
+        ]
+
+        for part in _split_text_parts(text):
+            items.append(
+                build_content_item(
+                    content=part,
+                    source="corpus_blogspot",
+                    timestamp=timestamp,
+                    config=ingestion_config,
+                    url=str(path),
+                    linked_urls=extracted.linked_urls or [],
+                    title=title,
+                    author=author_name,
+                )
+            )
+
+    # Process author's comment replies with parent context
+    if author_name:
+        # Build a map of post ID -> post content for context
+        post_content_by_id: dict[str, str] = {}
+        for entry_id, entry in posts.items():
+            content_el = entry.find("atom:content", _ATOM_NS)
+            if content_el is not None and content_el.text:
+                post_content_by_id[entry_id] = html_to_text(content_el.text).text.strip()
+
+        # Build comment-by-ID map for comment-on-comment context
+        comment_by_id: dict[str, ET.Element] = {}
+        for cmt in comments:
+            cmt_id = cmt.findtext("atom:id", "", _ATOM_NS)
+            if cmt_id:
+                comment_by_id[cmt_id] = cmt
+
+        for cmt in comments:
+            # Only the journal owner's comments
+            cmt_author = cmt.find("atom:author/atom:name", _ATOM_NS)
+            if cmt_author is None or cmt_author.text != author_name:
+                continue
+
+            content_el = cmt.find("atom:content", _ATOM_NS)
+            if content_el is None or not content_el.text:
+                continue
+
+            reply_text = html_to_text(content_el.text).text.strip()
+            if not reply_text:
+                continue
+
+            timestamp = _blogspot_timestamp(cmt)
+            if timestamp is None:
+                continue
+
+            # Find parent — could be the post or another comment
+            parent_el = cmt.find("blogger:parent", _ATOM_NS)
+            parent_id = parent_el.text if parent_el is not None and parent_el.text else None
+
+            context_text = ""
+            context_user = ""
+            if parent_id and parent_id in comment_by_id:
+                # Parent is a comment
+                parent_cmt = comment_by_id[parent_id]
+                parent_author = parent_cmt.find("atom:author/atom:name", _ATOM_NS)
+                context_user = (parent_author.text or "?") if parent_author is not None else "?"
+                parent_content = parent_cmt.find("atom:content", _ATOM_NS)
+                if parent_content is not None and parent_content.text:
+                    context_text = html_to_text(parent_content.text).text.strip()
+            if parent_id and parent_id in post_content_by_id:
+                # Parent is the post — include as standalone follow-up comment
+                items.append(
+                    build_content_item(
+                        content=reply_text,
+                        source="corpus_blogspot",
+                        timestamp=timestamp,
+                        config=ingestion_config,
+                        url=str(path),
+                        title=None,
+                        author=author_name,
+                    )
+                )
+                continue
+
+            if context_user == author_name:
+                # Skip self-replies
+                continue
+
+            if context_text and context_user:
+                part = f"[context: {context_user}] {context_text}\n\n[reply] {reply_text}"
+            else:
+                part = reply_text
+
+            items.append(
+                build_content_item(
+                    content=part,
+                    source="corpus_blogspot",
+                    timestamp=timestamp,
+                    config=ingestion_config,
+                    url=str(path),
+                    title=None,
+                    author=author_name,
+                )
+            )
+
+    return items
+
+
+def _blogspot_timestamp(entry: ET.Element) -> datetime | None:
+    """Extract timestamp from a Blogger Atom entry."""
+    for tag in ("atom:published", "blogger:created"):
+        el = entry.find(tag, _ATOM_NS)
+        if el is not None and el.text:
+            parsed = _parse_datetime(el.text)
+            if parsed is not None:
+                return parsed
     return None
 
 

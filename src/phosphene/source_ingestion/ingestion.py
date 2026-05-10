@@ -19,6 +19,7 @@ from phosphene.source_ingestion.adapters import (
 from phosphene.source_ingestion.corpus import (
     corpus_blog_adapter_factory,
     corpus_conversations_adapter_factory,
+    corpus_blogspot_adapter_factory,
     corpus_livejournal_adapter_factory,
     corpus_text_adapter_factory,
     corpus_twitter_adapter_factory,
@@ -48,6 +49,7 @@ _SUPPORTED_ADAPTER_TYPES = {
     "corpus_blog",
     "corpus_conversations",
     "corpus_text",
+    "corpus_blogspot",
 }
 
 _REQUIRED_CREDENTIAL_KEYS = {
@@ -66,6 +68,7 @@ _REQUIRED_PARAM_KEYS = {
     "corpus_blog": (("archive_path", "format"),),
     "corpus_conversations": (("archive_path", "format"),),
     "corpus_text": (("archive_path",),),
+    "corpus_blogspot": (("archive_path",),),
 }
 
 _REDDIT_SORT_VALUES = {"new", "hot", "top"}
@@ -81,6 +84,7 @@ _ADAPTER_REGISTRY["corpus_text"] = corpus_text_adapter_factory
 _ADAPTER_REGISTRY["corpus_blog"] = corpus_blog_adapter_factory
 _ADAPTER_REGISTRY["corpus_livejournal"] = corpus_livejournal_adapter_factory
 _ADAPTER_REGISTRY["corpus_twitter"] = corpus_twitter_adapter_factory
+_ADAPTER_REGISTRY["corpus_blogspot"] = corpus_blogspot_adapter_factory
 _ADAPTER_REGISTRY["corpus_conversations"] = corpus_conversations_adapter_factory
 _ADAPTER_REGISTRY["human_share"] = human_share_adapter_factory
 _ADAPTER_REGISTRY["telegram_channel"] = telegram_channel_adapter_factory
