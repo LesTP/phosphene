@@ -101,3 +101,14 @@ ARCHITECTURE.md: MVP Orchestrator status updated from Phase MVP.2 complete to Co
 DECISIONS.md: D-51 closed. PROJECT.md: no open project risks were resolved by this phase.
 
 (MVP.2 entries archived to DEVLOG_archive.md on 2026-05-09.)
+
+### Step MVP.4.1: Create run.py
+
+**Date:** 2026-05-10
+**Mode:** autonomous
+**Outcome:** Complete
+**Contract changes:** None
+
+Added `run.py` as the MVP bootstrap entry point. The script reads `.env`, builds runtime configs for Memory Store, Attention Filter, Source Ingestion corpus adapters, Distillation, Generator, Gateway, and MVP Orchestrator, then exposes `--seed-only`, `--once`, and default cron-loop modes. It uses `paraphrase-multilingual-MiniLM-L12-v2` as the default embedding model and keeps `--help` import-safe even when the external `toolkit` package is not present in this checkout.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 - <<'PY' ... import run ... PY`, `PYTHONPATH=src:.python_deps python3 run.py --help`, and `PYTHONPATH=src:.python_deps python3 -m pytest tests/`. DEVPLAN keeps `state: execute`, leaves `steps_remaining` at 3 after consuming one action from the prompt budget, and moves focus to MVP.4.2 seed-only mode.

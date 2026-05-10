@@ -68,18 +68,7 @@ Write the entry-point script (`run.py`) that instantiates all 6 modules from rea
 
 **Steps:**
 
-1. **Create `run.py`** — Entry-point script that:
-   - Reads `.env` (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ANTHROPIC_API_KEY)
-   - Instantiates `MemoryStore` (vault path: `./vault/`)
-   - Instantiates `AttentionFilter` with `EmbeddingConfig(model='paraphrase-multilingual-MiniLM-L12-v2')`
-   - Instantiates `SourceIngestion` with adapter configs for: corpus_livejournal (ljsm, LJ Backup path), corpus_blogspot (2 atom files), corpus_text (seed/*.txt)
-   - Instantiates `DistillationEngine` with embedding and LLM configs
-   - Instantiates `Generator` with LLM config and `RouterConfig`
-   - Instantiates `Gateway` with Telegram adapter (bot token, chat ID)
-   - Builds `MVPOrchestratorConfig` with schedule entries (ingestion every 6h, distillation daily, generation every 12h, decay daily)
-   - Wires `ModuleRefs`, constructs `MVPOrchestrator`
-   - Adds CLI args: `--seed-only` (run one ingestion cycle and exit), `--once` (run one full activation cycle), default (cron loop)
-   - Test: script imports successfully and `--help` works
+1. ~~**Create `run.py`** — DONE. Entry point imports successfully and `--help` works.~~
 
 2. **Test seed-only mode** — Run `python run.py --seed-only` against the real corpus archives:
    - Verify adapters find and parse the HTML/atom files
