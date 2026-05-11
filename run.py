@@ -317,7 +317,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
                     result = distillation_engine.distill_t1_to_t2(distill_config)
                     print(f"  T1→T2: {len(result.clusters_created)} clusters created")
                 else:
-                    print(f"  T1→T2 gates not met (need {gates.t1_volume_needed} more T1 notes)")
+                    print(f"  T1→T2 gates not met yet")
             except Exception as exc:
                 print(f"  Distillation error: {exc}")
 
