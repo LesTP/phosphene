@@ -49,6 +49,9 @@ def main() -> int:
     if args.seed_direct:
         return _seed_direct(env)
 
+    if args.seed_chronological:
+        return _seed_chronological(env)
+
     orchestrator = build_orchestrator(env)
 
     if args.seed_only:
@@ -171,6 +174,151 @@ def _seed_direct(env: dict[str, str]) -> int:
     return 0
 
 
+def _seed_chronological(env: dict[str, str]) -> int:
+    """Chronological seed: sort by date, feed in yearly batches, distill between.
+
+    Items without timestamps come in last. Each batch is embedded and stored
+    as T1, then distillation runs (T1→T2) before the next batch. This lets
+    early writing shape the initial personality and later writing build on it.
+    """
+    from collections import defaultdict
+    from toolkit.embedding import embed, EmbeddingConfig
+
+    vault_path = Path(env.get("PHOSPHENE_VAULT_PATH", str(DEFAULT_VAULT_PATH)))
+    memory_store = MemoryStore(
+        MemoryStoreConfig(
+            vault_path=str(vault_path),
+            embedding_path=str(vault_path / ".embeddings"),
+        )
+    )
+    embedding_config = _make_embedding_config(env)
+    ingestion_config = _make_ingestion_config(env, vault_path)
+    source_ingestion = SourceIngestion(ingestion_config)
+
+    # Poll all adapters
+    print("Polling corpus adapters...")
+    ingestion_results = source_ingestion.poll()
+    items = []
+    for result in ingestion_results:
+        items.extend(result.items)
+        if result.items:
+            print(f"  {result.adapter_label}: {len(result.items)} items")
+    print(f"  Total: {len(items)} items")
+
+    if not items:
+        print("No items to import.")
+        return 0
+
+    # Filter and clean (same as _seed_direct)
+    import re
+    MIN_WORDS = 10
+    items = [item for item in items if len(item.content.split()) >= MIN_WORDS]
+
+    _TRACK_LINE_RE = re.compile(r"^\s*\d+[\.\)]\s+.{3,80}$", re.MULTILINE)
+    _SHARE_LINE_RE = re.compile(
+        r"^.*(?:depositfiles|mediafire|megaupload|sharebee|rapidshare|hotfile)\S*.*$",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    _BITRATE_LINE_RE = re.compile(
+        r"^.*\d+\s*(?:kbps|mb|kbit).*$", re.MULTILINE | re.IGNORECASE,
+    )
+
+    def _clean(text):
+        text = _TRACK_LINE_RE.sub("", text)
+        text = _SHARE_LINE_RE.sub("", text)
+        text = _BITRATE_LINE_RE.sub("", text)
+        return re.sub(r"\n\s*\n\s*\n+", "\n\n", text).strip()
+
+    for item in items:
+        item.content = _clean(item.content)
+    items = [item for item in items if len(item.content.split()) >= MIN_WORDS]
+    print(f"  After filtering/cleaning: {len(items)} items")
+
+    # Group by year (items without real timestamps go to year 9999)
+    from datetime import datetime, timezone
+    batches = defaultdict(list)
+    for item in items:
+        ts = item.timestamp
+        # Treat "today" timestamps as no-timestamp (seed-time artifacts)
+        if ts and ts.year < 2026:
+            batches[ts.year].append(item)
+        else:
+            batches[9999].append(item)
+
+    years = sorted(batches.keys())
+    print(f"\nChronological batches: {len(years)}")
+    for year in years:
+        label = "no-timestamp" if year == 9999 else str(year)
+        print(f"  {label}: {len(batches[year])} items")
+
+    # Process each batch: embed → store → distill
+    from phosphene.memory_store.types import NoteInput
+
+    # Set up distillation engine for between-batch cycles
+    llm_config = _make_llm_config(env)
+    distillation_engine = None
+    try:
+        from phosphene.distillation import DistillationEngine, DistillationConfig
+        distillation_engine = DistillationEngine(memory_store)
+    except Exception as exc:
+        print(f"  Warning: distillation unavailable ({exc}) — will seed without distillation")
+
+    total_stored = 0
+    for batch_idx, year in enumerate(years):
+        batch_items = batches[year]
+        label = "no-timestamp" if year == 9999 else str(year)
+        print(f"\n{'='*60}")
+        print(f"Batch {batch_idx + 1}/{len(years)}: {label} ({len(batch_items)} items)")
+        print(f"{'='*60}")
+
+        # Embed
+        texts = [item.content for item in batch_items]
+        emb = embed(texts, embedding_config)
+
+        # Store
+        stored = 0
+        for i, item in enumerate(batch_items):
+            title = item.title or item.content[:60].replace("\n", " ")
+            note = NoteInput(
+                tier=1,
+                content=item.content,
+                title=title,
+                importance=0.5,
+                source=item.source,
+                embedding=emb.vectors[i],
+                tags=[],
+            )
+            try:
+                memory_store.store_note(note)
+                stored += 1
+            except Exception as exc:
+                print(f"  Error storing note {i}: {exc}")
+        total_stored += stored
+        print(f"  Stored {stored} T1 notes (total: {total_stored})")
+
+        # Run distillation between batches (skip after last batch — let --once handle it)
+        if distillation_engine and batch_idx < len(years) - 1:
+            print("  Running distillation...")
+            try:
+                distill_config = DistillationConfig(
+                    llm_config=llm_config,
+                    embedding_config=embedding_config,
+                )
+                gates = distillation_engine.check_gates(distill_config)
+                if gates.t1_to_t2_ready:
+                    result = distillation_engine.distill_t1_to_t2(distill_config)
+                    print(f"  T1→T2: {len(result.clusters_created)} clusters created")
+                else:
+                    print(f"  T1→T2 gates not met (need {gates.t1_volume_needed} more T1 notes)")
+            except Exception as exc:
+                print(f"  Distillation error: {exc}")
+
+    print(f"\n{'='*60}")
+    print(f"Chronological seed complete. {total_stored} T1 notes across {len(years)} batches.")
+    print(f"Run 'python run.py --once' for final distillation + first generation.")
+    return 0
+
+
 def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     """Construct the real MVP module graph from environment-backed config."""
 
@@ -257,6 +405,11 @@ def _parse_args() -> argparse.Namespace:
         "--seed-direct",
         action="store_true",
         help="Bulk-import corpus directly into Memory Store. No LLM calls, no attention filter. Uses embeddings only (local, free).",
+    )
+    mode.add_argument(
+        "--seed-chronological",
+        action="store_true",
+        help="Chronological seed: sort corpus by date, feed in yearly batches with distillation between each. No-timestamp items come last. Costs ~$5-10 API for distillation rounds.",
     )
     mode.add_argument(
         "--seed-only",
@@ -377,6 +530,17 @@ def _make_ingestion_config(env: dict[str, str], vault_path: Path) -> IngestionCo
             params={
                 **params_common,
                 "archive_path": env.get("PHOSPHENE_TEXT_ARCHIVE_PATH", "seed"),
+            },
+        ),
+        AdapterConfig(
+            adapter_type="corpus_facebook",
+            source_label="corpus_facebook",
+            params={
+                **params_common,
+                "archive_path": env.get(
+                    "PHOSPHENE_FACEBOOK_ARCHIVE_PATH",
+                    "seed/your_posts__check_ins__photos_and_videos_1.html",
+                ),
             },
         ),
     ]
