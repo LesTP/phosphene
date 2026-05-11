@@ -5,11 +5,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from dataclasses import asdict, is_dataclass
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+
+# Add source paths for phosphene and toolkit
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE / "src"))
+_TOOLKIT_PATH = os.environ.get(
+    "TOOLKIT_SRC",
+    str(Path(r"c:\Users\myeluashvili\claude-code-workspace\projects\toolkit\src")),
+)
+sys.path.insert(0, _TOOLKIT_PATH)
 
 from phosphene.attention_filter import AttentionFilter, AttentionFilterConfig
 from phosphene.distillation import DistillationConfig, DistillationEngine

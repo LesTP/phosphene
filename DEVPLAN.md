@@ -18,7 +18,7 @@ steps_remaining: 3
 - **What this is** — Autonomous personality agent with hierarchical memory, attention filtering, and personality development through distillation.
 - **Key constraints** — Python 3.12+. Depends on toolkit/ (sibling project, all modules complete). Obsidian-compatible markdown storage. LLM API costs managed via subscription rotation and model tier system. Runs on Raspberry Pi 5 (orchestration only, inference via API).
 - **Gotchas** —
-  - toolkit/ is an external dependency — import from it, never modify it
+  - toolkit/ is an external dependency — import from it, never modify it. Source is at `c:\Users\myeluashvili\claude-code-workspace\projects\toolkit\src`. `run.py` adds this to sys.path via `TOOLKIT_SRC` env var or hardcoded default.
   - Memory Store uses consumer-provided embeddings (no toolkit/embedding dependency in the store itself)
   - All 9 ARCH files define contracts — implementation must match signatures exactly
   - Model selection policy D-5: single primary model during establishment phase (~90 days)
