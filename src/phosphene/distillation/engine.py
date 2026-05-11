@@ -106,7 +106,7 @@ class _RaptorClusterConfig:
     raptor_max_depth: int = 3
     min_cluster_size: int = 5
     min_samples: int = 2
-    metric: str = "cosine"
+    metric: str = "euclidean"
     reduce_dims: int | None = None
 
 

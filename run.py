@@ -319,7 +319,10 @@ def _seed_chronological(env: dict[str, str]) -> int:
                 else:
                     print(f"  T1→T2 gates not met yet")
             except Exception as exc:
-                print(f"  Distillation error: {exc}")
+                print(f"  DISTILLATION FAILED: {exc}")
+                print(f"  Aborting chronological seed. Fix the error and re-run.")
+                print(f"  {total_stored} T1 notes written so far (partial).")
+                return 1
 
     print(f"\n{'='*60}")
     print(f"Chronological seed complete. {total_stored} T1 notes across {len(years)} batches.")
