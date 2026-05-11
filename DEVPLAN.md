@@ -84,7 +84,13 @@ The Phosphene code and seed corpus are already on the Pi via the Samba share (`/
 - `claude-code` container running (Incus)
 - Workspace bind-mount active at `/home/claude/workspace`
 - Phosphene repo at `/home/claude/workspace/phosphene/`
-- Toolkit repo at `/home/claude/workspace/toolkit/` (or wherever — path is configurable)
+- Toolkit repo at `/home/claude/workspace/toolkit/` — **not on the share by default.** Clone or copy from Windows:
+  ```bash
+  # Option A: clone from GitHub
+  cd /mnt/passport/shared && git clone https://github.com/LesTP/toolkit.git
+  # Option B: copy from Windows
+  scp -r "c:\Users\myeluashvili\claude-code-workspace\projects\toolkit" pirozhok:/mnt/passport/shared/
+  ```
 
 ### Steps
 
