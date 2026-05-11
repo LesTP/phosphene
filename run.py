@@ -15,11 +15,19 @@ from typing import Any
 # Add source paths for phosphene and toolkit
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE / "src"))
-_TOOLKIT_PATH = os.environ.get(
-    "TOOLKIT_SRC",
-    str(Path(r"c:\Users\myeluashvili\claude-code-workspace\projects\toolkit\src")),
-)
-sys.path.insert(0, _TOOLKIT_PATH)
+_TOOLKIT_PATH = os.environ.get("TOOLKIT_SRC")
+if not _TOOLKIT_PATH:
+    # Try common locations
+    for candidate in [
+        _HERE.parent / "toolkit" / "src",  # sibling directory
+        Path("/mnt/passport/shared/toolkit/src"),  # Pi shared drive
+        Path(r"c:\Users\myeluashvili\claude-code-workspace\projects\toolkit\src"),  # Windows
+    ]:
+        if candidate.is_dir():
+            _TOOLKIT_PATH = str(candidate)
+            break
+if _TOOLKIT_PATH:
+    sys.path.insert(0, _TOOLKIT_PATH)
 
 from phosphene.attention_filter import AttentionFilter, AttentionFilterConfig
 from phosphene.distillation import DistillationConfig, DistillationEngine
