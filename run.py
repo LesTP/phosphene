@@ -45,6 +45,10 @@ DEFAULT_MARKER_PATH = DEFAULT_VAULT_PATH / ".source_markers.json"
 def main() -> int:
     args = _parse_args()
     env = _load_env(Path(args.env_file))
+
+    if args.seed_direct:
+        return _seed_direct(env)
+
     orchestrator = build_orchestrator(env)
 
     if args.seed_only:
@@ -60,6 +64,110 @@ def main() -> int:
         return exit_code
 
     orchestrator.start()
+    return 0
+
+
+def _seed_direct(env: dict[str, str]) -> int:
+    """Bulk-import corpus into Memory Store, bypassing the attention filter.
+
+    Polls all configured corpus adapters, embeds each content item locally,
+    and writes T1 notes directly. No LLM calls — embedding is the only compute.
+    """
+    from toolkit.embedding import embed, EmbeddingConfig
+
+    vault_path = Path(env.get("PHOSPHENE_VAULT_PATH", str(DEFAULT_VAULT_PATH)))
+    memory_store = MemoryStore(
+        MemoryStoreConfig(
+            vault_path=str(vault_path),
+            embedding_path=str(vault_path / ".embeddings"),
+        )
+    )
+    embedding_config = _make_embedding_config(env)
+    ingestion_config = _make_ingestion_config(env, vault_path)
+    source_ingestion = SourceIngestion(ingestion_config)
+
+    # Poll all adapters
+    print("Polling corpus adapters...")
+    ingestion_results = source_ingestion.poll()
+    items = []
+    total_errors = 0
+    for result in ingestion_results:
+        items.extend(result.items)
+        total_errors += len(result.errors)
+        if result.items:
+            print(f"  {result.adapter_label}: {len(result.items)} items")
+        if result.errors:
+            print(f"  {result.adapter_label}: {len(result.errors)} errors")
+    print(f"  Total: {len(items)} items, {total_errors} errors")
+
+    if not items:
+        print("No items to import.")
+        return 0
+
+    # Filter out very short items
+    MIN_WORDS = 10
+    items = [item for item in items if len(item.content.split()) >= MIN_WORDS]
+    print(f"  After filtering (<{MIN_WORDS} words): {len(items)} items")
+
+    # Clean content: strip numbered track listing lines and share links
+    import re
+    _TRACK_LINE_RE = re.compile(r"^\s*\d+[\.\)]\s+.{3,80}$", re.MULTILINE)
+    _SHARE_LINE_RE = re.compile(
+        r"^.*(?:depositfiles|mediafire|megaupload|sharebee|rapidshare|hotfile)\S*.*$",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    _BITRATE_LINE_RE = re.compile(
+        r"^.*\d+\s*(?:kbps|mb|kbit).*$", re.MULTILINE | re.IGNORECASE,
+    )
+
+    def _clean_content(text: str) -> str:
+        text = _TRACK_LINE_RE.sub("", text)
+        text = _SHARE_LINE_RE.sub("", text)
+        text = _BITRATE_LINE_RE.sub("", text)
+        # Collapse leftover blank lines
+        text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+        return text.strip()
+
+    for item in items:
+        item.content = _clean_content(item.content)
+
+    # Re-filter after cleaning (some items may now be too short)
+    before = len(items)
+    items = [item for item in items if len(item.content.split()) >= MIN_WORDS]
+    if len(items) < before:
+        print(f"  Cleaned and re-filtered: {before - len(items)} items removed, {len(items)} remain")
+
+    # Embed in batches
+    print(f"Embedding {len(items)} items with {embedding_config.model}...")
+    texts = [item.content for item in items]
+    result = embed(texts, embedding_config)
+    print(f"  Embedded into {result.dimension}-dim vectors")
+
+    # Store as T1 notes
+    print("Writing T1 notes to vault...")
+    from phosphene.memory_store.types import NoteInput
+    stored = 0
+    for i, item in enumerate(items):
+        title = item.title or item.content[:60].replace("\n", " ")
+        note = NoteInput(
+            tier=1,
+            content=item.content,
+            title=title,
+            importance=0.5,
+            source=item.source,
+            embedding=result.vectors[i],
+            tags=[],
+        )
+        try:
+            memory_store.store_note(note)
+            stored += 1
+        except Exception as exc:
+            print(f"  Error storing note {i}: {exc}")
+
+        if (i + 1) % 100 == 0:
+            print(f"  {i + 1}/{len(items)} stored...")
+
+    print(f"\nDone. {stored} T1 notes written to {vault_path}")
     return 0
 
 
@@ -146,9 +254,14 @@ def _parse_args() -> argparse.Namespace:
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
+        "--seed-direct",
+        action="store_true",
+        help="Bulk-import corpus directly into Memory Store. No LLM calls, no attention filter. Uses embeddings only (local, free).",
+    )
+    mode.add_argument(
         "--seed-only",
         action="store_true",
-        help="Run one ingestion activation and exit.",
+        help="Run one ingestion activation via the full pipeline (attention filter + LLM). WARNING: expensive for large corpora.",
     )
     mode.add_argument(
         "--once",
@@ -232,7 +345,7 @@ def _make_ingestion_config(env: dict[str, str], vault_path: Path) -> IngestionCo
             source_label="corpus_livejournal",
             params={
                 **params_common,
-                "archive_path": env.get("PHOSPHENE_LJ_ARCHIVE_PATH", "seed/livejournal"),
+                "archive_path": env.get("PHOSPHENE_LJ_ARCHIVE_PATH", "seed/LJ Backup/ljsm/lestp"),
                 "format": "ljsm",
             },
         ),

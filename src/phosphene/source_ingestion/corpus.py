@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html import unescape as html_unescape
 import json
 from pathlib import Path
 import re
@@ -192,6 +193,60 @@ class CorpusTwitterAdapter:
                     newest_marker = marker
 
         return AdapterPollResult(items=items, errors=errors, next_marker=newest_marker)
+
+
+class CorpusFacebookAdapter:
+    """Import Facebook HTML data export.
+
+    Parses the ``your_posts__check_ins__photos_and_videos`` HTML file
+    exported by Facebook's "Download Your Information" tool.
+
+    Config params:
+        archive_path: Path to the HTML file (or directory containing them).
+    """
+
+    def __init__(self, config: AdapterConfig, ingestion_config: IngestionConfig) -> None:
+        self.config = config
+        self.ingestion_config = ingestion_config
+        self.archive_path = Path(str(config.params["archive_path"]))
+
+    def poll(self, last_seen_marker: LastSeenMarker) -> AdapterPollResult:
+        try:
+            if self.archive_path.is_file():
+                paths = [self.archive_path]
+            elif self.archive_path.is_dir():
+                paths = sorted(self.archive_path.glob("*.html"))
+            else:
+                raise FileNotFoundError(f"not found: {self.archive_path}")
+        except OSError as exc:
+            return AdapterPollResult(
+                errors=[AdapterItemError(error=str(exc), url=str(self.archive_path))],
+                next_marker=last_seen_marker,
+            )
+
+        items: list[ContentItem] = []
+        errors: list[AdapterItemError] = []
+        newest_marker = last_seen_marker
+
+        for path in paths:
+            try:
+                new_items = _parse_facebook_html(path, last_seen_marker, self.ingestion_config)
+                items.extend(new_items)
+            except (OSError, UnicodeError) as exc:
+                errors.append(AdapterItemError(error=str(exc), url=str(path)))
+
+        for item in items:
+            marker = f"{item.timestamp.timestamp():020.6f}:{item.url or ''}:000000"
+            if is_marker_newer(marker, newest_marker):
+                newest_marker = marker
+
+        return AdapterPollResult(items=items, errors=errors, next_marker=newest_marker)
+
+
+def corpus_facebook_adapter_factory(
+    config: AdapterConfig, ingestion_config: IngestionConfig
+) -> CorpusFacebookAdapter:
+    return CorpusFacebookAdapter(config, ingestion_config)
 
 
 class CorpusConversationsAdapter:
@@ -938,6 +993,78 @@ _ATOM_NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "blogger": "http://schemas.google.com/blogger/2018",
 }
+
+_FB_POST_RE = re.compile(r'<div class="_2pin">')
+_FB_TIMESTAMP_RE = re.compile(
+    r"(?:Updated|Created)\s+(\w+ \d+,\s*\d{4}\s+\d+:\d+:\d+)\s*(?:AM|PM|am|pm)?"
+)
+_FB_TAG_RE = re.compile(r"@\[\d+:\d+:([^\]]+)\]")
+_FB_BOILERPLATE_RE = re.compile(
+    r"\s*(?:Mike Yeluashvili|Michael Yeluashvili)\s+(?:shared a link|posted|updated|wrote on)\b[^.]*\.?",
+    re.IGNORECASE,
+)
+
+
+def _parse_fb_timestamp(raw: str) -> datetime | None:
+    """Parse Facebook export timestamp like 'Aug 12, 2009 3:54:40'."""
+    raw = raw.strip()
+    for fmt in ("%b %d, %Y %H:%M:%S", "%b %d,%Y %H:%M:%S", "%B %d, %Y %H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_facebook_html(
+    path: Path,
+    last_seen_marker: LastSeenMarker,
+    ingestion_config: IngestionConfig,
+) -> list[ContentItem]:
+    """Parse Facebook HTML data export into ContentItems."""
+    content = path.read_text(encoding="utf-8")
+    blocks = _FB_POST_RE.split(content)[1:]  # skip header
+
+    items: list[ContentItem] = []
+
+    for block in blocks:
+        # Extract timestamp
+        ts_match = _FB_TIMESTAMP_RE.search(block)
+        if not ts_match:
+            continue  # skip blocks without timestamps (media-only halves)
+
+        timestamp = _parse_fb_timestamp(ts_match.group(1))
+        if timestamp is None:
+            continue
+
+        # Extract text: strip HTML, decode entities
+        text = re.sub(r"<[^>]+>", " ", block)
+        text = html_unescape(text).strip()
+        text = re.sub(r"\s+", " ", text)
+
+        # Clean FB user tags: @[id:hash:Name] -> @Name
+        text = _FB_TAG_RE.sub(r"@\1", text)
+
+        # Remove the timestamp text and boilerplate from content
+        text = _FB_TIMESTAMP_RE.sub("", text).strip()
+        text = _FB_BOILERPLATE_RE.sub("", text).strip()
+
+        if not text or len(text.split()) < 5:
+            continue
+
+        items.append(
+            build_content_item(
+                content=text,
+                source="corpus_facebook",
+                timestamp=timestamp,
+                config=ingestion_config,
+                url=str(path),
+                title=None,
+                author=None,
+            )
+        )
+
+    return items
 
 
 def _parse_blogspot_atom(

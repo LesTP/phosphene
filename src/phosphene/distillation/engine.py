@@ -104,6 +104,10 @@ class _RaptorClusterConfig:
     raptor_summarizer: Callable[[list[str]], str]
     raptor_embedder: Callable[[list[str]], object]
     raptor_max_depth: int = 3
+    min_cluster_size: int = 5
+    min_samples: int = 2
+    metric: str = "cosine"
+    reduce_dims: int | None = None
 
 
 @dataclass(frozen=True)

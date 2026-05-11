@@ -297,7 +297,7 @@ def default_telegram_client_factory(config: PlatformConfig) -> object:
         allowed_chat_ids = [int(chat_id)]
     except (TypeError, ValueError):
         allowed_chat_ids = None
-    return TelegramClient(bot_token=bot_token, allowed_chat_ids=allowed_chat_ids)
+    return TelegramClient(bot_token=bot_token)
 
 
 def telegram_adapter_factory(
