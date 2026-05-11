@@ -49,6 +49,8 @@ steps_remaining: 2
 ### Remaining
 - [ ] **Move to local disk or RPi5** — copy project, vault, seed, toolkit to local filesystem
 - [ ] **Seed Facebook corpus** — add FB adapter to `run.py`, run `--seed-direct` (appends, no re-seed needed)
+- [ ] **Chronological seeding mode** — `--seed-chronological` option: sort all corpus items by publication timestamp, feed in yearly batches, run distillation + decay between batches. Items without timestamps (plain text seed files) come in last. This lets the network "grow up" chronologically — early writing shapes initial personality, later writing reinforces or challenges it. Estimated cost: ~$5-10 extra for 3-4 distillation rounds. **Delete existing vault before running** — this replaces bulk seed. Record as D-54.
+- [ ] **Raise `density_crossover` to 15.0** — set in run.py's AttentionFilterConfig. Delays Phase 2 structural scoring until the network develops organic link density through distillation/decay. Lower back to 3.0 after 30-60 days of operation.
 - [ ] **Run `--once`** — first distillation (T1→T2 clustering) + generation + Telegram delivery
 - [ ] **Verify Telegram** — check message arrives on phone (manual)
 - [ ] **Raise `density_crossover`** — set to 10-15 for establishment phase. Current value (3.0) activates Phase 2 immediately on the dense seeded vault, using artifact structure as if it were mature. Lower back to 3.0 after 30-60 days.
