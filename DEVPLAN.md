@@ -66,8 +66,11 @@ steps_remaining: 2
 
 ## Post-MVP.4 (next priorities)
 
-1. **Wire inbound message handler** — `#` prefix → ingestion (file away, ack with 📌), no prefix → conversation (generate personality-flavored reply, store user message as T1). Open decision: sync vs async response.
-2. **Inbound chat ID filter** — filter messages by chat ID at Phosphene gateway level.
+1. **Wire inbound message handler** — `#` prefix → ingestion (file away, ack with 📌), no prefix → conversation (generate personality-flavored reply). Open decision: sync vs async response.
+   - **Trust tiers for input:** Owner (your chat ID) = full importance, stored as T1, enters distillation. Trusted (manually approved) = lower importance (0.2-0.3), stored but unlikely to form clusters. Untrusted (everyone else) = minimal importance (0.05), stored briefly for conversation memory but decays fast (7d) and never reaches distillation. Uses existing `importance` and `attractor_relevance` fields — no new mechanisms needed.
+   - **Conversation memory:** All tiers get stored as T1 with `source=conversation:{chat_id}`, so the bot remembers previous exchanges per person. For untrusted users, this memory is ephemeral (fast decay) but provides continuity within a few days.
+   - **Trust promotion:** `/trust @username` raises stored note importance. Could be automatic over time for consistently benign interlocutors. Post-MVP feature.
+2. **Inbound chat ID filter** — determines trust tier. Owner chat ID = owner tier. Others start as untrusted.
 3. **Deploy to Pi** — run inside `claude-code` Incus container (not over SMB from Windows). See deployment checklist below.
 4. **Leiden community detection** — replace agglomerative clustering. See `notebooks/CLUSTERING_AB_PLAN.md`.
 5. **Tuning panel** — live parameter adjustment interface.
