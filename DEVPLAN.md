@@ -65,10 +65,66 @@ steps_remaining: 2
 
 1. **Wire inbound message handler** — `#` prefix → ingestion (file away, ack with 📌), no prefix → conversation (generate personality-flavored reply, store user message as T1). Open decision: sync vs async response.
 2. **Inbound chat ID filter** — filter messages by chat ID at Phosphene gateway level.
-3. **Deploy to RPi5** — clone repos, install deps, copy `.env` + vault, configure paths.
+3. **Deploy to Pi** — run inside `claude-code` Incus container (not over SMB from Windows). See deployment checklist below.
 4. **Leiden community detection** — replace agglomerative clustering. See `notebooks/CLUSTERING_AB_PLAN.md`.
 5. **Tuning panel** — live parameter adjustment interface.
 6. **Network visualization** — 2D UMAP projection of vault embeddings, colored by source/cluster/tier.
+
+## Deployment Checklist (Pi / claude-code container)
+
+The Phosphene code and seed corpus are already on the Pi via the Samba share (`/mnt/passport/shared` → bind-mounted into `claude-code` at `/home/claude/workspace`). No file copying needed — just install deps and run locally instead of over SMB.
+
+### Prerequisites
+- `claude-code` container running (Incus)
+- Workspace bind-mount active at `/home/claude/workspace`
+- Phosphene repo at `/home/claude/workspace/phosphene/`
+- Toolkit repo at `/home/claude/workspace/toolkit/` (or wherever — path is configurable)
+
+### Steps
+
+```bash
+# Enter container
+ssh pirozhok "incus exec claude-code -- su - claude"
+
+# 1. Install Python deps
+pip install sentence-transformers croniter anthropic
+
+# 2. Verify paths
+ls /home/claude/workspace/phosphene/run.py
+ls /home/claude/workspace/phosphene/seed/
+ls /home/claude/workspace/toolkit/src/toolkit/
+
+# 3. Set up .env (edit with correct TOOLKIT_SRC path)
+cat > /home/claude/workspace/phosphene/.env << 'EOF'
+TELEGRAM_BOT_TOKEN=<bot-token>
+TELEGRAM_CHAT_ID=<chat-id>
+ANTHROPIC_API_KEY=<api-key>
+TOOLKIT_SRC=/home/claude/workspace/toolkit/src
+EOF
+
+# 4. Test imports
+cd /home/claude/workspace/phosphene
+python3 run.py --help
+
+# 5. Clear stale vault and re-seed (local disk I/O, ~3-10 minutes)
+rm -rf vault/
+python3 run.py --seed-direct
+
+# 6. First cycle (distillation + generation + Telegram, costs ~$1-3 API)
+python3 run.py --once
+
+# 7. Verify Telegram message arrived on phone
+
+# 8. (Optional) Install as systemd service for cron loop
+#    Pattern: same as codexbot.service — see pirozhok README
+```
+
+### Notes
+- **Edit from Windows, run on Pi.** VS Code edits via Samba share (P: drive) are fine. Python execution must happen inside the container where files are on local disk.
+- **Git sync:** Push from Windows, pull inside container. Vault and `.env` are gitignored — they stay local.
+- **Model download:** First `--seed-direct` run downloads `paraphrase-multilingual-MiniLM-L12-v2` (~471MB). Cached after that.
+- **Memory:** Embedding model uses ~200-500MB. Container has 12-14GB RAM — plenty of headroom.
+- **Vault on NVMe:** The `/mnt/passport/` drive is the Passport SSD. Vault writes go there, not the SD card.
 
 ## Deferred Work
 
