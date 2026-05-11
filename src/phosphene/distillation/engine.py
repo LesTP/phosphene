@@ -1381,14 +1381,14 @@ def _build_raptor_cluster_config(config: DistillationConfig) -> object:
 
     if config.clustering_config is None:
         return _RaptorClusterConfig(
-            strategy="RAPTOR",
+            strategy="raptor",
             raptor_summarizer=summarizer,
             raptor_embedder=embedder,
         )
 
     if isinstance(config.clustering_config, dict):
         cluster_config = dict(config.clustering_config)
-        cluster_config.setdefault("strategy", "RAPTOR")
+        cluster_config.setdefault("strategy", "raptor")
         cluster_config["raptor_summarizer"] = summarizer
         cluster_config["raptor_embedder"] = embedder
         return cluster_config
