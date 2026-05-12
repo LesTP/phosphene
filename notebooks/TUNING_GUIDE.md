@@ -69,7 +69,15 @@ Bulk-loading all content at once produces a flat snapshot — distillation sees 
 
 Direct seeding writes notes with zero structural metadata (no links, no clusters, no unresolvedness). Phase 2 structural scoring requires `mean_link_degree >= 1.5` and `cluster_count >= 3`. After direct seed, all metrics are zero — Phase 2 is naturally inactive. It activates only after distillation creates real structure. No manual `density_crossover` adjustment needed.
 
-## Tools
+## TODO: Illustrations
+
+After the first successful seed run, add visual illustrations:
+- **UMAP 2D cluster maps** — show actual cluster structure (from `tools/visualize_network.py`)
+- **Regime comparison** — same seed with different attention filter weight profiles, showing which regions of the embedding space each profile selects/rejects. Side-by-side UMAP projections with accepted notes highlighted.
+- **Chronological development** — snapshots of the network after each batch (batch 1 = 2002-2003, batch 5 = 2005, batch 15 = 2015+). Show how clusters form, merge, split over time.
+- **Pruning effects** — network before/after a decay cycle, showing what survived and what died
+
+These require a completed seed run with distillation.
 
 | Tool | What it does |
 |------|-------------|
