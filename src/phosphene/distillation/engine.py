@@ -1379,11 +1379,21 @@ def _make_raptor_summarizer(
         llm_complete_callable = _toolkit_complete
 
     def summarizer(texts: list[str]) -> str:
-        return llm_complete_callable(
-            messages=_build_cluster_summary_request(texts),
-            config=llm_config,
-            tier=tier,
-        )
+        try:
+            return llm_complete_callable(
+                messages=_build_cluster_summary_request(texts),
+                config=llm_config,
+                tier=tier,
+            )
+        except Exception:
+            # Retry once on transient failures (empty response, rate limit)
+            import time
+            time.sleep(2)
+            return llm_complete_callable(
+                messages=_build_cluster_summary_request(texts),
+                config=llm_config,
+                tier=tier,
+            )
 
     return summarizer
 
