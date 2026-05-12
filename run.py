@@ -308,14 +308,16 @@ def _seed_chronological(env: dict[str, str]) -> int:
         if distillation_engine and batch_idx < len(years) - 1:
             print("  Running distillation...")
             try:
+                from datetime import timedelta
                 distill_config = DistillationConfig(
                     llm_config=llm_config,
                     embedding_config=embedding_config,
+                    min_time_between_runs=timedelta(seconds=0),  # allow rapid distillation during seed
                 )
                 gates = distillation_engine.check_gates(distill_config)
                 if gates.t1_to_t2_ready:
                     result = distillation_engine.distill_t1_to_t2(distill_config)
-                    print(f"  T1→T2: {len(result.clusters_created)} clusters created")
+                    print(f"  T1→T2: {len(result.new_cluster_ids)} new clusters, {result.promoted_count} notes promoted")
                 else:
                     print(f"  T1→T2 gates not met yet")
             except Exception as exc:
