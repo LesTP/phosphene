@@ -23,7 +23,9 @@ steps_remaining: 2
   - All 9 ARCH files define contracts — implementation must match signatures exactly
   - Model selection policy D-5: single primary model during establishment phase (~90 days)
   - **Cost estimation** — before any batch operation that touches the LLM, estimate cost first: items × avg tokens × price/token. Use `--seed-direct` for corpus import (local embeddings only, no LLM). Never use `--seed-only` for large corpora.
-  - **Run from local disk** — do NOT run the system from a network share (P: drive). Network drops kill long-running processes, SMB file I/O is 10× slower. Copy project + vault to local disk or deploy to RPi5.
+  - **Run from local disk** — do NOT run the system from a network share (P: drive). Network drops kill long-running processes, SMB file I/O is 10× slower. Run on the Pi via SSH.
+  - **No inline SSH commands** — PowerShell→SSH→Python quoting is broken. Always write a script file (e.g., `tools/script.py`), then `ssh pirozhok "python3 /path/script.py"`. Never use `python -c` through SSH.
+  - **Integration checks before expensive runs** — before launching distillation, seeding, or any multi-hour operation, write a dry-run probe script that validates the full interface chain (config types, method signatures, enum values) against the actual toolkit code. Do not rely on "try and see" for integration bugs.
   - **NTFS atomic rename** — `os.rename()` for marker files fails on network shares. Needs fix before production.
 
 ## Current Status
