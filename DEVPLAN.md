@@ -68,6 +68,7 @@ steps_remaining: 2
 - LJ adapter path wrong (`seed/livejournal` → `seed/LJ Backup/ljsm/lestp`)
 - Network share kills long-running processes — must run on Pi via SSH
 - RAPTOR summary prompt sent all cluster members (227K tokens > 200K limit) — capped at 50 obs × 2000 chars
+- HDBSCAN mega-cluster (733 notes) — fixed with UMAP `reduce_dims=15`: 25→227 clusters, largest 733→50, noise 76%→38%. Tested dims 5/10/15/20; 15 optimal.
 - Anthropic API empty response — added retry + per-cluster tolerance with placeholder summaries
 - NTFS-3G `rm -rf` fails — use `find -delete` pattern
 - Toolkit not on Samba share — copied to `/mnt/passport/shared/toolkit/`
