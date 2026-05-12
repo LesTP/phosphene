@@ -22,6 +22,29 @@ HDBSCAN on raw 384-dim embeddings produces one mega-cluster (733/3919 notes) and
 
 **What to test:** Run `tools/test_reduce_dims.py` on your seeded vault. Compare cluster count, largest cluster, noise percentage across dims. The sweet spot depends on corpus diversity — more diverse content needs fewer dims.
 
+### Coherence threshold must match the embedding model
+
+The `min_cluster_coherence` threshold (default 0.4) gates which clusters produce T2 notes. With the multilingual model (tighter similarity distribution), 0.4 is too strict — only 5 of 11 clusters pass, losing the largest and most thematically interesting groups.
+
+Measured on 200-note sample (11 clusters):
+- At 0.4: 5/11 pass (28% of notes promoted)
+- At 0.3: 8/11 pass (75% of notes promoted)
+- At 0.25: 11/11 pass (81% of notes promoted)
+
+**What to test:** Run `tools/check_coherence.py` after seeding to see how your corpus's clusters score against the threshold. If >50% of clusters fail, lower the threshold.
+
+**Set to 0.25 for multilingual corpora.** The clusters at 0.27 coherence produce valid summaries — they're diverse within a topic (e.g., bilingual music discussions) but still thematically coherent.
+
+### LLM model fallback for cluster summaries
+
+The summarizer now tries: primary model → same model retry → fallback model → placeholder. Fallback models are `claude-sonnet-4-20250514` and `claude-haiku-4-5-20251001`. This catches model-specific refusals without wasting the entire cluster.
+
+### RAPTOR summary propagation (integration bug)
+
+The toolkit's RAPTOR clustering stores summaries in `ClusterResult.tree[].summaries`, but Phosphene's normalizer was reading from `ClusterResult.labels` (Path B), which doesn't carry summaries. This caused T2 notes to contain raw T1 text instead of LLM-generated syntheses. Fixed by extracting summaries from the tree layers during normalization.
+
+**What to watch for:** If T2 notes contain raw journal text instead of synthesis paragraphs, the summary propagation is broken. Check `ClusterResult.tree` structure against the normalizer.
+
 ### LLM model selection: newer isn't always better
 
 `claude-sonnet-4-5-20250929` (Sonnet 4.5) consistently returns `stop_reason: refusal` on bilingual casual conversations — the exact content that makes up most of the corpus. Same prompts work perfectly on `claude-sonnet-4-20250514` (Sonnet 4) with `stop_reason: end_turn`.

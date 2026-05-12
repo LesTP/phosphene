@@ -321,7 +321,8 @@ def _seed_chronological(env: dict[str, str]) -> int:
                 distill_config = DistillationConfig(
                     llm_config=llm_config,
                     embedding_config=embedding_config,
-                    min_time_between_runs=timedelta(seconds=0),  # allow rapid distillation during seed
+                    min_time_between_runs=timedelta(seconds=0),
+                    min_cluster_coherence=0.25,  # lowered for multilingual model
                 )
                 gates = distillation_engine.check_gates(distill_config)
                 if gates.t1_to_t2_ready:
@@ -452,6 +453,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
         embedding_config=embedding_config,
         min_time_between_runs=timedelta(hours=24),
         min_tier1_volume=int(env.get("PHOSPHENE_MIN_TIER1_VOLUME", "20")),
+        min_cluster_coherence=0.25,  # lowered for multilingual model (default 0.4 too strict)
     )
     generator_config = GeneratorConfig(llm_config=llm_config)
     router_config = RouterConfig(

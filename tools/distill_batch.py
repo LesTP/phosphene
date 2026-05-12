@@ -72,6 +72,7 @@ distill_config = DistillationConfig(
     llm_config=llm_config,
     embedding_config=embedding_config,
     min_time_between_runs=timedelta(seconds=0),
+    min_cluster_coherence=0.25,  # lowered for multilingual model
 )
 
 engine = DistillationEngine(ms)
