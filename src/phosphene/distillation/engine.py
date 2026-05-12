@@ -1426,15 +1426,21 @@ def _make_raptor_summarizer(
     if llm_complete_callable is None:
         llm_complete_callable = _toolkit_complete
 
+    _summary_count = 0
+
     def summarizer(texts: list[str]) -> str:
+        nonlocal _summary_count
         import time
         time.sleep(_THROTTLE_DELAY)
+        _summary_count += 1
         try:
-            return llm_complete_callable(
+            result = llm_complete_callable(
                 messages=_build_cluster_summary_request(texts),
                 config=llm_config,
                 tier=tier,
             )
+            print(f"  Cluster summary {_summary_count}: {len(texts)} texts → {len(result)} chars OK")
+            return result
         except Exception as first_err:
             err_str = str(first_err)
             # Rate limit: wait 60s and retry same model
