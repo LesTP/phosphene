@@ -319,10 +319,16 @@ def _seed_chronological(env: dict[str, str]) -> int:
                 else:
                     print(f"  T1→T2 gates not met yet")
             except Exception as exc:
-                print(f"  DISTILLATION FAILED: {exc}")
-                print(f"  Aborting chronological seed. Fix the error and re-run.")
-                print(f"  {total_stored} T1 notes written so far (partial).")
-                return 1
+                exc_name = type(exc).__name__
+                # Auth/config errors are global — abort
+                if "auth" in exc_name.lower() or "config" in exc_name.lower() or "import" in exc_name.lower():
+                    print(f"  DISTILLATION FAILED (global): {exc}")
+                    print(f"  Aborting chronological seed. Fix the error and re-run.")
+                    print(f"  {total_stored} T1 notes written so far (partial).")
+                    return 1
+                # Other errors (cluster-level) — warn and continue
+                print(f"  Distillation warning: {exc}")
+                print(f"  Continuing to next batch...")
 
     print(f"\n{'='*60}")
     print(f"Chronological seed complete. {total_stored} T1 notes across {len(years)} batches.")

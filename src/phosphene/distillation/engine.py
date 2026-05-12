@@ -1385,15 +1385,24 @@ def _make_raptor_summarizer(
                 config=llm_config,
                 tier=tier,
             )
-        except Exception:
+        except Exception as first_err:
             # Retry once on transient failures (empty response, rate limit)
             import time
             time.sleep(2)
-            return llm_complete_callable(
-                messages=_build_cluster_summary_request(texts),
-                config=llm_config,
-                tier=tier,
-            )
+            try:
+                return llm_complete_callable(
+                    messages=_build_cluster_summary_request(texts),
+                    config=llm_config,
+                    tier=tier,
+                )
+            except Exception:
+                # Skip this cluster — return a placeholder summary
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Cluster summary failed after retry (%d texts): %s",
+                    len(texts), first_err,
+                )
+                return f"[cluster of {len(texts)} items — summary unavailable]"
 
     return summarizer
 
