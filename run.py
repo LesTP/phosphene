@@ -75,6 +75,9 @@ def main() -> int:
         return exit_code
 
     orchestrator.start()
+    # Re-set our routing handler — orchestrator.start() overwrites on_message
+    # with its own _run_respond, but we need the # prefix routing layer
+    orchestrator.modules.gateway.on_message = orchestrator._inbound_handler
     return 0
 
 
@@ -365,9 +368,78 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     source_ingestion = SourceIngestion(_make_ingestion_config(env, vault_path))
     distillation_engine = DistillationEngine(memory_store)
     generator = Generator(memory_store)
+    # Trust tiers for inbound messages
+    owner_chat_id = env.get("TELEGRAM_CHAT_ID", "")
+    TRUST_IMPORTANCE = {"owner": 0.5, "trusted": 0.25, "untrusted": 0.05}
+    TRUST_INGESTION_PREFIX = "#"
+
+    def _get_trust_tier(sender: str) -> str:
+        if str(sender) == str(owner_chat_id):
+            return "owner"
+        # Future: check trusted list from config
+        return "untrusted"
+
+    def _handle_inbound_message(message: object) -> None:
+        """Route inbound messages: # prefix → ingestion, else → conversation."""
+        from phosphene.memory_store.types import NoteInput
+        from phosphene.gateway.types import InboundMessage, OutboundMessage
+
+        if not hasattr(message, "content") or not message.content:
+            return
+
+        text = message.content.strip()
+        sender = getattr(message, "sender", "unknown")
+        tier = _get_trust_tier(sender)
+        importance = TRUST_IMPORTANCE.get(tier, 0.05)
+
+        if text.startswith(TRUST_INGESTION_PREFIX):
+            # Ingestion path: store content, ack with 📌
+            if tier != "owner":
+                return  # only owner can feed content
+
+            content = text[len(TRUST_INGESTION_PREFIX):].strip()
+            if not content:
+                return
+
+            try:
+                note = NoteInput(
+                    tier=1,
+                    content=content,
+                    title=content[:60].replace("\n", " "),
+                    importance=importance,
+                    source=f"human_share:{sender}",
+                    tags=[],
+                )
+                memory_store.store_note(note)
+                gateway.send(OutboundMessage(
+                    content="📌",
+                    platform="telegram",
+                    reply_to=getattr(message, "message_id", None),
+                ))
+            except Exception as exc:
+                print(f"Ingestion handler error: {exc}")
+        else:
+            # Conversation path: store user message as T1, then respond
+            try:
+                note = NoteInput(
+                    tier=1,
+                    content=text,
+                    title=text[:60].replace("\n", " "),
+                    importance=importance,
+                    source=f"conversation:{sender}",
+                    tags=[],
+                )
+                memory_store.store_note(note)
+            except Exception as exc:
+                print(f"Conversation store error: {exc}")
+
+            # Delegate to orchestrator's respond path (set after orchestrator is built)
+            if hasattr(gateway, "_orchestrator_respond"):
+                gateway._orchestrator_respond(message)
+
     gateway = Gateway(
         _make_gateway_config(env),
-        on_message=lambda _message: None,
+        on_message=_handle_inbound_message,
         on_feedback=lambda _signal: None,
     )
 
@@ -415,7 +487,14 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
         router_config=router_config,
         log_path=Path(env.get("PHOSPHENE_LOG_PATH", DEFAULT_LOG_PATH)),
     )
-    return MVPOrchestrator(modules, config)
+    orchestrator = MVPOrchestrator(modules, config)
+
+    # Wire orchestrator respond into the inbound handler's delegation path
+    gateway._orchestrator_respond = orchestrator._run_respond
+    # Save handler reference for re-assignment after start()
+    orchestrator._inbound_handler = _handle_inbound_message
+
+    return orchestrator
 
 
 def _parse_args() -> argparse.Namespace:
