@@ -378,3 +378,12 @@ Priority: Important
 Decision: The embedding model choice is a runtime configuration, not a permanent commitment. Switching models requires re-embedding all living notes (a batch operation, ~minutes on CPU). Mitigation: store the active model name in Memory Store metadata; on startup, if the configured model differs from the stored model, trigger a re-embedding pass before any scoring operations.
 Rationale: Embedding model quality improves over time. Phosphene should be able to benefit from better models without requiring a vault rebuild. The 384-dim constraint (shared by MiniLM-L12 and e5-small families) means no storage format changes for the most likely upgrade path.
 Revisit if: A model upgrade requires a dimension change (e.g., to 768-dim), which would require vector storage migration in addition to re-embedding.
+
+---
+
+### D-54: NoteInput.created_at for timestamp preservation
+Date: 2026-05-12 | Status: Closed
+Priority: Required for chronological distillation
+Decision: Added optional created_at: datetime | None = None field to NoteInput. When provided, store_note uses it instead of datetime.now(). Corpus adapters pass the original publication timestamp; live messages use None (defaults to now).
+Rationale: Chronological distillation requires notes to carry their original publication date, not vault creation time. Without this, all notes have identical timestamps and can't be sorted chronologically.
+Contract change: NoteInput gains one optional field. Backward-compatible — all existing callers continue to work (field defaults to None). store_note behavior unchanged when created_at is None.

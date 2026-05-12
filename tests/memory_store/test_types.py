@@ -61,6 +61,7 @@ def test_note_input_defaults() -> None:
     assert note.embedding is None
     assert note.attractor_relevance is None
     assert note.cluster_group is None
+    assert note.created_at is None
 
 
 def test_note_input_accepts_full_optional_field_set() -> None:

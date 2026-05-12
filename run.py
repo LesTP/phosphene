@@ -185,6 +185,7 @@ def _seed_direct(env: dict[str, str]) -> int:
             source=item.source,
             embedding=result.vectors[i],
             tags=[],
+            created_at=item.timestamp,
         )
         try:
             memory_store.store_note(note)
@@ -318,6 +319,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
                 source=item.source,
                 embedding=emb.vectors[i],
                 tags=[],
+                created_at=item.timestamp,
             )
             try:
                 memory_store.store_note(note)

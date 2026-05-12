@@ -33,6 +33,7 @@ class NoteInput:
     embedding: ndarray | None = None
     attractor_relevance: float | None = None
     cluster_group: str | None = None
+    created_at: datetime | None = None
 
 
 @dataclass
