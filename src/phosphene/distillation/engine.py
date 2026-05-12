@@ -1358,8 +1358,22 @@ def _extract_json_object(
     *,
     response_name: str,
 ) -> Mapping[str, object]:
+    text = response_text.strip()
+    # Strip markdown code fences if present
+    if "```" in text:
+        parts = text.split("```")
+        if len(parts) >= 3:
+            inner = parts[1]
+            if inner.startswith("json"):
+                inner = inner[4:]
+            text = inner.strip()
+    # Skip preamble text before first {
+    if not text.startswith("{"):
+        brace_idx = text.find("{")
+        if brace_idx >= 0:
+            text = text[brace_idx:]
     try:
-        payload = json.loads(response_text)
+        payload = json.loads(text)
     except json.JSONDecodeError as exc:
         raise DistillationError(f"{response_name} must be valid JSON") from exc
 
