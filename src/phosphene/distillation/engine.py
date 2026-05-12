@@ -1391,6 +1391,26 @@ def _extract_json_object(
     return payload
 
 
+_FALLBACK_MODELS = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
+
+
+def _make_fallback_llm_config(llm_config: object) -> object | None:
+    """Create a fallback LLM config with a different model for retry."""
+    models = getattr(llm_config, "models", {})
+    current_model = models.get("default", "") if isinstance(models, dict) else ""
+
+    for fallback in _FALLBACK_MODELS:
+        if fallback != current_model:
+            try:
+                from dataclasses import replace
+                return replace(llm_config, models={
+                    k: fallback for k in models
+                })
+            except Exception:
+                return None
+    return None
+
+
 def _make_raptor_summarizer(
     llm_config: object,
     tier: object,
@@ -1413,7 +1433,7 @@ def _make_raptor_summarizer(
             )
         except Exception as first_err:
             err_str = str(first_err)
-            # Rate limit: wait 60s and retry
+            # Rate limit: wait 60s and retry same model
             wait = 60 if "429" in err_str or "rate_limit" in err_str else 5
             import logging
             logging.getLogger(__name__).warning(
@@ -1428,6 +1448,23 @@ def _make_raptor_summarizer(
                     tier=tier,
                 )
             except Exception:
+                # Try fallback model if available
+                fallback_config = _make_fallback_llm_config(llm_config)
+                if fallback_config is not None:
+                    logging.getLogger(__name__).warning(
+                        "Retrying with fallback model (%d texts)",
+                        len(texts),
+                    )
+                    time.sleep(30)
+                    try:
+                        return llm_complete_callable(
+                            messages=_build_cluster_summary_request(texts),
+                            config=fallback_config,
+                            tier=tier,
+                        )
+                    except Exception:
+                        pass
+                # All attempts failed — placeholder
                 logging.getLogger(__name__).warning(
                     "Cluster summary failed after retry (%d texts): %s",
                     len(texts), first_err,
