@@ -125,7 +125,7 @@ class _RaptorClusterConfig:
     min_cluster_size: int = 5
     min_samples: int = 2
     metric: str = "euclidean"
-    reduce_dims: int | None = 15
+    reduce_dims: int | None = None  # set from _REDUCE_DIMS at construction
 
 
 @dataclass(frozen=True)
@@ -776,8 +776,8 @@ def _toolkit_cluster(
 def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, str]]:
     # Limit observations to avoid exceeding LLM context window.
     # Truncate individual texts and cap total count.
-    MAX_OBS = 50  # max observations per cluster summary
-    MAX_CHARS_PER_OBS = 2000  # ~500 tokens per observation
+    MAX_OBS = _MAX_OBS_PER_SUMMARY
+    MAX_CHARS_PER_OBS = _MAX_CHARS_PER_OBS
 
     obs = texts[:MAX_OBS] if len(texts) > MAX_OBS else list(texts)
     obs = [str(t)[:MAX_CHARS_PER_OBS] for t in obs]
@@ -1391,10 +1391,16 @@ def _extract_json_object(
     return payload
 
 
+# Module-level tuning parameters — overridable from run.py
+_THROTTLE_DELAY = 45
+_MAX_OBS_PER_SUMMARY = 50
+_MAX_CHARS_PER_OBS = 2000
+_REDUCE_DIMS = 15
+
 _FALLBACK_MODELS = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
 
 
-def _make_fallback_llm_config(llm_config: object) -> object | None:
+def _make_fallback_llm_config
     """Create a fallback LLM config with a different model for retry."""
     models = getattr(llm_config, "models", {})
     current_model = models.get("default", "") if isinstance(models, dict) else ""
@@ -1422,9 +1428,7 @@ def _make_raptor_summarizer(
 
     def summarizer(texts: list[str]) -> str:
         import time
-        # Rate limit: 30K tokens/min. Each call is ~5-10K tokens.
-        # Wait 45s between calls to stay safely under limit.
-        time.sleep(45)
+        time.sleep(_THROTTLE_DELAY)
         try:
             return llm_complete_callable(
                 messages=_build_cluster_summary_request(texts),
@@ -1497,6 +1501,7 @@ def _build_raptor_cluster_config(config: DistillationConfig) -> object:
             strategy=_StrategyStr("raptor"),
             raptor_summarizer=summarizer,
             raptor_embedder=embedder,
+            reduce_dims=_REDUCE_DIMS,
         )
 
     if isinstance(config.clustering_config, dict):

@@ -45,9 +45,23 @@ from phosphene.source_ingestion import AdapterConfig, IngestionConfig, SourceIng
 
 DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+DEFAULT_FALLBACK_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_VAULT_PATH = Path("./vault")
 DEFAULT_LOG_PATH = Path("./logs/mvp_orchestrator.jsonl")
 DEFAULT_MARKER_PATH = DEFAULT_VAULT_PATH / ".source_markers.json"
+
+# Tunable parameters — all overridable via .env
+# See notebooks/TUNING_GUIDE.md for guidance on values.
+DEFAULTS = {
+    "min_cluster_coherence": 0.25,   # coherence gate for T2 promotion (lower for multilingual)
+    "reduce_dims": 15,               # UMAP dims before HDBSCAN (None to skip)
+    "min_cluster_size": 5,           # HDBSCAN min cluster size
+    "min_samples": 2,                # HDBSCAN density parameter
+    "throttle_delay": 45,            # seconds between LLM calls (rate limit safety)
+    "max_obs_per_summary": 50,       # max observations per cluster summary prompt
+    "max_chars_per_obs": 2000,       # max chars per observation in summary prompt
+    "batch_size": 200,               # notes per batch in chronological seeding
+}
 
 
 def main() -> int:
@@ -256,7 +270,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
     print(f"  Sorted chronologically. Range: {items[0].timestamp} → {items[-1].timestamp}")
 
     # Split into fixed-size batches of 200
-    BATCH_SIZE = 200
+    BATCH_SIZE = int(_tuning_param(env, "batch_size"))
     batches = [items[i:i + BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
     print(f"\nChronological batches: {len(batches)} (size={BATCH_SIZE})")
     for i, batch in enumerate(batches):
@@ -322,7 +336,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
                     llm_config=llm_config,
                     embedding_config=embedding_config,
                     min_time_between_runs=timedelta(seconds=0),
-                    min_cluster_coherence=0.25,  # lowered for multilingual model
+                    min_cluster_coherence=_tuning_param(env, "min_cluster_coherence"),
                 )
                 gates = distillation_engine.check_gates(distill_config)
                 if gates.t1_to_t2_ready:
@@ -364,6 +378,16 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     )
     llm_config = _make_llm_config(env)
     embedding_config = _make_embedding_config(env)
+
+    # Apply tuning parameters to distillation engine internals
+    from phosphene.distillation import engine as _dist_engine
+    _dist_engine._THROTTLE_DELAY = int(_tuning_param(env, "throttle_delay"))
+    _dist_engine._MAX_OBS_PER_SUMMARY = int(_tuning_param(env, "max_obs_per_summary"))
+    _dist_engine._MAX_CHARS_PER_OBS = int(_tuning_param(env, "max_chars_per_obs"))
+    _dist_engine._REDUCE_DIMS = int(_tuning_param(env, "reduce_dims"))
+    fallback = env.get("PHOSPHENE_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL)
+    if fallback:
+        _dist_engine._FALLBACK_MODELS = [fallback]
 
     attention_filter = AttentionFilter(memory_store)
     source_ingestion = SourceIngestion(_make_ingestion_config(env, vault_path))
@@ -453,7 +477,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
         embedding_config=embedding_config,
         min_time_between_runs=timedelta(hours=24),
         min_tier1_volume=int(env.get("PHOSPHENE_MIN_TIER1_VOLUME", "20")),
-        min_cluster_coherence=0.25,  # lowered for multilingual model (default 0.4 too strict)
+        min_cluster_coherence=_tuning_param(env, "min_cluster_coherence"),
     )
     generator_config = GeneratorConfig(llm_config=llm_config)
     router_config = RouterConfig(
@@ -555,6 +579,20 @@ def _require_env(env: dict[str, str], key: str) -> str:
     if not value:
         raise SystemExit(f"Missing required environment variable: {key}")
     return value
+
+
+def _tuning_param(env: dict[str, str], key: str) -> float | int | str:
+    """Read a tuning parameter from .env, falling back to DEFAULTS."""
+    env_key = f"PHOSPHENE_{key.upper()}"
+    raw = env.get(env_key)
+    if raw is None:
+        return DEFAULTS[key]
+    default = DEFAULTS[key]
+    if isinstance(default, int):
+        return int(raw)
+    if isinstance(default, float):
+        return float(raw)
+    return raw
 
 
 def _make_llm_config(env: dict[str, str]) -> object:
