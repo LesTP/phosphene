@@ -1379,6 +1379,10 @@ def _make_raptor_summarizer(
         llm_complete_callable = _toolkit_complete
 
     def summarizer(texts: list[str]) -> str:
+        import time
+        # Rate limit: 30K tokens/min. Each call is ~5-10K tokens.
+        # Wait 20s between calls to stay under limit (~3 calls/min).
+        time.sleep(20)
         try:
             return llm_complete_callable(
                 messages=_build_cluster_summary_request(texts),
@@ -1386,9 +1390,15 @@ def _make_raptor_summarizer(
                 tier=tier,
             )
         except Exception as first_err:
-            # Retry once on transient failures (empty response, rate limit)
-            import time
-            time.sleep(2)
+            err_str = str(first_err)
+            # Rate limit: wait 60s and retry
+            wait = 60 if "429" in err_str or "rate_limit" in err_str else 5
+            import logging
+            logging.getLogger(__name__).warning(
+                "Cluster summary failed (%d texts), retrying in %ds: %s",
+                len(texts), wait, first_err,
+            )
+            time.sleep(wait)
             try:
                 return llm_complete_callable(
                     messages=_build_cluster_summary_request(texts),
@@ -1396,8 +1406,6 @@ def _make_raptor_summarizer(
                     tier=tier,
                 )
             except Exception:
-                # Skip this cluster — return a placeholder summary
-                import logging
                 logging.getLogger(__name__).warning(
                     "Cluster summary failed after retry (%d texts): %s",
                     len(texts), first_err,
