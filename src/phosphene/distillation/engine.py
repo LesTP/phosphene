@@ -125,7 +125,7 @@ class _RaptorClusterConfig:
     min_cluster_size: int = 5
     min_samples: int = 2
     metric: str = "euclidean"
-    reduce_dims: int | None = None
+    reduce_dims: int | None = 15
 
 
 @dataclass(frozen=True)
