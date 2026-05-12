@@ -44,7 +44,7 @@ from phosphene.source_ingestion import AdapterConfig, IngestionConfig, SourceIng
 
 
 DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 DEFAULT_VAULT_PATH = Path("./vault")
 DEFAULT_LOG_PATH = Path("./logs/mvp_orchestrator.jsonl")
 DEFAULT_MARKER_PATH = DEFAULT_VAULT_PATH / ".source_markers.json"
