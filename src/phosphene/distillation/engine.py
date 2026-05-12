@@ -776,8 +776,8 @@ def _toolkit_cluster(
 def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, str]]:
     # Limit observations to avoid exceeding LLM context window.
     # Truncate individual texts and cap total count.
-    MAX_OBS = 20  # max observations per cluster summary
-    MAX_CHARS_PER_OBS = 1000  # ~250 tokens per observation
+    MAX_OBS = 50  # max observations per cluster summary
+    MAX_CHARS_PER_OBS = 2000  # ~500 tokens per observation
 
     obs = texts[:MAX_OBS] if len(texts) > MAX_OBS else list(texts)
     obs = [str(t)[:MAX_CHARS_PER_OBS] for t in obs]
