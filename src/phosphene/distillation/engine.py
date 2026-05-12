@@ -99,8 +99,26 @@ class _Tier1DistillationInput:
 
 
 @dataclass(frozen=True)
+class _StrategyStr:
+    """Mimics ClusterStrategy enum: has .value for toolkit compat."""
+    _name: str
+
+    @property
+    def value(self) -> str:
+        return self._name
+
+    def __eq__(self, other: object) -> bool:
+        if hasattr(other, "value"):
+            return self._name == other.value
+        return self._name == other
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+
+@dataclass(frozen=True)
 class _RaptorClusterConfig:
-    strategy: str
+    strategy: _StrategyStr
     raptor_summarizer: Callable[[list[str]], str]
     raptor_embedder: Callable[[list[str]], object]
     raptor_max_depth: int = 3
@@ -1381,7 +1399,7 @@ def _build_raptor_cluster_config(config: DistillationConfig) -> object:
 
     if config.clustering_config is None:
         return _RaptorClusterConfig(
-            strategy="raptor",
+            strategy=_StrategyStr("raptor"),
             raptor_summarizer=summarizer,
             raptor_embedder=embedder,
         )
