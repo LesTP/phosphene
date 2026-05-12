@@ -22,6 +22,20 @@ HDBSCAN on raw 384-dim embeddings produces one mega-cluster (733/3919 notes) and
 
 **What to test:** Run `tools/test_reduce_dims.py` on your seeded vault. Compare cluster count, largest cluster, noise percentage across dims. The sweet spot depends on corpus diversity — more diverse content needs fewer dims.
 
+### LLM model selection: newer isn't always better
+
+`claude-sonnet-4-5-20250929` (Sonnet 4.5) consistently returns `stop_reason: refusal` on bilingual casual conversations — the exact content that makes up most of the corpus. Same prompts work perfectly on `claude-sonnet-4-20250514` (Sonnet 4) with `stop_reason: end_turn`.
+
+Verified empirically: same cluster (30 notes, 25K chars of bilingual LJ conversations), same prompt, same system message. Sonnet 4.5 refuses. Sonnet 4 produces "multilingual social interaction centered around drug-related humor" — which is an accurate summary, not objectionable content.
+
+The refusal happens on content that includes: transliterated Russian (`nu eto ty uzhe kuda-to zagnul`), casual drug references, informal language mixing. None of this is harmful — it's how bilingual people actually write in online journals.
+
+**What to test:** Before committing to an LLM model for distillation, send your actual cluster content (not synthetic test data) through the API and check `stop_reason`. Use the raw `anthropic` client, not a wrapper that swallows the refusal as "empty response."
+
+**What to watch for:** Model version upgrades may change safety classifier behavior. Sonnet 4 is deprecated (EOL June 15, 2026). When migrating to a newer model, re-test against real clusters before running a full seed.
+
+**Cost note:** Sonnet 4 and 4.5 are priced the same ($3/MTok input). Haiku ($0.25/MTok) is an option for cluster summaries if budget is tight, but needs its own refusal testing.
+
 ### LLM API rate limits dominate batch processing time
 
 Anthropic's API limit is 30K input tokens per minute. RAPTOR clustering produces ~50-200 clusters per batch, each needing an LLM summary call. Without throttling, the first 3 calls succeed and the rest get 429'd.
