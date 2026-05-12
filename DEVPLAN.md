@@ -21,6 +21,8 @@ steps_remaining: 2
   - **Run on Pi** — do NOT run from Windows over SMB. SSH into Pi, run locally.
   - **No inline SSH commands** — write script files, push and execute. PowerShell quoting is broken for SSH→Python.
   - **Integration checks before expensive runs** — validate interface chain with dry-run probe scripts (e.g., `tools/check_clustering_compat.py`).
+  - **Preflight before LLM spend** — run `tools/preflight.py` before any operation that costs money. Checks vault sanity (duplicates, timestamps), API, clustering, interface compat. Fix all NO-GO items first.
+  - **Small-batch test first** — before any full-corpus LLM operation, test on 5-10 items and verify output. Only scale up after small test passes.
   - **NTFS atomic rename** — `os.rename()` fails on NTFS-3G shares. Use `find -delete` to clear vault.
 
 ## Current Status
