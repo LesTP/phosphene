@@ -189,7 +189,6 @@ def _seed_chronological(env: dict[str, str]) -> int:
     as T1, then distillation runs (T1→T2) before the next batch. This lets
     early writing shape the initial personality and later writing build on it.
     """
-    from collections import defaultdict
     from toolkit.embedding import embed, EmbeddingConfig
 
     vault_path = Path(env.get("PHOSPHENE_VAULT_PATH", str(DEFAULT_VAULT_PATH)))
@@ -242,22 +241,27 @@ def _seed_chronological(env: dict[str, str]) -> int:
     items = [item for item in items if len(item.content.split()) >= MIN_WORDS]
     print(f"  After filtering/cleaning: {len(items)} items")
 
-    # Group by year (items without real timestamps go to year 9999)
+    # Sort by timestamp (no-timestamp items go last)
     from datetime import datetime, timezone
-    batches = defaultdict(list)
-    for item in items:
+    def _sort_key(item):
         ts = item.timestamp
-        # Treat "today" timestamps as no-timestamp (seed-time artifacts)
         if ts and ts.year < 2026:
-            batches[ts.year].append(item)
-        else:
-            batches[9999].append(item)
+            return (0, ts)
+        return (1, datetime.min.replace(tzinfo=timezone.utc))
 
-    years = sorted(batches.keys())
-    print(f"\nChronological batches: {len(years)}")
-    for year in years:
-        label = "no-timestamp" if year == 9999 else str(year)
-        print(f"  {label}: {len(batches[year])} items")
+    items.sort(key=_sort_key)
+    print(f"  Sorted chronologically. Range: {items[0].timestamp} → {items[-1].timestamp}")
+
+    # Split into fixed-size batches of 200
+    BATCH_SIZE = 200
+    batches = [items[i:i + BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
+    print(f"\nChronological batches: {len(batches)} (size={BATCH_SIZE})")
+    for i, batch in enumerate(batches):
+        first_ts = batch[0].timestamp
+        last_ts = batch[-1].timestamp
+        label_start = first_ts.strftime("%Y-%m") if first_ts and first_ts.year < 2026 else "no-ts"
+        label_end = last_ts.strftime("%Y-%m") if last_ts and last_ts.year < 2026 else "no-ts"
+        print(f"  Batch {i+1}: {len(batch)} items ({label_start} → {label_end})")
 
     # Process each batch: embed → store → distill
     from phosphene.memory_store.types import NoteInput
@@ -272,11 +276,13 @@ def _seed_chronological(env: dict[str, str]) -> int:
         print(f"  Warning: distillation unavailable ({exc}) — will seed without distillation")
 
     total_stored = 0
-    for batch_idx, year in enumerate(years):
-        batch_items = batches[year]
-        label = "no-timestamp" if year == 9999 else str(year)
+    for batch_idx, batch_items in enumerate(batches):
+        first_ts = batch_items[0].timestamp
+        last_ts = batch_items[-1].timestamp
+        label_start = first_ts.strftime("%Y-%m") if first_ts and first_ts.year < 2026 else "no-ts"
+        label_end = last_ts.strftime("%Y-%m") if last_ts and last_ts.year < 2026 else "no-ts"
         print(f"\n{'='*60}")
-        print(f"Batch {batch_idx + 1}/{len(years)}: {label} ({len(batch_items)} items)")
+        print(f"Batch {batch_idx + 1}/{len(batches)}: {label_start}→{label_end} ({len(batch_items)} items)")
         print(f"{'='*60}")
 
         # Embed
@@ -305,7 +311,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
         print(f"  Stored {stored} T1 notes (total: {total_stored})")
 
         # Run distillation between batches (skip after last batch — let --once handle it)
-        if distillation_engine and batch_idx < len(years) - 1:
+        if distillation_engine and batch_idx < len(batches) - 1:
             print("  Running distillation...")
             try:
                 from datetime import timedelta
@@ -333,7 +339,7 @@ def _seed_chronological(env: dict[str, str]) -> int:
                 print(f"  Continuing to next batch...")
 
     print(f"\n{'='*60}")
-    print(f"Chronological seed complete. {total_stored} T1 notes across {len(years)} batches.")
+    print(f"Chronological seed complete. {total_stored} T1 notes across {len(batches)} batches.")
     print(f"Run 'python run.py --once' for final distillation + first generation.")
     return 0
 
