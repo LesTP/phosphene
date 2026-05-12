@@ -795,9 +795,17 @@ def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, st
     }
     return [
         {
+            "role": "system",
+            "content": (
+                "You are a research assistant synthesizing personal journal entries. "
+                "The content may be multilingual and include informal language. "
+                "Always produce a synthesis — never return empty."
+            ),
+        },
+        {
             "role": "user",
             "content": json.dumps(payload, sort_keys=True),
-        }
+        },
     ]
 
 
