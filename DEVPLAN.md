@@ -140,6 +140,10 @@ python3 run.py --once
 - **Memory:** Embedding model uses ~200-500MB. Container has 12-14GB RAM — plenty of headroom.
 - **Vault on NVMe:** The `/mnt/passport/` drive is the Passport SSD. Vault writes go there, not the SD card.
 
+## Discussion Items
+
+- **`tools/preflight.py`** — Runtime integration check script. Imports every module with real dependencies (not fakes), constructs minimal configs, runs trivial operations. Catches type/interface mismatches before expensive runs. Questions: should it run automatically before `--once`/`--seed-chronological`? Should it be a separate command or built into run.py as a `--preflight` flag?
+
 ## Deferred Work
 
 ### Feedback Collector Phase 7.2 (post-MVP)

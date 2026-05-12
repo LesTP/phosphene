@@ -25,7 +25,10 @@ Execute the phase completion protocol:
    patterns. Extract prescriptive one-liners and promote to DEVPLAN Gotchas.
 4. Contract Changes scan — scan DEVLOG for Contract Changes markers. List
    affected upstream documents and flag what needs propagation.
-5. Make all updates identified in steps 2–4. Commit.
+5. Integration check — if this phase modified cross-module types or wired
+   modules together, run `/integration-check` between affected module pairs.
+   Verify actual outputs feed into actual inputs (not just fakes).
+6. Make all updates identified in steps 2–5. Commit.
 6. Present summary of everything done.
 
 **If autonomous:** Commit. Exit with ESCALATE — human audits before next
