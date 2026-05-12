@@ -1000,7 +1000,7 @@ _FB_TIMESTAMP_RE = re.compile(
 )
 _FB_TAG_RE = re.compile(r"@\[\d+:\d+:([^\]]+)\]")
 _FB_BOILERPLATE_RE = re.compile(
-    r"\s*(?:Mike Yeluashvili|Michael Yeluashvili)\s+(?:shared a link|posted|updated|wrote on)\b[^.]*\.?",
+    r"\s*(?:Mike Yeluashvili|Michael Yeluashvili)\s+(?:shared a link|shared a post|shared a photo|added a new photo|posted|updated|wrote on)[^.]*\.?",
     re.IGNORECASE,
 )
 
