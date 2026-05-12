@@ -49,22 +49,37 @@ steps_remaining: 2
 - [x] Facebook adapter — `CorpusFacebookAdapter` parses FB HTML data export (467 posts, not yet seeded)
 
 ### Remaining
-- [ ] **Move to local disk or RPi5** — copy project, vault, seed, toolkit to local filesystem
-- [ ] **Seed Facebook corpus** — add FB adapter to `run.py`, run `--seed-direct` (appends, no re-seed needed)
-- [ ] **Chronological seeding mode** — `--seed-chronological` option: sort all corpus items by publication timestamp, feed in yearly batches, run distillation + decay between batches. Items without timestamps (plain text seed files) come in last. This lets the network "grow up" chronologically — early writing shapes initial personality, later writing reinforces or challenges it. Estimated cost: ~$5-10 extra for 3-4 distillation rounds. **Delete existing vault before running** — this replaces bulk seed. Record as D-54.
-- [x] **Measure link density on seeded vault** — DONE. Result: all zeros (mean_link_degree=0, cluster_count=0). The `--seed-direct` mode writes notes with no links/clusters/unresolvedness — these only develop through distillation. Phase 2 is naturally inactive after direct seed. **No need to raise density_crossover** — the system starts in Phase 1 by default and Phase 2 activates organically as distillation creates structure.
-- [ ] ~~**Raise `density_crossover` (if needed)**~~ — NOT NEEDED. See above.
-- [ ] **Run `--once`** — first distillation (T1→T2 clustering) + generation + Telegram delivery
+- [x] Deploy to Pi — venv at `~/phosphene-venv`, toolkit copied to `/mnt/passport/shared/toolkit/`, .env with TOOLKIT_SRC configured
+- [x] Seed Facebook corpus — FB adapter added to `run.py` config
+- [x] Chronological seeding mode — `--seed-chronological` implemented with yearly batches + distillation between
+- [x] Measure link density — all zeros after direct seed, Phase 2 naturally inactive, density_crossover NOT NEEDED
+- [ ] **Chronological seed IN PROGRESS (attempt 5)** — running on Pi. All interface fixes applied, per-cluster error tolerance, prompt size cap.
+- [ ] **Run `--once`** — first generation + Telegram delivery (after seed completes)
 - [ ] **Verify Telegram** — check message arrives on phone (manual)
-- [ ] **Raise `density_crossover`** — set to 10-15 for establishment phase. Current value (3.0) activates Phase 2 immediately on the dense seeded vault, using artifact structure as if it were mature. Lower back to 3.0 after 30-60 days.
 
-### Bugs found during first-run attempts
-- Ingestion via `--seed-only` cost $4 before we realized it LLM-scores every item
-- `_RaptorClusterConfig` missing `min_cluster_size` (toolkit interface mismatch) — fixed
-- Gateway `allowed_chat_ids` kwarg not in toolkit `TelegramClient` — fixed
-- LLM response wrapped in markdown fences, not raw JSON — fixed
-- LJ adapter path wrong (`seed/livejournal` vs actual `seed/LJ Backup/ljsm/lestp`) — fixed
-- Network share kills long-running processes — must run locally
+### Bugs found and fixed during first-run attempts
+- Ingestion via `--seed-only` cost $4 — LLM-scores every item (use `--seed-direct`)
+- `_RaptorClusterConfig` missing `min_cluster_size` — toolkit interface mismatch
+- `_RaptorClusterConfig.strategy` uppercase `"RAPTOR"` — toolkit enum expects lowercase `"raptor"`
+- `_RaptorClusterConfig.strategy` plain string — toolkit accesses `.value` (enum compat). Added `_StrategyStr`
+- `_RaptorClusterConfig.metric` defaulted to `"cosine"` — HDBSCAN expects `"euclidean"`
+- Gateway `allowed_chat_ids` kwarg not in toolkit `TelegramClient`
+- LLM response wrapped in markdown fences — added fence stripping to JSON parser
+- LJ adapter path wrong (`seed/livejournal` → `seed/LJ Backup/ljsm/lestp`)
+- Network share kills long-running processes — must run on Pi via SSH
+- RAPTOR summary prompt sent all cluster members (227K tokens > 200K limit) — capped at 50 obs × 2000 chars
+- Anthropic API empty response — added retry + per-cluster tolerance with placeholder summaries
+- NTFS-3G `rm -rf` fails — use `find -delete` pattern
+- Toolkit not on Samba share — copied to `/mnt/passport/shared/toolkit/`
+- Venv can't run on NTFS (no exec bits) — created on ext4 at `~/phosphene-venv`
+- `run.py` toolkit path hardcoded to Windows — added cross-platform resolution
+
+### Governance improvements
+- `/phase-complete` step 5: integration check for cross-module types
+- DEVPLAN gotchas: no inline SSH commands, integration checks before expensive runs
+- `tools/check_clustering_compat.py` — dry-run interface validation
+- `tools/measure_density.py` — vault density metrics
+- Discussion: `tools/preflight.py` for full module graph validation
 
 ## Post-MVP.4 (next priorities)
 
@@ -73,7 +88,7 @@ steps_remaining: 2
    - **Conversation memory:** All tiers get stored as T1 with `source=conversation:{chat_id}`, so the bot remembers previous exchanges per person. For untrusted users, this memory is ephemeral (fast decay) but provides continuity within a few days.
    - **Trust promotion:** `/trust @username` raises stored note importance. Could be automatic over time for consistently benign interlocutors. Post-MVP feature.
 2. **Inbound chat ID filter** — determines trust tier. Owner chat ID = owner tier. Others start as untrusted.
-3. **Deploy to Pi** — run inside `claude-code` Incus container (not over SMB from Windows). See deployment checklist below.
+3. **Deploy to Pi** — DONE. See deployment checklist below (already executed).
 4. **Leiden community detection** — replace agglomerative clustering. See `notebooks/CLUSTERING_AB_PLAN.md`.
 5. **Tuning panel** — live parameter adjustment interface.
 6. **Network visualization** — 2D UMAP projection of vault embeddings, colored by source/cluster/tier.
