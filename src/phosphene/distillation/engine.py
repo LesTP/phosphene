@@ -1400,7 +1400,7 @@ _REDUCE_DIMS = 15
 _FALLBACK_MODELS = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
 
 
-def _make_fallback_llm_config
+def _make_fallback_llm_config(llm_config: object) -> object | None:
     """Create a fallback LLM config with a different model for retry."""
     models = getattr(llm_config, "models", {})
     current_model = models.get("default", "") if isinstance(models, dict) else ""
