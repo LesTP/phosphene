@@ -112,3 +112,59 @@ DECISIONS.md: D-51 closed. PROJECT.md: no open project risks were resolved by th
 Added `run.py` as the MVP bootstrap entry point. The script reads `.env`, builds runtime configs for Memory Store, Attention Filter, Source Ingestion corpus adapters, Distillation, Generator, Gateway, and MVP Orchestrator, then exposes `--seed-only`, `--once`, and default cron-loop modes. It uses `paraphrase-multilingual-MiniLM-L12-v2` as the default embedding model and keeps `--help` import-safe even when the external `toolkit` package is not present in this checkout.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 - <<'PY' ... import run ... PY`, `PYTHONPATH=src:.python_deps python3 run.py --help`, and `PYTHONPATH=src:.python_deps python3 -m pytest tests/`. DEVPLAN keeps `state: execute`, leaves `steps_remaining` at 3 after consuming one action from the prompt budget, and moves focus to MVP.4.2 seed-only mode.
+
+### MVP.4 Integration Session (supervised)
+**Date:** 2026-05-10 through 2026-05-12
+**Mode:** supervised (interactive)
+**Outcome:** In progress — seed run with distillation pending overnight
+
+This was a two-day supervised integration session — the first time all modules ran against real dependencies, real APIs, and real corpus data. 25 commits covering:
+
+**Corpus adapters (5 commits):**
+- ljsm format support for LJ adapter (date extraction, comment stripping, reply context)
+- Blogspot Atom adapter (posts + author follow-up comments)
+- Facebook HTML export adapter (467 posts, boilerplate cleanup)
+- Content cleaning in seed-direct (track listings, share links, bitrate lines)
+- FB boilerplate stripping ("shared a photo/post")
+
+**Bootstrap and seeding (6 commits):**
+- `--seed-direct` mode (bypasses LLM attention filter, embeds locally)
+- `--seed-chronological` mode (200-note batches, distillation between each)
+- Fixed-size batches (replaced uneven yearly batches)
+- Cross-platform toolkit path resolution
+- 3,919 T1 notes successfully seeded from 4 sources
+
+**Integration bugfixes (8 commits):**
+- `_RaptorClusterConfig` interface: missing `min_cluster_size`, uppercase strategy, plain string vs enum `.value`, wrong metric default
+- Gateway `allowed_chat_ids` kwarg not in toolkit
+- JSON fence stripping in attention filter and distillation parsers
+- Cluster summary prompt overflow (capped at 50 obs × 2000 chars)
+- Rate limit throttling (30s between calls, 60s on 429)
+- Per-cluster error tolerance with placeholder summaries
+- System prompt for cluster summaries
+- Model switch: Sonnet 4.5 refuses bilingual content (`stop_reason: refusal`), Sonnet 4 handles it (`stop_reason: end_turn`)
+
+**Clustering optimization (2 commits):**
+- UMAP `reduce_dims=15`: 25→227 clusters, largest 733→50, noise 76%→38%
+- Tested dims 5/10/15/20; 15 optimal
+
+**Deployment (3 commits):**
+- Pi deployment: venv on ext4, toolkit copied to share, .env with TOOLKIT_SRC
+- Network visualization tool (`tools/visualize_network.py`)
+- Density measurement tool (`tools/measure_density.py`)
+
+**Design decisions (2 commits):**
+- D-52/D-53: multilingual embedding model, switchability
+- Inbound message handler: `#` prefix → ingestion, no prefix → conversation, trust tiers
+
+**Governance (2 commits):**
+- `/phase-complete` step 5: integration check for cross-module types
+- DEVPLAN gotchas: no inline SSH, integration checks before expensive runs, cost estimation
+
+**Documentation (2 commits):**
+- `notebooks/TUNING_GUIDE.md`: corpus-to-personality findings
+- `AUTONOMOUS_SOFTWARE_DEVELOPMENT.md` §11 + lessons 25-29
+
+**Key finding:** Integration testing is a distinct work regime. 15+ interface mismatches discovered, all at boundaries between real dependencies and fake test doubles. A dry-run probe script (`tools/check_clustering_compat.py`) catches these in 30 seconds — established as standard practice.
+
+**Key finding:** LLM model version selection matters for personality corpora. Sonnet 4.5 refuses on bilingual casual content. Sonnet 4 produces excellent summaries. Must test with real cluster content before committing to a model.
