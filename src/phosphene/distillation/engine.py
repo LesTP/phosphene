@@ -774,6 +774,14 @@ def _toolkit_cluster(
 
 
 def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, str]]:
+    # Limit observations to avoid exceeding LLM context window.
+    # Truncate individual texts and cap total count.
+    MAX_OBS = 50  # max observations per cluster summary
+    MAX_CHARS_PER_OBS = 2000  # ~500 tokens per observation
+
+    obs = texts[:MAX_OBS] if len(texts) > MAX_OBS else list(texts)
+    obs = [str(t)[:MAX_CHARS_PER_OBS] for t in obs]
+
     payload = {
         "task": "distill_tier1_cluster_summary",
         "instructions": (
@@ -782,7 +790,8 @@ def _build_cluster_summary_request(texts: Sequence[str]) -> list[Mapping[str, st
             "friction, and unresolved questions. Avoid inventing context not "
             "supported by the observations. Return plain text only."
         ),
-        "observations": [str(text) for text in texts],
+        "observations": obs,
+        "note": f"Showing {len(obs)} of {len(texts)} cluster members.",
     }
     return [
         {
