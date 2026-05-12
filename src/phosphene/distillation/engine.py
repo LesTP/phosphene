@@ -1552,9 +1552,24 @@ def _normalize_cluster_result(
                 noise_indices.add(index)
             else:
                 grouped.setdefault(str(label), []).append(index)
+
+        # Extract RAPTOR summaries from tree if available
+        tree = _result_value(result, "tree")
+        summaries_by_id: dict[str, str] = {}
+        if tree:
+            for layer in tree:
+                layer_summaries = getattr(layer, "summaries", None)
+                if layer_summaries and isinstance(layer_summaries, dict):
+                    for cid, summary in layer_summaries.items():
+                        summaries_by_id[str(cid)] = str(summary)
+
         return _NormalizedClusterResult(
             clusters=[
-                _NormalizedCluster(cluster_id=cluster_id, member_indices=indices)
+                _NormalizedCluster(
+                    cluster_id=cluster_id,
+                    member_indices=indices,
+                    summary=summaries_by_id.get(cluster_id),
+                )
                 for cluster_id, indices in grouped.items()
             ],
             noise_indices=noise_indices,
