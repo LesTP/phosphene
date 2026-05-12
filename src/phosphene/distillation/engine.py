@@ -1403,8 +1403,8 @@ def _make_raptor_summarizer(
     def summarizer(texts: list[str]) -> str:
         import time
         # Rate limit: 30K tokens/min. Each call is ~5-10K tokens.
-        # Wait 20s between calls to stay under limit (~3 calls/min).
-        time.sleep(20)
+        # Wait 30s between calls to stay well under limit (~2 calls/min).
+        time.sleep(30)
         try:
             return llm_complete_callable(
                 messages=_build_cluster_summary_request(texts),
