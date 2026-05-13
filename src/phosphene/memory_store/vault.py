@@ -93,7 +93,7 @@ def parse_note(text: str) -> MemoryNote:
 
 
 def _slugify(title: str) -> str:
-    words = re.findall(r"[A-Za-z0-9]+", title.lower())
+    words = re.findall(r"[\w]+", title.lower())  # \w matches Unicode letters
     slug = "-".join(words)[:_ID_SLUG_MAX_LENGTH].strip("-")
     return slug or "note"
 
