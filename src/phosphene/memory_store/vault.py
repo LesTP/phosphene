@@ -15,11 +15,11 @@ from phosphene.memory_store.types import MemoryNote
 _ID_SLUG_MAX_LENGTH = 60
 
 
-def generate_note_id(title: str, created_at: datetime) -> str:
-    """Generate a deterministic note id from title and creation time."""
+def generate_note_id(title: str, created_at: datetime, content: str = "") -> str:
+    """Generate a deterministic note id from title, creation time, and content."""
     slug = _slugify(title)
     timestamp = created_at.strftime("%Y%m%d%H%M%S")
-    hash_input = f"{title}\0{created_at.isoformat()}".encode("utf-8")
+    hash_input = f"{title}\0{created_at.isoformat()}\0{content}".encode("utf-8")
     suffix = hashlib.sha1(hash_input).hexdigest()[:4]
     return f"{slug}-{timestamp}-{suffix}"
 

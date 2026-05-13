@@ -59,7 +59,7 @@ class MemoryStore:
         _validate_score("unresolvedness", note.unresolvedness)
 
         created_at = note.created_at or datetime.now(timezone.utc)
-        note_id = generate_note_id(note.title, created_at)
+        note_id = generate_note_id(note.title, created_at, note.content)
         memory_note = MemoryNote(
             note_id=note_id,
             tier=note.tier,
