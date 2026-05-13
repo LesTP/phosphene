@@ -221,3 +221,15 @@ Fix planned as three Build steps: (1) engine fix with centroid similarity filter
 Replaced the T2 all-to-all same-run link mesh with centroid cosine similarity ranking. Each promoted cluster now links only to peers above the configured threshold, capped at the configured top-K. Added regression coverage for five known centroids where only the similar pair cross-links, updated config contract tests, and kept backward compatibility through defaults.
 
 Validation: `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/` passed (82 tests). Full suite passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (619 tests).
+
+### Step 2: Strip bad links + regenerate proper cross-links
+**Date:** 2026-05-13
+**Mode:** autonomous Build
+**Outcome:** Success — live vault T2 cross-links rebuilt from centroid similarity
+**Contract changes:** None.
+
+Added `tools/rebuild_t2_crosslinks.py` with dry-run and write modes, using the Memory Store markdown parser and stored centroid embeddings. The tool strips T2→T2 links, preserves non-T2 source links, ranks candidate T2 peers by cosine similarity, and rewrites note frontmatter link counts with corrected outbound links.
+
+Live vault run at `--threshold 0.45 --max-links 15`: dry-run and write both processed 251 T2 notes, stripped 51,050 old T2 links, preserved 2,645 non-T2 links, added 3,582 similarity-filtered T2 links, and produced a T2 link distribution from 1 to 15 links per note. `tools/measure_density.py` changed mean link degree from 26.15 before rebuild to 3.03 after rebuild.
+
+Validation: `PYTHONPATH=src:.python_deps python3 -m pytest tests/` passed (621 tests).

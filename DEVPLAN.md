@@ -2,7 +2,7 @@
 phase: MVP.4
 blocked: false
 state: execute
-steps_remaining: 3
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -60,7 +60,7 @@ steps_remaining: 3
 
 **Contract change:** Adds `cross_link_threshold` and `max_cross_links` to `DistillationConfig`. Both have defaults so existing callers are unaffected. Update ARCH_distillation.md step 7 to describe the filtering.
 
-### Step 2: Strip bad links + regenerate proper cross-links
+### Step 2: Strip bad links + regenerate proper cross-links (done)
 
 **What:** Write `tools/rebuild_t2_crosslinks.py` that:
 1. Loads all T2 notes from `vault/tier2/*.md`
