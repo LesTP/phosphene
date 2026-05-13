@@ -233,3 +233,13 @@ Added `tools/rebuild_t2_crosslinks.py` with dry-run and write modes, using the M
 Live vault run at `--threshold 0.45 --max-links 15`: dry-run and write both processed 251 T2 notes, stripped 51,050 old T2 links, preserved 2,645 non-T2 links, added 3,582 similarity-filtered T2 links, and produced a T2 link distribution from 1 to 15 links per note. `tools/measure_density.py` changed mean link degree from 26.15 before rebuild to 3.03 after rebuild.
 
 Validation: `PYTHONPATH=src:.python_deps python3 -m pytest tests/` passed (621 tests).
+
+### Step 3: Validate vault state
+**Date:** 2026-05-13
+**Mode:** autonomous Build
+**Outcome:** Success — vault state validated after T2 cross-link rebuild
+**Contract changes:** None.
+
+Validated the rebuilt vault: `tools/measure_density.py` reports 4,107 total notes, 225 clusters, and mean link degree 3.03. A post-write dry run of `tools/rebuild_t2_crosslinks.py --threshold 0.45 --max-links 15 --dry-run` reported `rewritten_count: 0`, 251 T2 notes, 0 missing embeddings, 2,645 preserved non-T2 links, and 3,582 T2 links with no note above the 15-link cap. The vault still has 251 T2 markdown notes and 225 assertion cache JSON files.
+
+`tools/preflight.py` initially failed because `.python_deps` lacked `anthropic`, `hdbscan`, and `umap`; installing those runtime dependencies into `.python_deps` with workspace-local `TMPDIR` resolved the issue. Preflight is now GO with only the expected warning that T2 notes already exist. Full suite passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (621 tests).

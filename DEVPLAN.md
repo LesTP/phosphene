@@ -2,7 +2,7 @@
 phase: MVP.4
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -37,7 +37,7 @@ steps_remaining: 2
 - [x] **Fix missing notes** — root cause: note ID collision (same title+timestamp → same filename). Fixed by including content in hash. Re-seeded: 3,856 T1 notes (was 1,469).
 - [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
 - [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
-- [ ] **Fix T2→T2 cross-links** — see MVP.4a below
+- [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated.
 - [ ] **T2→T3 distillation** — reflect-evolve personality files
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
@@ -78,7 +78,7 @@ steps_remaining: 2
 - After write: verify T1 links preserved, T2 links within expected range
 - Run `tools/measure_density.py` and compare before/after
 
-### Step 3: Validate vault state
+### Step 3: Validate vault state (done)
 
 **What:** Run `tools/measure_density.py` and `tools/preflight.py`. Verify:
 - T2 link distribution is ~5-15 per note (not 224)
