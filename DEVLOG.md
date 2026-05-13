@@ -243,3 +243,13 @@ Validation: `PYTHONPATH=src:.python_deps python3 -m pytest tests/` passed (621 t
 Validated the rebuilt vault: `tools/measure_density.py` reports 4,107 total notes, 225 clusters, and mean link degree 3.03. A post-write dry run of `tools/rebuild_t2_crosslinks.py --threshold 0.45 --max-links 15 --dry-run` reported `rewritten_count: 0`, 251 T2 notes, 0 missing embeddings, 2,645 preserved non-T2 links, and 3,582 T2 links with no note above the 15-link cap. The vault still has 251 T2 markdown notes and 225 assertion cache JSON files.
 
 `tools/preflight.py` initially failed because `.python_deps` lacked `anthropic`, `hdbscan`, and `umap`; installing those runtime dependencies into `.python_deps` with workspace-local `TMPDIR` resolved the issue. Preflight is now GO with only the expected warning that T2 notes already exist. Full suite passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (621 tests).
+
+### T2→T3 distillation blocked
+**Date:** 2026-05-13
+**Mode:** autonomous Build
+**Outcome:** Escalated — next step is unsafe under current implementation
+**Contract changes:** None.
+
+Before running the next LLM operation, estimated the T2→T3 reflection request from the live vault. The current request would include 251 T2 pattern notes, about 809,011 characters (~202k rough input tokens) before output, which is at or beyond the practical context budget for the configured model. The vault also has 0 Tier 3 personality files, while the implemented evolution path only proposes supersession or unchanged actions for existing T3 files; it does not create initial personality files from scratch.
+
+Stopped before spending LLM budget. Human/design decision needed: add an initial T3 bootstrap path, compact/select the T2 pattern layer before reflection, or seed initial T3 files before using the existing supersession path.

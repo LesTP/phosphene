@@ -1,8 +1,8 @@
 ---
 phase: MVP.4
-blocked: false
+blocked: true
 state: execute
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -28,8 +28,8 @@ steps_remaining: 1
 ## Current Status
 
 - **Phase** — MVP.4: Bootstrap and first run
-- **Focus** — Fix T2→T2 cross-link bug before T2→T3 distillation.
-- **Blocked** — No.
+- **Focus** — T2→T3 distillation blocked pending bootstrap design.
+- **Blocked** — Yes: current T2→T3 path would send ~202k input tokens from 251 T2 notes and there are 0 existing T3 personality files for the implemented supersession-only evolution path.
 
 ## MVP.4: Remaining Steps
 
@@ -38,7 +38,7 @@ steps_remaining: 1
 - [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
 - [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
 - [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated.
-- [ ] **T2→T3 distillation** — reflect-evolve personality files
+- [ ] **T2→T3 distillation** — blocked: needs initial T3 bootstrap/compaction design before running.
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
 
