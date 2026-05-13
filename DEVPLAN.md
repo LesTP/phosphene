@@ -28,14 +28,17 @@ steps_remaining: 2
 ## Current Status
 
 - **Phase** — MVP.4: Bootstrap and first run
-- **Focus** — Chronological seed + first distillation + first Telegram output
-- **Blocked** — No. Chronological seed ready to launch on Pi.
+- **Focus** — Chronological distillation working on 200-note batches. Next: full corpus.
+- **Blocked** — No.
 
 ## MVP.4: Remaining Steps
 
-- [ ] **Run `--seed-chronological`** — 200-note batches, distillation between each. Launch overnight on Pi.
-- [ ] **Run `--once`** — first generation + Telegram delivery (after seed completes)
-- [ ] **Verify Telegram** — check message arrives on phone (manual)
+- [x] T1→T2 distillation working — 12/12 cluster summaries succeeded, 11 T2 notes produced from 200 notes
+- [ ] **Fix missing notes** — re-seed to get all 3,859 (currently have 1,469 due to NTFS flush issue)
+- [ ] **Full chronological distillation** — iterate 200-note batches through all notes
+- [ ] **T2→T3 distillation** — reflect-evolve personality files
+- [ ] **Run generation** — first output via Telegram
+- [ ] **Verify Telegram** — check message arrives on phone
 
 ## Next Priorities (post-MVP.4)
 

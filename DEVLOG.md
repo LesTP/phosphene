@@ -168,3 +168,21 @@ This was a two-day supervised integration session — the first time all modules
 **Key finding:** Integration testing is a distinct work regime. 15+ interface mismatches discovered, all at boundaries between real dependencies and fake test doubles. A dry-run probe script (`tools/check_clustering_compat.py`) catches these in 30 seconds — established as standard practice.
 
 **Key finding:** LLM model version selection matters for personality corpora. Sonnet 4.5 refuses on bilingual casual content. Sonnet 4 produces excellent summaries. Must test with real cluster content before committing to a model.
+
+### First successful T1?T2 distillation
+**Date:** 2026-05-13
+**Mode:** supervised
+**Outcome:** Success � 11 T2 notes produced
+
+Pipeline validated end-to-end: T1 notes (200, chronologically sorted with real timestamps from 2003-2026) ? UMAP (384?15 dim) ? HDBSCAN (12 clusters) ? LLM cluster summaries (12/12 succeeded, Sonnet 4.6, no refusals) ? coherence gating (11/12 passed at 0.25 threshold) ? T2 note writes ? assertion cache.
+
+Key changes that enabled success:
+- Sonnet 4.6 instead of 4.5 (which refuses bilingual content)
+- reduce_dims=15 (UMAP pre-reduction eliminates mega-clusters)
+- min_cluster_coherence=0.25 (lowered from 0.4 for multilingual model)
+- 45s throttle between LLM calls (stays under 30K tokens/min)
+- RAPTOR summary extraction from tree layers (was falling through to raw text fallback)
+- Staging approach to limit distillation scope (engine processes all vault T1 notes)
+- Success logging per cluster summary for progress tracking
+- NoteInput.created_at for original timestamp preservation (D-54)
+- All tuning params extracted to .env-backed config
