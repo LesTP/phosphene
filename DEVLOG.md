@@ -172,7 +172,7 @@ This was a two-day supervised integration session — the first time all modules
 ### First successful T1?T2 distillation
 **Date:** 2026-05-13
 **Mode:** supervised
-**Outcome:** Success � 11 T2 notes produced
+**Outcome:** Success � 11 T2 notes produced
 
 Pipeline validated end-to-end: T1 notes (200, chronologically sorted with real timestamps from 2003-2026) ? UMAP (384?15 dim) ? HDBSCAN (12 clusters) ? LLM cluster summaries (12/12 succeeded, Sonnet 4.6, no refusals) ? coherence gating (11/12 passed at 0.25 threshold) ? T2 note writes ? assertion cache.
 
@@ -190,7 +190,7 @@ Key changes that enabled success:
 ### Note ID collision fix
 **Date:** 2026-05-13
 **Mode:** supervised
-**Outcome:** 3,856 T1 notes (was 1,469 � 62% were silently overwritten)
+**Outcome:** 3,856 T1 notes (was 1,469 � 62% were silently overwritten)
 
 Root cause: LJ comment replies share the parent post's title and timestamp. The note ID hash used only title+timestamp, so multiple replies from the same post generated identical filenames. Each subsequent write overwrote the previous file.
 
@@ -198,4 +198,26 @@ Fix: include note content in the SHA1 hash input (vault.py line 22). The 4-char 
 
 Also fixed: ASCII-only slugifier (only matched [A-Za-z0-9]) replaced with Unicode-aware \w regex. Cyrillic titles now produce readable slugs instead of falling back to 'note'.
 
-Both are contract changes to the Memory Store vault module � note IDs generated after this fix are different from previous runs. Vault must be re-seeded.
+Both are contract changes to the Memory Store vault module — note IDs generated after this fix are different from previous runs. Vault must be re-seeded.
+
+### T2→T2 cross-link bug identified
+**Date:** 2026-05-13
+**Mode:** supervised (Discuss)
+**Outcome:** Bug documented, fix planned as MVP.4a (autonomous Build)
+**Contract changes:** Planned — `DistillationConfig` gains `cross_link_threshold` and `max_cross_links` fields (both with defaults, backward compatible)
+
+Investigation of vault state after full chronological distillation revealed that `_write_tier2_cluster_notes()` (engine.py:638-641) creates an all-to-all mesh: every T2 note from a distillation run is linked to every other T2 note from the same run. Vault distribution: 225 notes with 224 T2 cross-links each (from `distill_full`), 26 notes with 25 each (from `distill_loop2`). The two cliques are disconnected from each other.
+
+Designed for incremental operation (~10 clusters per batch = small clique, roughly correct), but the full-corpus bootstrap produced 225 clusters in one pass, creating a meaningless complete graph. T1 source links (5-16 per note) are correct.
+
+Fix planned as three Build steps: (1) engine fix with centroid similarity filtering, (2) vault link regeneration script, (3) validation. See DEVPLAN MVP.4a for details.
+
+### Step 1: Engine fix — similarity-filtered cross-links
+**Date:** 2026-05-13
+**Mode:** autonomous Build
+**Outcome:** Success — distillation now links only similar same-run T2 clusters
+**Contract changes:** `DistillationConfig` now includes `cross_link_threshold` and `max_cross_links`; `ARCH_distillation.md` step 7 documents centroid-similarity cross-link filtering.
+
+Replaced the T2 all-to-all same-run link mesh with centroid cosine similarity ranking. Each promoted cluster now links only to peers above the configured threshold, capped at the configured top-K. Added regression coverage for five known centroids where only the similar pair cross-links, updated config contract tests, and kept backward compatibility through defaults.
+
+Validation: `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/` passed (82 tests). Full suite passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (619 tests).

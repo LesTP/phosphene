@@ -2,7 +2,7 @@
 phase: MVP.4
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 3
 ---
 
 # Phosphene — Development Plan
@@ -28,18 +28,64 @@ steps_remaining: 2
 ## Current Status
 
 - **Phase** — MVP.4: Bootstrap and first run
-- **Focus** — Chronological distillation working on 200-note batches. Next: full corpus.
+- **Focus** — Fix T2→T2 cross-link bug before T2→T3 distillation.
 - **Blocked** — No.
 
 ## MVP.4: Remaining Steps
 
 - [x] T1→T2 distillation working — 12/12 cluster summaries succeeded, 11 T2 notes produced from 200 notes
 - [x] **Fix missing notes** — root cause: note ID collision (same title+timestamp → same filename). Fixed by including content in hash. Re-seeded: 3,856 T1 notes (was 1,469).
-- [ ] **Stage 200 notes + run preflight** — prepare for chronological distillation
-- [ ] **Full chronological distillation** — iterate 200-note batches through all notes (~$3-4, ~3 hours)
+- [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
+- [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
+- [ ] **Fix T2→T2 cross-links** — see MVP.4a below
 - [ ] **T2→T3 distillation** — reflect-evolve personality files
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
+
+## MVP.4a: Fix T2→T2 Cross-Links (autonomous, Build)
+
+**Problem:** `_write_tier2_cluster_notes()` (engine.py:638-641) creates an all-to-all mesh: every T2 note produced in a distillation run gets linked to every other T2 note from the same run. In incremental mode (~10 clusters per run), this is a small clique and roughly correct. In the full-corpus bootstrap (225 clusters), it produces a 225-node complete graph where every note has 224 meaningless cross-links. The ARCH spec (line 128) says "wires cross-references between **related** clusters" — the implementation skips the "related" filter.
+
+**Current vault state:** 251 T2 .md notes. 225 have 224 T2 cross-links each (from `distill_full`), 26 have 25 each (from `distill_loop2`). T1 source links (5-16 per note) are correct and must be preserved. Cluster centroids stored in `vault/.embeddings/` (4,122 .npy files). `_cosine_similarity()` helper exists at engine.py:1707.
+
+**Network impact:** All-to-all T2 links make density metrics flat (every node equally connected), defeat link-density decay (nothing can be forgotten), and provide no structural signal for the Attention Filter's prompt-to-structure transition.
+
+### Step 1: Engine fix — similarity-filtered cross-links (done)
+
+**What:** Replace lines 638-641 with centroid-similarity filtering. Add `cross_link_threshold: float = 0.45` and `max_cross_links: int = 15` to `DistillationConfig`. For each note, compute cosine similarity against all other centroids from the same run, keep only pairs above threshold, cap at top-K.
+
+**Files:** `engine.py` (lines 638-641), `engine.py` (DistillationConfig definition — find line). Test file for cross-linking.
+
+**Verification:** Unit test — given 5 promotions with known centroids (2 similar, 3 dissimilar), verify only the similar pair gets cross-linked. Existing tests must still pass.
+
+**Contract change:** Adds `cross_link_threshold` and `max_cross_links` to `DistillationConfig`. Both have defaults so existing callers are unaffected. Update ARCH_distillation.md step 7 to describe the filtering.
+
+### Step 2: Strip bad links + regenerate proper cross-links
+
+**What:** Write `tools/rebuild_t2_crosslinks.py` that:
+1. Loads all T2 notes from `vault/tier2/*.md`
+2. For each note, partitions `links` into T1 links (resolve to `vault/tier1/`) and T2 links (resolve to `vault/tier2/`)
+3. Strips all T2→T2 links
+4. Loads centroid embeddings from `vault/.embeddings/{note_id}.npy`
+5. Computes pairwise cosine similarity between all T2 centroids
+6. For each T2 note, adds cross-links to top-K most similar peers above threshold
+7. Rewrites the .md files with corrected links
+
+**Parameters:** `--threshold 0.45 --max-links 15` (same defaults as engine). `--dry-run` mode that prints link distribution without writing.
+
+**Verification:**
+- Dry-run first: check link count distribution (should be 0-15 per note, not 224)
+- After write: verify T1 links preserved, T2 links within expected range
+- Run `tools/measure_density.py` and compare before/after
+
+### Step 3: Validate vault state
+
+**What:** Run `tools/measure_density.py` and `tools/preflight.py`. Verify:
+- T2 link distribution is ~5-15 per note (not 224)
+- T1 source links unchanged
+- Total T2 notes unchanged (251)
+- Assertion caches (.json) untouched
+- All existing tests pass
 
 ## Next Priorities (post-MVP.4)
 

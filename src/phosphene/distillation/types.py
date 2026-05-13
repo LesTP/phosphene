@@ -45,6 +45,13 @@ def _require_positive_int(value: int, field_name: str) -> None:
         raise DistillationConfigError(f"{field_name} must be positive")
 
 
+def _require_non_negative_int(value: int, field_name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DistillationConfigError(f"{field_name} must be an integer")
+    if value < 0:
+        raise DistillationConfigError(f"{field_name} must be non-negative")
+
+
 def _require_non_negative_float(value: float, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise DistillationConfigError(f"{field_name} must be a number")
@@ -75,6 +82,8 @@ class DistillationConfig:
     max_compression_ratio: float = 0.5
     incorporate_feedback: bool = True
     min_cluster_coherence: float = 0.4
+    cross_link_threshold: float = 0.45
+    max_cross_links: int = 15
 
     def __post_init__(self) -> None:
         _require_present(self.llm_config, "llm_config")
@@ -95,6 +104,8 @@ class DistillationConfig:
             raise DistillationConfigError("max_inertia must be at least 1.0")
         _require_probability(self.max_compression_ratio, "max_compression_ratio")
         _require_probability(self.min_cluster_coherence, "min_cluster_coherence")
+        _require_probability(self.cross_link_threshold, "cross_link_threshold")
+        _require_non_negative_int(self.max_cross_links, "max_cross_links")
 
 
 @dataclass

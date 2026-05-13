@@ -109,8 +109,8 @@ class _StrategyStr:
 
     def __eq__(self, other: object) -> bool:
         if hasattr(other, "value"):
-            return self._name == other.value
-        return self._name == other
+            return self._name.casefold() == str(other.value).casefold()
+        return self._name.casefold() == str(other).casefold()
 
     def __hash__(self) -> int:
         return hash(self._name)
@@ -354,7 +354,7 @@ class DistillationEngine:
                 coherent_promotions,
                 config,
             )
-            write_result = self._write_tier2_cluster_notes(coherent_promotions)
+            write_result = self._write_tier2_cluster_notes(coherent_promotions, config)
             assertion_cache_updated = self._write_assertion_caches(
                 assertion_cache_payloads
             )
@@ -569,6 +569,7 @@ class DistillationEngine:
     def _write_tier2_cluster_notes(
         self,
         promotions: Sequence[_CoherentClusterPromotion],
+        config: DistillationConfig,
     ) -> dict[str, list[str]]:
         existing_by_group = {
             str(note.cluster_group): note
@@ -635,10 +636,9 @@ class DistillationEngine:
                 updated_cluster_ids.append(str(updated_note.note_id))
                 note_ids_by_group[promotion.cluster.cluster_id] = str(updated_note.note_id)
 
-        cluster_note_ids = list(note_ids_by_group.values())
-        for note_id in cluster_note_ids:
-            related_ids = [related_id for related_id in cluster_note_ids if related_id != note_id]
-            self.memory_store.add_links(note_id, related_ids)
+        cross_links = _related_cluster_links(promotions, note_ids_by_group, config)
+        for note_id in note_ids_by_group.values():
+            self.memory_store.add_links(note_id, cross_links.get(note_id, []))
 
         return {
             "new_cluster_ids": new_cluster_ids,
@@ -1720,6 +1720,38 @@ def _cosine_similarity(left: object, right: object) -> float:
         for left_value, right_value in zip(left_values, right_values, strict=True)
     )
     return dot / (left_norm * right_norm)
+
+
+def _related_cluster_links(
+    promotions: Sequence[_CoherentClusterPromotion],
+    note_ids_by_group: Mapping[str, str],
+    config: DistillationConfig,
+) -> dict[str, list[str]]:
+    if config.max_cross_links == 0:
+        return {note_id: [] for note_id in note_ids_by_group.values()}
+
+    promotions_by_note_id = {
+        note_ids_by_group[promotion.cluster.cluster_id]: promotion
+        for promotion in promotions
+        if promotion.cluster.cluster_id in note_ids_by_group
+    }
+    related: dict[str, list[str]] = {}
+    for source_id, source_promotion in promotions_by_note_id.items():
+        scored_targets: list[tuple[float, str]] = []
+        for target_id, target_promotion in promotions_by_note_id.items():
+            if target_id == source_id:
+                continue
+            similarity = _cosine_similarity(
+                source_promotion.centroid,
+                target_promotion.centroid,
+            )
+            if similarity >= config.cross_link_threshold:
+                scored_targets.append((similarity, target_id))
+        scored_targets.sort(key=lambda item: (-item[0], item[1]))
+        related[source_id] = [
+            target_id for _similarity, target_id in scored_targets[: config.max_cross_links]
+        ]
+    return related
 
 
 def _vector_at(vectors: object, index: int) -> object:

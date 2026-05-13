@@ -82,6 +82,8 @@ def test_arch_dataclass_field_names_match_contract() -> None:
         "max_compression_ratio",
         "incorporate_feedback",
         "min_cluster_coherence",
+        "cross_link_threshold",
+        "max_cross_links",
     ]
     assert [field.name for field in fields(GateStatus)] == [
         "ready",
@@ -200,6 +202,8 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
     assert config.max_compression_ratio == 0.5
     assert config.incorporate_feedback is True
     assert config.min_cluster_coherence == 0.4
+    assert config.cross_link_threshold == 0.45
+    assert config.max_cross_links == 15
     assert gates.ready is True
     assert promotion.assertion_cache_updated == ["group-1"]
     assert evolution.insights == [insight]
@@ -222,6 +226,8 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
         ("max_inertia", 0.9, "max_inertia must be at least 1.0"),
         ("max_compression_ratio", 1.1, r"max_compression_ratio must be in \[0.0, 1.0\]"),
         ("min_cluster_coherence", -0.1, r"min_cluster_coherence must be in \[0.0, 1.0\]"),
+        ("cross_link_threshold", 1.1, r"cross_link_threshold must be in \[0.0, 1.0\]"),
+        ("max_cross_links", -1, "max_cross_links must be non-negative"),
     ],
 )
 def test_distillation_config_validates_thresholds_and_required_toolkit_configs(

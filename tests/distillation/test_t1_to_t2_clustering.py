@@ -292,6 +292,76 @@ def test_distill_t1_to_t2_updates_existing_cluster_and_links_related_clusters(
     ]
 
 
+def test_distill_t1_to_t2_filters_cross_links_by_centroid_similarity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    embeddings = [
+        [1.0, 0.0],
+        [0.98, 0.2],
+        [0.0, 1.0],
+        [-1.0, 0.0],
+        [0.0, -1.0],
+    ]
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_embed",
+        lambda texts, _config: embeddings,
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_cluster",
+        lambda _embeddings, _config, *, texts: {
+            "clusters": [
+                {"id": "alpha", "member_indices": [0], "summary": "Alpha pattern"},
+                {"id": "near-alpha", "member_indices": [1], "summary": "Near alpha"},
+                {"id": "north", "member_indices": [2], "summary": "North pattern"},
+                {"id": "west", "member_indices": [3], "summary": "West pattern"},
+                {"id": "south", "member_indices": [4], "summary": "South pattern"},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "phosphene.distillation.engine._toolkit_complete",
+        lambda **_kwargs: json.dumps({"assertions": []}),
+    )
+    store = ClusterMemoryStore(
+        tmp_path / "vault",
+        [
+            ClusterNote("note-a", "alpha"),
+            ClusterNote("note-b", "near alpha"),
+            ClusterNote("note-c", "north"),
+            ClusterNote("note-d", "west"),
+            ClusterNote("note-e", "south"),
+        ],
+    )
+    engine = DistillationEngine(store)
+
+    result = engine.distill_t1_to_t2(
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            min_tier1_volume=5,
+            cross_link_threshold=0.95,
+            max_cross_links=15,
+            incorporate_feedback=False,
+        )
+    )
+
+    assert result.new_cluster_ids == [
+        "stored-1",
+        "stored-2",
+        "stored-3",
+        "stored-4",
+        "stored-5",
+    ]
+    assert store.link_calls == [
+        ("stored-1", ["stored-2"]),
+        ("stored-2", ["stored-1"]),
+        ("stored-3", []),
+        ("stored-4", []),
+        ("stored-5", []),
+    ]
+
+
 def test_distill_t1_to_t2_malformed_assertion_cache_payload_fails_atomically(
     tmp_path,
     monkeypatch,

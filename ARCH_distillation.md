@@ -25,6 +25,8 @@ class DistillationConfig:
     incorporate_feedback: bool = True                    # process feedback events during distillation
     min_cluster_coherence: float = 0.4                   # minimum mean pairwise similarity for Tier 2 promotion
                                                          # clusters below this threshold are held in Tier 1
+    cross_link_threshold: float = 0.45                   # minimum centroid similarity for T2→T2 links
+    max_cross_links: int = 15                            # cap on same-run T2→T2 links per cluster
 
 @dataclass
 class GateStatus:
@@ -126,6 +128,9 @@ Three gates must pass before any distillation runs:
 6. **Checks cluster coherence**: for each cluster, computes `mean(pairwise_sim(member_embeddings))`. Clusters below `config.min_cluster_coherence` are not promoted — their member notes remain in Tier 1 with unmodified decay windows. This prevents diffuse, gap-filling material from forming weak clusters that become reference centroids for the Attention Filter's geometric scoring (see novelty-addiction risk in ARCH_attention_filter.md). Clusters must earn their status as attractors.
 7. For each coherent cluster: creates or updates a Tier 2 note via `memory_store.store_note` or `memory_store.update_note`, setting `cluster_group` to the cluster identifier.
 7. Wires cross-references between related clusters via `memory_store.add_links`.
+   Relatedness is determined by cosine similarity between same-run cluster
+   centroids: pairs below `config.cross_link_threshold` are ignored, and each
+   note links to at most `config.max_cross_links` highest-similarity peers.
 8. **Extracts and caches assertions** from each cluster summary via a lightweight LLM call. For each new or updated cluster, the call extracts the dominant claims (assertions the cluster's material supports or contests). These are stored alongside cluster centroids as the **assertion cache** — consumed by the Attention Filter's friction scoring, which compares incoming text assertions against cached cluster assertions rather than re-extracting per filter call. Storage: JSON file per cluster in the Tier 2 directory, keyed by cluster_group identifier.
 9. Tier 1 notes that clustered are candidates for decay (their content is now captured in Tier 2). Noise items (unclustered) remain in Tier 1 with unmodified decay windows.
 10. Releases lock.

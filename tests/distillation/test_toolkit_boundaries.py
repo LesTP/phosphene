@@ -50,7 +50,7 @@ def test_raptor_summarizer_uses_llm_config_tier_and_cluster_summary_prompt() -> 
         }
     ]
 
-    payload = json.loads(calls[0]["messages"][0]["content"])
+    payload = json.loads(calls[0]["messages"][1]["content"])
     assert payload["task"] == "distill_tier1_cluster_summary"
     assert payload["observations"] == ["first observation", "second observation"]
     assert "Tier 2 pattern" in payload["instructions"]
