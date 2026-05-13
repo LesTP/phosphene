@@ -34,8 +34,9 @@ steps_remaining: 2
 ## MVP.4: Remaining Steps
 
 - [x] T1→T2 distillation working — 12/12 cluster summaries succeeded, 11 T2 notes produced from 200 notes
-- [ ] **Fix missing notes** — re-seed to get all 3,859 (currently have 1,469 due to NTFS flush issue)
-- [ ] **Full chronological distillation** — iterate 200-note batches through all notes
+- [x] **Fix missing notes** — root cause: note ID collision (same title+timestamp → same filename). Fixed by including content in hash. Re-seeded: 3,856 T1 notes (was 1,469).
+- [ ] **Stage 200 notes + run preflight** — prepare for chronological distillation
+- [ ] **Full chronological distillation** — iterate 200-note batches through all notes (~$3-4, ~3 hours)
 - [ ] **T2→T3 distillation** — reflect-evolve personality files
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone

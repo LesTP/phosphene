@@ -186,3 +186,16 @@ Key changes that enabled success:
 - Success logging per cluster summary for progress tracking
 - NoteInput.created_at for original timestamp preservation (D-54)
 - All tuning params extracted to .env-backed config
+
+### Note ID collision fix
+**Date:** 2026-05-13
+**Mode:** supervised
+**Outcome:** 3,856 T1 notes (was 1,469 — 62% were silently overwritten)
+
+Root cause: LJ comment replies share the parent post's title and timestamp. The note ID hash used only title+timestamp, so multiple replies from the same post generated identical filenames. Each subsequent write overwrote the previous file.
+
+Fix: include note content in the SHA1 hash input (vault.py line 22). The 4-char hash suffix now differentiates notes with identical titles and timestamps but different content.
+
+Also fixed: ASCII-only slugifier (only matched [A-Za-z0-9]) replaced with Unicode-aware \w regex. Cyrillic titles now produce readable slugs instead of falling back to 'note'.
+
+Both are contract changes to the Memory Store vault module — note IDs generated after this fix are different from previous runs. Vault must be re-seeded.

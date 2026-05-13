@@ -73,6 +73,16 @@ Naive approach: send all cluster members as one prompt. With 300+ notes per clus
 
 **Fix:** Cap at 50 observations × 2000 chars each per summary call (~30K tokens). The LLM summarizes a representative sample, not every member. This loses some coverage but the RAPTOR hierarchy compensates — higher-level summaries aggregate lower-level ones.
 
+### Note ID collisions on multi-item posts
+
+When corpus adapters extract multiple items from a single source entry (e.g., LJ post + its comment replies), all items may share the same title and timestamp. The note ID hash must include the content, not just title + timestamp, to prevent silent file overwrites.
+
+Symptom: `run.py` reports "3859 stored" but `ls vault/tier1/ | wc -l` shows far fewer files (e.g., 1,469). No errors thrown — files are silently overwritten.
+
+Fix: `generate_note_id()` includes content in the SHA1 hash input.
+
+**What to test:** After seeding, verify `ls vault/tier1/ | wc -l` matches the reported count. If they differ, check for title+timestamp collisions with `tools/debug_seed200.py`.
+
 ### "Your" content vs other people's
 
 In LJ exports, comments from other people are embedded alongside your posts. Their voice dilutes your personality signal. In Facebook exports, "shared a post" and "added a photo" boilerplate creates junk clusters.
