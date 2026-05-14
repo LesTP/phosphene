@@ -24,6 +24,7 @@ steps_remaining: 0
   - **Preflight before LLM spend** — run `tools/preflight.py` before any operation that costs money. Checks vault sanity (duplicates, timestamps), API, clustering, interface compat. Fix all NO-GO items first.
   - **Small-batch test first** — before any full-corpus LLM operation, test on 5-10 items and verify output. Only scale up after small test passes.
   - **NTFS atomic rename** — `os.rename()` fails on NTFS-3G shares. Use `find -delete` to clear vault.
+  - **LLM ID hallucination** — LLMs prefer shorter IDs when long slugs and short numeric IDs coexist in prompts. Remove competing ID fields from LLM payloads, or use synthetic short IDs with a mapping.
 
 ## Current Status
 

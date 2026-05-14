@@ -83,6 +83,14 @@ Fix: `generate_note_id()` includes content in the SHA1 hash input.
 
 **What to test:** After seeding, verify `ls vault/tier1/ | wc -l` matches the reported count. If they differ, check for title+timestamp collisions with `tools/debug_seed200.py`.
 
+### LLM ID hallucination in structured prompts
+
+When the LLM receives both a long slug ID (like `the-cluster-centers-on-...-20260513114528-xxxx`) and a short numeric ID (like `cluster_group: "198"`) in the same JSON payload, it preferentially uses the shorter ID in its response — even when instructed to use the long one. This caused 3/9 T2→T3 reflection batches to produce zero valid insights (all source_pattern_ids were numeric cluster_group values, not note_id slugs).
+
+Fix: remove competing ID fields from LLM payloads. `_pattern_note_payload()` no longer sends `cluster_group`. The reflection prompt explicitly instructs the LLM to use full `note_id` slugs. The parser now warns and drops hallucinated IDs instead of crashing.
+
+**What to watch for:** If any LLM prompt sends multiple ID fields for the same entity, the LLM will use the shorter one. Either remove the short field or use synthetic mapped IDs (P1, P2, P3).
+
 ### T2→T2 cross-links are all-to-all in bootstrap mode
 
 The distillation engine creates cross-references between T2 cluster notes at the end of each `distill_t1_to_t2()` call. The implementation (engine.py lines 638-641) links every T2 note produced in a run to every other T2 note from the same run. In incremental mode (~10 clusters per batch), this is a small clique and roughly correct — they're contemporaneous patterns from the same time window. But in a full-corpus bootstrap (225 clusters in one run), it creates a 225-node complete graph where every note has 224 meaningless cross-links.

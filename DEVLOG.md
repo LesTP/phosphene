@@ -128,3 +128,19 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/di
 Added real MemoryStore integration coverage for the complete T2→T3 bootstrap path. The test seeds 60 Tier 2 notes with no Tier 3 files, verifies reflection runs in two batches at `t2_reflection_batch_size=30`, verifies bootstrap creates Tier 3 personality files retrievable through `get_personality_context()`, then runs T2→T3 a second time and verifies the normal evolution prompt is used instead of the bootstrap branch.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t1_to_t2_integration.py -k 't2_to_t3_bootstrap_then_normal_evolution'` (1 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (634 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 0, and moves focus to MVP.4b Step 4: live-vault T2→T3 run and validation.
+
+### Step MVP.4b.4: Live T2→T3 distillation
+**Date:** 2026-05-14
+**Mode:** supervised
+**Outcome:** Success — 7 personality files created and evolved
+**Contract changes:** `_pattern_note_payload()` no longer sends `cluster_group`; reflection prompt explicitly requests full `note_id` slugs.
+
+First run (bootstrap): 9 batches of reflection, 42 insights produced. But batches 3, 7, 8 produced 0 insights — the LLM used numeric `cluster_group` values ("198", "152") in `source_pattern_ids` instead of full `note_id` slugs. Root cause: `_pattern_note_payload()` sent both `note_id` (long slug) and `cluster_group` (short number), and the LLM preferred the shorter form. All insights from those 3 batches were dropped by the validation.
+
+Bootstrap still succeeded: 42 insights from 6/9 batches produced 7 initial T3 personality files: The Authenticity Paradox, Productive Incompletion as Preferred State, Multilingual Identity Performance, Expertise Without Authority, Cultural Connection Through Shared Uncertainty, Emotional Deflection Through Analysis, Digital Ephemerality as Structural Feature.
+
+Fix applied: (1) removed `cluster_group` from `_pattern_note_payload()` — the LLM no longer sees the competing short ID; (2) added explicit instruction in reflection prompt to use full `note_id` strings; (3) changed `_parse_reflection_insights()` from crash-on-hallucination to warn-and-drop (tolerant parsing).
+
+Second run (evolution): all 9/9 batches succeeded, 51 insights (was 42). All 7 personality files superseded with enriched content. Titles evolved to be more specific (e.g., "The Authenticity Paradox" → "The Authenticity Paradox and Evolution Beyond Binary Thinking").
+
+**Gotcha promoted:** LLMs hallucinate shorter/simpler IDs when long slug IDs and short numeric IDs coexist in the prompt. Remove competing ID fields or use synthetic short IDs with a mapping.
