@@ -1,8 +1,8 @@
 ---
-phase: MVP.4b
+phase: MVP.4c
 blocked: false
-state: execute
-steps_remaining: 0
+state: plan
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -28,8 +28,8 @@ steps_remaining: 0
 
 ## Current Status
 
-- **Phase** — MVP.4b: Batch reflection + T3 bootstrap creation
-- **Focus** — Make T2→T3 work at any T2 volume and with zero existing T3 files.
+- **Phase** — MVP.4c: Generation output persistence + first run
+- **Focus** — Save generations to vault/outputs/ before Telegram delivery, then first live generation.
 - **Blocked** — No.
 
 ## MVP.4: Remaining Steps
@@ -39,52 +39,57 @@ steps_remaining: 0
 - [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
 - [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
 - [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated. See MVP.4a.
-- [ ] **T2→T3 distillation** — see MVP.4b below
+- [x] **T2→T3 distillation** — 7 personality files bootstrapped and evolved. See MVP.4b.
+- [ ] **Save generations** — see MVP.4c below
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
 
-## MVP.4b: Batch Reflection + T3 Bootstrap (autonomous, Build)
+## MVP.4c: Generation Output Persistence (autonomous, Build)
 
-**Problem:** Two blockers prevent T2→T3 from running on the live vault:
-1. **Context overflow** — `_prepare_tier2_evolution_input()` reads ALL T2 notes. With 251 notes, the reflection prompt is ~202K tokens — exceeds practical context budget.
-2. **No bootstrap path** — `_propose_personality_evolution()` only proposes supersession/unchanged for existing T3 files. With 0 T3 files, the evolution step has nothing to evolve.
+**Problem:** `_run_generation()` produces a `GeneratorOutput` in memory, routes it to Telegram, and discards it. Generated content is not saved anywhere. The system's development over time cannot be studied without preserving its outputs.
 
-**Design decision:** Option 1+2b from `DISCUSS_T2_TO_T3_BOOTSTRAP.md`. Batch reflection becomes the **permanent** T2→T3 reflection path (not bootstrap-specific code). Bootstrap creation fires only when T3 is empty. In steady state with 20 T2 notes, there's one batch — identical behavior. At 251 or 500+, it batches naturally.
+**Decision:** Save to `vault/outputs/` as Obsidian-compatible markdown with frontmatter. NOT in the distillation loop (distillation reads `vault/tier1/`, `vault/tier2/`, `vault/tier3/` only). Outputs are an archival/analysis layer — they can be retrospectively analyzed or selectively promoted to T1, but by default they do not feed back into personality evolution. This avoids echo chamber / self-reinforcement.
 
-**Current vault state:** 3,856 T1, 251 T2 (.md + .json caches), 0 T3. T2 cross-links rebuilt with similarity filtering (1-15 links per note). Embeddings stored in `vault/.embeddings/` (4,122 .npy files). 621 tests pass.
+**Telegram smoke test:** Passed. Bot `@battlepenguin_phosphenebot` delivered to chat_id successfully.
 
-### Step 1: Batch reflection — chunk T2 input for `_reflect_tier2_patterns()` (done)
+### Step 1: Save GeneratorOutput to vault/outputs/
 
-**What:** Add `t2_reflection_batch_size: int = 30` to `DistillationConfig`. Modify `_reflect_tier2_patterns()` to:
-1. Sort T2 notes by importance (descending), breaking ties by unresolvedness
-2. Split into chunks of `t2_reflection_batch_size`
-3. Call the existing reflection LLM prompt once per batch
-4. Merge all `ReflectionInsight` lists into a single list before returning
+**What:** In `_run_generation()` (orchestrator.py), after `generator.generate()` and before `route()`, write the output as a markdown file in `vault/outputs/`:
 
-When T2 count ≤ batch size, behavior is identical to current (single batch = single call).
+```
+vault/outputs/{slug}-{timestamp}-{hash}.md
+---
+intent_tag: observation
+output_mode: prompted
+importance_score: 0.7
+delivery_success: true/false  (updated after route())
+personality_file_ids: [list of T3 note_ids active at generation time]
+created_at: '2026-05-14T09:30:00+00:00'
+---
+[generated content body]
+```
 
-**Files:** `engine.py` — `DistillationConfig`, `_reflect_tier2_patterns()`, `_build_reflection_audit_artifact()`. Test file for batched reflection.
+Save BEFORE routing so the output is preserved even if Telegram delivery fails. Update `delivery_success` after routing completes.
 
-**Verification:** Unit test with FakeLLM: given 60 T2 notes at batch_size=30, verify two reflection calls are made and insights from both batches appear in the merged result. Single-batch case (20 notes at batch_size=30) should produce identical behavior to current. Existing T2→T3 tests must still pass.
+**Files:** `orchestrator/orchestrator.py` — `_run_generation()`. Possibly a `_save_generation_output()` helper.
 
-**Contract change:** Adds `t2_reflection_batch_size` to `DistillationConfig` with default. Update ARCH_distillation.md step 2 of `distill_t2_to_t3` to describe batching.
+**Verification:** Unit test: run generation with FakeGenerator + FakeGateway, verify `.md` file appears in `vault/outputs/`, verify frontmatter fields. Test with failed delivery: verify file still saved with `delivery_success: false`. Existing tests must pass.
 
-### Step 2: Bootstrap creation — initial T3 files from merged insights (done)
+### Step 2: First live generation + Telegram delivery
 
-**What:** Modify `_propose_personality_evolution()` to detect `len(personality_files) == 0`. When empty:
-1. Send merged `ReflectionInsight` list to LLM with a bootstrap-specific prompt: "Given these synthesized patterns from a personal writing corpus, create 3-7 initial personality files. Each should capture a distinct dimension: core orientations, recurring tensions, aesthetic preferences, intellectual preoccupations, social modes, etc. Be specific to this corpus — not generic."
-2. Parse the LLM response into `SupersessionRecord`-compatible writes (new notes, no supersession source)
-3. Store each personality file via `memory_store.store_note(tier=3, ...)` with `version_count=1`
+**What:** Run `run.py --once` on the Pi. This triggers one orchestrator cycle: ingestion (no sources configured → skip), distillation (gates won't pass — just ran), generation (personality files exist → generate), delivery (Telegram).
 
-When personality files exist, use the existing supersession/unchanged path unchanged.
+**Verification:**
+- Generated content appears in `vault/outputs/`
+- Message arrives on Telegram
+- Content is recognizably derived from the personality files (not generic)
+- Activation log (`logs/mvp_orchestrator.jsonl`) records the result
 
-**Files:** `engine.py` — `_propose_personality_evolution()`, `_build_evolution_proposal_artifact()`. Possibly a new `_build_bootstrap_proposal_artifact()`. Test file for bootstrap path.
+**Note:** This step involves real LLM spend (~$0.50-1). Run on Pi.
 
-**Verification:** Unit test with FakeLLM: given 5 reflection insights and 0 T3 files, verify bootstrap prompt is sent and personality files are created. Given 5 insights and 2 existing T3 files, verify normal supersession path is used (regression). Existing T2→T3 tests must still pass.
+## MVP.4b: Batch Reflection + T3 Bootstrap — Complete
 
-**Contract change:** None to public API — `distill_t2_to_t3()` signature unchanged. Internal behavior change: creates T3 files when none exist. Update ARCH_distillation.md evolution step 1-2 to document the bootstrap branch.
-
-### Step 3: Integration test — full T2→T3 with FakeLLM (done)
+Batched T2 reflection (30 notes per batch) + bootstrap T3 creation. 251 T2 patterns → 51 insights → 7 personality files created and evolved. See DEVLOG.
 
 **What:** End-to-end test: seed a MemoryStore with 60 T2 notes (no T3), run `distill_t2_to_t3()` with FakeLLM, verify:
 - Reflection ran in 2 batches (batch_size=30)
@@ -92,22 +97,6 @@ When personality files exist, use the existing supersession/unchanged path uncha
 - Personality files are stored in vault/tier3/
 - `get_personality_context()` returns the new files
 - A second `distill_t2_to_t3()` call uses the normal supersession path (not bootstrap)
-
-**Files:** Test file in `tests/distillation/`.
-
-**Verification:** All assertions in the test. Full test suite passes.
-
-### Step 4: Run T2→T3 on live vault + validate
-
-**What:** Run `distill_t2_to_t3()` on the live vault (251 T2 notes, 0 T3) via `run.py` or a one-off script. **Preflight first.** Estimate cost before running (~$2-5 for 8-9 reflection batches + 1 bootstrap evolution call).
-
-**Verification:**
-- T3 personality files created in vault/tier3/
-- Content is specific to the corpus (not generic)
-- `tools/measure_density.py` shows T3 notes
-- Network visualization shows T3 (gold squares) in the map
-
-**Note:** This step involves real LLM spend. Run on the Pi, not from Windows. Use Sonnet 4 (not 4.5) for bilingual content compatibility.
 
 ## MVP.4a: Fix T2→T2 Cross-Links — Complete
 
