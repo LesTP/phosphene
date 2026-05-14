@@ -387,3 +387,11 @@ Priority: Required for chronological distillation
 Decision: Added optional created_at: datetime | None = None field to NoteInput. When provided, store_note uses it instead of datetime.now(). Corpus adapters pass the original publication timestamp; live messages use None (defaults to now).
 Rationale: Chronological distillation requires notes to carry their original publication date, not vault creation time. Without this, all notes have identical timestamps and can't be sorted chronologically.
 Contract change: NoteInput gains one optional field. Backward-compatible — all existing callers continue to work (field defaults to None). store_note behavior unchanged when created_at is None.
+
+
+D-55: MVP.4b uses permanent batched T2 reflection plus empty-vault T3 bootstrap
+Date: 2026-05-14 | Status: Closed
+Priority: Required for MVP bootstrap
+Decision: Execute MVP.4b as a four-step Build phase: add `t2_reflection_batch_size` and batch `_reflect_tier2_patterns()`, add a T3 bootstrap branch when no personality files exist, prove the full T2->T3 path with FakeLLM integration coverage, then run and validate the live vault after preflight and cost estimate.
+Rationale: The live vault has 251 T2 notes and 0 T3 files. Reading all T2 notes into one reflection prompt creates an impractical context load, while the existing evolution path can only supersede current T3 files. Batching makes T2->T3 scale with corpus volume without changing steady-state behavior, and the bootstrap branch preserves the pipeline goal of deriving initial personality files from reflected corpus patterns.
+Revisit if: Batch-level reflection loses cross-batch synthesis quality in practice, or if live-vault validation shows the bootstrap prompt produces generic personality files rather than corpus-specific dimensions.

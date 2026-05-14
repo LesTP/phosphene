@@ -1,8 +1,8 @@
 ---
-phase: MVP.4
-blocked: true
+phase: MVP.4b
+blocked: false
 state: execute
-steps_remaining: 0
+steps_remaining: 3
 ---
 
 # Phosphene — Development Plan
@@ -27,9 +27,9 @@ steps_remaining: 0
 
 ## Current Status
 
-- **Phase** — MVP.4: Bootstrap and first run
-- **Focus** — T2→T3 distillation blocked pending bootstrap design.
-- **Blocked** — Yes: current T2→T3 path would send ~202k input tokens from 251 T2 notes and there are 0 existing T3 personality files for the implemented supersession-only evolution path.
+- **Phase** — MVP.4b: Batch reflection + T3 bootstrap creation
+- **Focus** — Make T2→T3 work at any T2 volume and with zero existing T3 files.
+- **Blocked** — No.
 
 ## MVP.4: Remaining Steps
 
@@ -37,55 +37,80 @@ steps_remaining: 0
 - [x] **Fix missing notes** — root cause: note ID collision (same title+timestamp → same filename). Fixed by including content in hash. Re-seeded: 3,856 T1 notes (was 1,469).
 - [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
 - [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
-- [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated.
-- [ ] **T2→T3 distillation** — blocked: needs initial T3 bootstrap/compaction design before running.
+- [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated. See MVP.4a.
+- [ ] **T2→T3 distillation** — see MVP.4b below
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
 
-## MVP.4a: Fix T2→T2 Cross-Links (autonomous, Build)
+## MVP.4b: Batch Reflection + T3 Bootstrap (autonomous, Build)
 
-**Problem:** `_write_tier2_cluster_notes()` (engine.py:638-641) creates an all-to-all mesh: every T2 note produced in a distillation run gets linked to every other T2 note from the same run. In incremental mode (~10 clusters per run), this is a small clique and roughly correct. In the full-corpus bootstrap (225 clusters), it produces a 225-node complete graph where every note has 224 meaningless cross-links. The ARCH spec (line 128) says "wires cross-references between **related** clusters" — the implementation skips the "related" filter.
+**Problem:** Two blockers prevent T2→T3 from running on the live vault:
+1. **Context overflow** — `_prepare_tier2_evolution_input()` reads ALL T2 notes. With 251 notes, the reflection prompt is ~202K tokens — exceeds practical context budget.
+2. **No bootstrap path** — `_propose_personality_evolution()` only proposes supersession/unchanged for existing T3 files. With 0 T3 files, the evolution step has nothing to evolve.
 
-**Current vault state:** 251 T2 .md notes. 225 have 224 T2 cross-links each (from `distill_full`), 26 have 25 each (from `distill_loop2`). T1 source links (5-16 per note) are correct and must be preserved. Cluster centroids stored in `vault/.embeddings/` (4,122 .npy files). `_cosine_similarity()` helper exists at engine.py:1707.
+**Design decision:** Option 1+2b from `DISCUSS_T2_TO_T3_BOOTSTRAP.md`. Batch reflection becomes the **permanent** T2→T3 reflection path (not bootstrap-specific code). Bootstrap creation fires only when T3 is empty. In steady state with 20 T2 notes, there's one batch — identical behavior. At 251 or 500+, it batches naturally.
 
-**Network impact:** All-to-all T2 links make density metrics flat (every node equally connected), defeat link-density decay (nothing can be forgotten), and provide no structural signal for the Attention Filter's prompt-to-structure transition.
+**Current vault state:** 3,856 T1, 251 T2 (.md + .json caches), 0 T3. T2 cross-links rebuilt with similarity filtering (1-15 links per note). Embeddings stored in `vault/.embeddings/` (4,122 .npy files). 621 tests pass.
 
-### Step 1: Engine fix — similarity-filtered cross-links (done)
+### Step 1: Batch reflection — chunk T2 input for `_reflect_tier2_patterns()`
 
-**What:** Replace lines 638-641 with centroid-similarity filtering. Add `cross_link_threshold: float = 0.45` and `max_cross_links: int = 15` to `DistillationConfig`. For each note, compute cosine similarity against all other centroids from the same run, keep only pairs above threshold, cap at top-K.
+**What:** Add `t2_reflection_batch_size: int = 30` to `DistillationConfig`. Modify `_reflect_tier2_patterns()` to:
+1. Sort T2 notes by importance (descending), breaking ties by unresolvedness
+2. Split into chunks of `t2_reflection_batch_size`
+3. Call the existing reflection LLM prompt once per batch
+4. Merge all `ReflectionInsight` lists into a single list before returning
 
-**Files:** `engine.py` (lines 638-641), `engine.py` (DistillationConfig definition — find line). Test file for cross-linking.
+When T2 count ≤ batch size, behavior is identical to current (single batch = single call).
 
-**Verification:** Unit test — given 5 promotions with known centroids (2 similar, 3 dissimilar), verify only the similar pair gets cross-linked. Existing tests must still pass.
+**Files:** `engine.py` — `DistillationConfig`, `_reflect_tier2_patterns()`, `_build_reflection_audit_artifact()`. Test file for batched reflection.
 
-**Contract change:** Adds `cross_link_threshold` and `max_cross_links` to `DistillationConfig`. Both have defaults so existing callers are unaffected. Update ARCH_distillation.md step 7 to describe the filtering.
+**Verification:** Unit test with FakeLLM: given 60 T2 notes at batch_size=30, verify two reflection calls are made and insights from both batches appear in the merged result. Single-batch case (20 notes at batch_size=30) should produce identical behavior to current. Existing T2→T3 tests must still pass.
 
-### Step 2: Strip bad links + regenerate proper cross-links (done)
+**Contract change:** Adds `t2_reflection_batch_size` to `DistillationConfig` with default. Update ARCH_distillation.md step 2 of `distill_t2_to_t3` to describe batching.
 
-**What:** Write `tools/rebuild_t2_crosslinks.py` that:
-1. Loads all T2 notes from `vault/tier2/*.md`
-2. For each note, partitions `links` into T1 links (resolve to `vault/tier1/`) and T2 links (resolve to `vault/tier2/`)
-3. Strips all T2→T2 links
-4. Loads centroid embeddings from `vault/.embeddings/{note_id}.npy`
-5. Computes pairwise cosine similarity between all T2 centroids
-6. For each T2 note, adds cross-links to top-K most similar peers above threshold
-7. Rewrites the .md files with corrected links
+### Step 2: Bootstrap creation — initial T3 files from merged insights
 
-**Parameters:** `--threshold 0.45 --max-links 15` (same defaults as engine). `--dry-run` mode that prints link distribution without writing.
+**What:** Modify `_propose_personality_evolution()` to detect `len(personality_files) == 0`. When empty:
+1. Send merged `ReflectionInsight` list to LLM with a bootstrap-specific prompt: "Given these synthesized patterns from a personal writing corpus, create 3-7 initial personality files. Each should capture a distinct dimension: core orientations, recurring tensions, aesthetic preferences, intellectual preoccupations, social modes, etc. Be specific to this corpus — not generic."
+2. Parse the LLM response into `SupersessionRecord`-compatible writes (new notes, no supersession source)
+3. Store each personality file via `memory_store.store_note(tier=3, ...)` with `version_count=1`
+
+When personality files exist, use the existing supersession/unchanged path unchanged.
+
+**Files:** `engine.py` — `_propose_personality_evolution()`, `_build_evolution_proposal_artifact()`. Possibly a new `_build_bootstrap_proposal_artifact()`. Test file for bootstrap path.
+
+**Verification:** Unit test with FakeLLM: given 5 reflection insights and 0 T3 files, verify bootstrap prompt is sent and personality files are created. Given 5 insights and 2 existing T3 files, verify normal supersession path is used (regression). Existing T2→T3 tests must still pass.
+
+**Contract change:** None to public API — `distill_t2_to_t3()` signature unchanged. Internal behavior change: creates T3 files when none exist. Update ARCH_distillation.md evolution step 1-2 to document the bootstrap branch.
+
+### Step 3: Integration test — full T2→T3 with FakeLLM
+
+**What:** End-to-end test: seed a MemoryStore with 60 T2 notes (no T3), run `distill_t2_to_t3()` with FakeLLM, verify:
+- Reflection ran in 2 batches (batch_size=30)
+- Bootstrap creation produced T3 personality files
+- Personality files are stored in vault/tier3/
+- `get_personality_context()` returns the new files
+- A second `distill_t2_to_t3()` call uses the normal supersession path (not bootstrap)
+
+**Files:** Test file in `tests/distillation/`.
+
+**Verification:** All assertions in the test. Full test suite passes.
+
+### Step 4: Run T2→T3 on live vault + validate
+
+**What:** Run `distill_t2_to_t3()` on the live vault (251 T2 notes, 0 T3) via `run.py` or a one-off script. **Preflight first.** Estimate cost before running (~$2-5 for 8-9 reflection batches + 1 bootstrap evolution call).
 
 **Verification:**
-- Dry-run first: check link count distribution (should be 0-15 per note, not 224)
-- After write: verify T1 links preserved, T2 links within expected range
-- Run `tools/measure_density.py` and compare before/after
+- T3 personality files created in vault/tier3/
+- Content is specific to the corpus (not generic)
+- `tools/measure_density.py` shows T3 notes
+- Network visualization shows T3 (gold squares) in the map
 
-### Step 3: Validate vault state (done)
+**Note:** This step involves real LLM spend. Run on the Pi, not from Windows. Use Sonnet 4 (not 4.5) for bilingual content compatibility.
 
-**What:** Run `tools/measure_density.py` and `tools/preflight.py`. Verify:
-- T2 link distribution is ~5-15 per note (not 224)
-- T1 source links unchanged
-- Total T2 notes unchanged (251)
-- Assertion caches (.json) untouched
-- All existing tests pass
+## MVP.4a: Fix T2→T2 Cross-Links — Complete
+
+Engine fixed (similarity-filtered cross-links), vault rebuilt (51K bad links stripped, 3.5K proper links added), validated (621 tests). See DEVLOG.
 
 ## Next Priorities (post-MVP.4)
 
