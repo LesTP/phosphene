@@ -160,14 +160,15 @@ Three gates must pass before any distillation runs:
 
 **Step 2 — Evolution:**
 1. Reads current personality files via `memory_store.get_personality_context()`.
-2. Calls LLM (at `evolution_tier`, potentially a different model) with the reflection insights and current personality files. Each personality file's `version_count` (number of T2→T3 cycles survived) is conveyed in the prompt. Files with higher version counts have earned more inertia — effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)` — and require proportionally stronger evidence to override.
-3. For each proposed modification:
+2. If no personality files exist, calls LLM (at `evolution_tier`) with the merged reflection insights and asks for 3-7 initial personality files. Each file must capture a distinct corpus-specific dimension. Writes each file via `memory_store.store_note(tier=3, ...)` with `version_count = 1`.
+3. If personality files exist, calls LLM (at `evolution_tier`, potentially a different model) with the reflection insights and current personality files. Each personality file's `version_count` (number of T2→T3 cycles survived) is conveyed in the prompt. Files with higher version counts have earned more inertia — effective weight = `min(max_inertia, 1.0 + (version_count - 1) * inertia_per_cycle)` — and require proportionally stronger evidence to override.
+4. For each proposed modification:
    - Checks for contradictions with existing personality claims. Contradictions are resolved via supersession, not accumulation.
    - Enforces `max_compression_ratio` — a single pass cannot reduce personality file content by more than this ratio.
    - Writes the update via `memory_store.supersede(note_id, new_content, new_title, change_summary)`. The new note starts with `version_count = 1`.
-4. For personality files that survived this cycle unchanged (in `unchanged_ids`): increments their `version_count` via `memory_store.update_note` metadata update.
-5. Computes `criteria_adjustments` from feedback data: criteria that consistently produce well-received content get weight increases; criteria that produce ignored content get decreases.
-6. Releases lock.
+5. For personality files that survived this cycle unchanged (in `unchanged_ids`): increments their `version_count` via `memory_store.update_note` metadata update.
+6. Computes `criteria_adjustments` from feedback data: criteria that consistently produce well-received content get weight increases; criteria that produce ignored content get decreases.
+7. Releases lock.
 
 **The reflection output is an audit artifact.** It can be reviewed independently of the evolution output to diagnose whether a personality file change was triggered by genuine insight or by a synthesis artifact.
 

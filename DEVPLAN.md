@@ -2,7 +2,7 @@
 phase: MVP.4b
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -68,7 +68,7 @@ When T2 count ≤ batch size, behavior is identical to current (single batch = s
 
 **Contract change:** Adds `t2_reflection_batch_size` to `DistillationConfig` with default. Update ARCH_distillation.md step 2 of `distill_t2_to_t3` to describe batching.
 
-### Step 2: Bootstrap creation — initial T3 files from merged insights
+### Step 2: Bootstrap creation — initial T3 files from merged insights (done)
 
 **What:** Modify `_propose_personality_evolution()` to detect `len(personality_files) == 0`. When empty:
 1. Send merged `ReflectionInsight` list to LLM with a bootstrap-specific prompt: "Given these synthesized patterns from a personal writing corpus, create 3-7 initial personality files. Each should capture a distinct dimension: core orientations, recurring tensions, aesthetic preferences, intellectual preoccupations, social modes, etc. Be specific to this corpus — not generic."

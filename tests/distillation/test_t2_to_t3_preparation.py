@@ -9,6 +9,7 @@ from phosphene.distillation import (
     ReflectionInsight,
 )
 from phosphene.distillation.engine import (
+    _build_bootstrap_request,
     _build_evolution_proposal_artifact,
     _build_evolution_request,
     _build_reflection_audit_artifact,
@@ -16,6 +17,7 @@ from phosphene.distillation.engine import (
     _criterion_feedback_metrics,
     _DistillationRunMetadata,
     _effective_inertia,
+    _parse_bootstrap_proposals,
     _parse_evolution_proposals,
     _parse_reflection_insights,
     _prepare_personality_files,
@@ -75,6 +77,7 @@ class EvolutionMemoryStore:
         self.queries = []
         self.write_calls: list[tuple[str, object, object | None]] = []
         self.personality_context_calls = 0
+        self.stored_notes: list[object] = []
 
     def query_notes(self, query):
         self.queries.append(query)
@@ -86,9 +89,21 @@ class EvolutionMemoryStore:
             notes = []
         return notes[: query.limit]
 
-    def store_note(self, *_args: object, **_kwargs: object) -> str:
-        self.write_calls.append(("store_note", None, None))
-        raise AssertionError("T2 to T3 preparation must not store notes")
+    def store_note(self, note_input) -> str:
+        self.write_calls.append(("store_note", note_input.title, note_input))
+        note = EvolutionNote(
+            note_id=f"personality-bootstrap-{len(self.stored_notes) + 1}",
+            title=note_input.title,
+            content=note_input.content,
+            source=note_input.source,
+            importance=note_input.importance,
+            unresolvedness=note_input.unresolvedness,
+            tags=list(note_input.tags),
+            version_count=1,
+        )
+        self.stored_notes.append(note)
+        self.personality_context.personality_files.append(note)
+        return note.note_id
 
     def update_note(self, note_id: str, patch) -> object:
         self.write_calls.append(("update_note", note_id, patch))
@@ -511,6 +526,64 @@ def test_evolution_proposal_artifact_calls_evolution_tier_and_parses_proposals()
     assert artifact.criteria_adjustments[0].new_weight == pytest.approx(1.1)
 
 
+def test_bootstrap_request_asks_for_initial_personality_files() -> None:
+    messages = _build_bootstrap_request(
+        [
+            ReflectionInsight(
+                content="Aesthetic judgment keeps colliding with social play.",
+                source_pattern_ids=["pattern-a"],
+                insight_type="recurring_tension",
+                confidence=0.8,
+            )
+        ]
+    )
+
+    payload = json.loads(messages[0]["content"])
+    assert payload["task"] == "distill_t2_to_t3_bootstrap"
+    assert "3-7 initial personality files" in payload["instructions"]
+    assert "not generic" in payload["instructions"]
+    assert payload["reflection_insights"][0]["source_pattern_ids"] == ["pattern-a"]
+
+
+def test_parse_bootstrap_proposals_accepts_three_to_seven_files() -> None:
+    proposals = _parse_bootstrap_proposals(
+        '{"personality_files": ['
+        '{"title": "Core orientation", "content": "Specific corpus stance.", '
+        '"change_summary": "Initial file from reflected patterns."},'
+        '{"title": "Recurring tensions", "content": "Specific tensions.", '
+        '"change_summary": "Initial file from reflected patterns."},'
+        '{"title": "Aesthetic preferences", "content": "Specific preferences.", '
+        '"change_summary": "Initial file from reflected patterns."}'
+        "]}"
+    )
+
+    assert [proposal.title for proposal in proposals] == [
+        "Core orientation",
+        "Recurring tensions",
+        "Aesthetic preferences",
+    ]
+    assert proposals[0].change_summary == "Initial file from reflected patterns."
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        ("not json", "valid JSON"),
+        ('{"personality_files": "nope"}', "personality_files list"),
+        ('{"personality_files": []}', "3-7 personality files"),
+        ('{"personality_files": [{"title": "x", "content": "x", "change_summary": "x"}]}', "3-7 personality files"),
+        ('{"personality_files": [{"title": "x", "content": "x", "change_summary": "x"}, {"title": "y", "content": "y", "change_summary": "y"}, {"title": "", "content": "z", "change_summary": "z"}]}', "title cannot be empty"),
+        ('{"personality_files": [{"title": "x", "content": "x", "change_summary": "x"}, {"title": "y", "content": "y", "change_summary": "y"}, {"title": "z", "content": "", "change_summary": "z"}]}', "content cannot be empty"),
+    ],
+)
+def test_parse_bootstrap_proposals_rejects_malformed_responses(
+    response: str,
+    message: str,
+) -> None:
+    with pytest.raises(DistillationError, match=message):
+        _parse_bootstrap_proposals(response)
+
+
 @pytest.mark.parametrize(
     ("response", "message"),
     [
@@ -704,6 +777,74 @@ def test_distill_t2_to_t3_supersedes_personality_and_preserves_audit_record(
     assert result.superseded[0].change_summary == "Resolved contradiction."
     assert result.unchanged_ids == []
     assert result.compression_ratio == 0.0
+    assert engine._read_run_metadata().last_t2_to_t3_run is not None
+
+
+def test_distill_t2_to_t3_bootstraps_personality_files_when_none_exist(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = EvolutionMemoryStore(
+        tmp_path / "vault",
+        tier2_notes=[
+            EvolutionNote("pattern-a", content="first pattern"),
+            EvolutionNote("pattern-b", content="second pattern"),
+        ],
+        personality_context=EvolutionPersonalityContext(personality_files=[]),
+    )
+    engine = DistillationEngine(store)
+    calls: list[str] = []
+
+    def fake_complete(**kwargs: object) -> str:
+        payload = json.loads(kwargs["messages"][0]["content"])  # type: ignore[index]
+        calls.append(payload["task"])
+        if payload["task"] == "distill_t2_to_t3_reflection":
+            return (
+                '{"insights": [{"content": "A new pattern is visible.", '
+                '"source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", '
+                '"confidence": 0.8}]}'
+            )
+        return (
+            '{"personality_files": ['
+            '{"title": "Core orientation", '
+            '"content": "A corpus-specific orientation.", '
+            '"change_summary": "Initial orientation from reflection."},'
+            '{"title": "Recurring tensions", '
+            '"content": "A corpus-specific tension.", '
+            '"change_summary": "Initial tension from reflection."},'
+            '{"title": "Aesthetic preferences", '
+            '"content": "A corpus-specific preference.", '
+            '"change_summary": "Initial preference from reflection."}'
+            "]}"
+        )
+
+    monkeypatch.setattr("phosphene.distillation.engine._toolkit_complete", fake_complete)
+
+    result = engine.distill_t2_to_t3(
+        DistillationConfig(llm_config=object(), embedding_config=object())
+    )
+
+    assert calls == ["distill_t2_to_t3_reflection", "distill_t2_to_t3_bootstrap"]
+    assert [(call[0], call[1]) for call in store.write_calls] == [
+        ("store_note", "Core orientation"),
+        ("store_note", "Recurring tensions"),
+        ("store_note", "Aesthetic preferences"),
+    ]
+    assert [note.title for note in store.stored_notes] == [
+        "Core orientation",
+        "Recurring tensions",
+        "Aesthetic preferences",
+    ]
+    assert all(note.tags == ["personality", "version_count:1"] for note in store.stored_notes)
+    assert [record.old_note_id for record in result.superseded] == ["", "", ""]
+    assert [record.new_note_id for record in result.superseded] == [
+        "personality-bootstrap-1",
+        "personality-bootstrap-2",
+        "personality-bootstrap-3",
+    ]
+    assert result.unchanged_ids == []
+    assert result.compression_ratio == 0.0
+    assert store.personality_context_calls == 1
     assert engine._read_run_metadata().last_t2_to_t3_run is not None
 
 

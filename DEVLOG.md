@@ -108,3 +108,13 @@ Confirmed MVP.4b as a four-step Build phase: batch reflection, bootstrap T3 crea
 Added permanent batching to the T2→T3 reflection path. Tier 2 patterns are sorted by importance descending with unresolvedness as the tie-breaker, split by `config.t2_reflection_batch_size`, reflected with the existing prompt once per batch, and merged into a single insight list before evolution. Single-batch runs keep the same request shape as before.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_distillation_exports.py tests/distillation/test_t2_to_t3_preparation.py` (53 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (624 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 2, and moves focus to MVP.4b Step 2: empty-T3 bootstrap creation.
+
+### Step MVP.4b.2: Empty-T3 bootstrap creation
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** `ARCH_distillation.md` documents the empty-personality bootstrap branch inside `distill_t2_to_t3()`.
+
+Added a bootstrap proposal path for T2→T3 when `memory_store.get_personality_context()` returns no personality files. The engine now sends merged reflection insights to a bootstrap-specific LLM prompt asking for 3-7 corpus-specific initial personality files, parses that response separately from supersession proposals, and writes Tier 3 notes with `version_count:1`. Existing personality files still use the normal supersession/unchanged evolution path.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t2_to_t3_preparation.py` (42 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (633 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4b Step 3: full T2→T3 FakeLLM integration coverage.

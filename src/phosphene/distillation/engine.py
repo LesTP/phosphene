@@ -208,12 +208,20 @@ class _SupersessionProposal:
 
 
 @dataclass(frozen=True)
+class _BootstrapPersonalityProposal:
+    title: str
+    content: str
+    change_summary: str
+
+
+@dataclass(frozen=True)
 class _EvolutionProposalArtifact:
     request_messages: list[Mapping[str, str]]
     raw_response: str
     supersession_proposals: list[_SupersessionProposal]
     unchanged_ids: list[str]
     criteria_adjustments: list[CriteriaAdjustment]
+    bootstrap_proposals: list[_BootstrapPersonalityProposal]
 
 
 class DistillationEngine:
@@ -558,6 +566,12 @@ class DistillationEngine:
     ) -> _EvolutionProposalArtifact:
         personality_context = self.memory_store.get_personality_context()
         personality_files = _prepare_personality_files(personality_context, config)
+        if not personality_files:
+            return _build_bootstrap_proposal_artifact(
+                reflection.insights,
+                config,
+                llm_complete_callable=llm_complete_callable,
+            )
         return _build_evolution_proposal_artifact(
             reflection.insights,
             personality_files,
@@ -672,6 +686,33 @@ class DistillationEngine:
         proposal: _EvolutionProposalArtifact,
         config: DistillationConfig,
     ) -> dict[str, object]:
+        if proposal.bootstrap_proposals:
+            superseded: list[SupersessionRecord] = []
+            for bootstrap in proposal.bootstrap_proposals:
+                note_id = self.memory_store.store_note(
+                    NoteInput(
+                        tier=3,
+                        content=bootstrap.content,
+                        title=bootstrap.title,
+                        importance=1.0,
+                        unresolvedness=0.0,
+                        tags=["personality", "version_count:1"],
+                        source="distillation",
+                    )
+                )
+                superseded.append(
+                    SupersessionRecord(
+                        old_note_id="",
+                        new_note_id=str(note_id),
+                        change_summary=bootstrap.change_summary,
+                    )
+                )
+
+            return {
+                "superseded": superseded,
+                "compression_ratio": 0.0,
+            }
+
         personality_context = self.memory_store.get_personality_context()
         personality_files = _prepare_personality_files(personality_context, config)
         files_by_id = {personality_file.note_id: personality_file for personality_file in personality_files}
@@ -1113,7 +1154,114 @@ def _build_evolution_proposal_artifact(
         supersession_proposals=supersession_proposals,
         unchanged_ids=unchanged_ids,
         criteria_adjustments=criteria_adjustments,
+        bootstrap_proposals=[],
     )
+
+
+def _build_bootstrap_request(
+    insights: Sequence[ReflectionInsight],
+) -> list[Mapping[str, str]]:
+    payload = {
+        "task": "distill_t2_to_t3_bootstrap",
+        "instructions": (
+            "Given these synthesized patterns from a personal writing corpus, "
+            "create 3-7 initial personality files. Each should capture a "
+            "distinct dimension: core orientations, recurring tensions, "
+            "aesthetic preferences, intellectual preoccupations, social modes, "
+            "or similar corpus-specific dimensions. Be specific to this corpus, "
+            "not generic. Return only JSON with shape "
+            '{"personality_files": [{"title": "...", "content": "...", '
+            '"change_summary": "..."}]}. Content and change_summary are required.'
+        ),
+        "reflection_insights": [
+            {
+                "content": insight.content,
+                "source_pattern_ids": insight.source_pattern_ids,
+                "insight_type": insight.insight_type,
+                "confidence": insight.confidence,
+            }
+            for insight in insights
+        ],
+    }
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(payload, sort_keys=True),
+        }
+    ]
+
+
+def _build_bootstrap_proposal_artifact(
+    insights: Sequence[ReflectionInsight],
+    config: DistillationConfig,
+    *,
+    llm_complete_callable: _LLMCompleteCallable | None = None,
+) -> _EvolutionProposalArtifact:
+    if llm_complete_callable is None:
+        llm_complete_callable = _toolkit_complete
+
+    request_messages = _build_bootstrap_request(insights)
+    raw_response = llm_complete_callable(
+        messages=request_messages,
+        config=config.llm_config,
+        tier=config.evolution_tier,
+    )
+    return _EvolutionProposalArtifact(
+        request_messages=request_messages,
+        raw_response=raw_response,
+        supersession_proposals=[],
+        unchanged_ids=[],
+        criteria_adjustments=[],
+        bootstrap_proposals=_parse_bootstrap_proposals(raw_response),
+    )
+
+
+def _parse_bootstrap_proposals(
+    response_text: str,
+) -> list[_BootstrapPersonalityProposal]:
+    payload = _extract_json_object(
+        response_text,
+        response_name="LLM bootstrap response",
+    )
+    raw_files = payload.get("personality_files", payload.get("files"))
+    if not isinstance(raw_files, Sequence) or isinstance(raw_files, str | bytes):
+        raise DistillationError(
+            "LLM bootstrap response must contain personality_files list"
+        )
+    if len(raw_files) < 3 or len(raw_files) > 7:
+        raise DistillationError(
+            "LLM bootstrap response must contain 3-7 personality files"
+        )
+
+    proposals: list[_BootstrapPersonalityProposal] = []
+    seen_titles: set[str] = set()
+    for raw_file in raw_files:
+        if not isinstance(raw_file, Mapping):
+            raise DistillationError("LLM bootstrap personality files must be objects")
+        title = _required_non_empty_string(
+            raw_file.get("title"),
+            "LLM bootstrap personality file title",
+        )
+        if title in seen_titles:
+            raise DistillationError(
+                "LLM bootstrap personality file title is duplicated: " f"{title}"
+            )
+        seen_titles.add(title)
+        proposals.append(
+            _BootstrapPersonalityProposal(
+                title=title,
+                content=_required_non_empty_string(
+                    raw_file.get("content"),
+                    "LLM bootstrap personality file content",
+                ),
+                change_summary=_required_non_empty_string(
+                    raw_file.get("change_summary"),
+                    "LLM bootstrap personality file change_summary",
+                ),
+            )
+        )
+
+    return proposals
 
 
 def _parse_evolution_proposals(
