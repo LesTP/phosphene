@@ -118,3 +118,13 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/di
 Added a bootstrap proposal path for T2→T3 when `memory_store.get_personality_context()` returns no personality files. The engine now sends merged reflection insights to a bootstrap-specific LLM prompt asking for 3-7 corpus-specific initial personality files, parses that response separately from supersession proposals, and writes Tier 3 notes with `version_count:1`. Existing personality files still use the normal supersession/unchanged evolution path.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t2_to_t3_preparation.py` (42 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (633 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4b Step 3: full T2→T3 FakeLLM integration coverage.
+
+### Step MVP.4b.3: Full T2→T3 FakeLLM integration
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** None.
+
+Added real MemoryStore integration coverage for the complete T2→T3 bootstrap path. The test seeds 60 Tier 2 notes with no Tier 3 files, verifies reflection runs in two batches at `t2_reflection_batch_size=30`, verifies bootstrap creates Tier 3 personality files retrievable through `get_personality_context()`, then runs T2→T3 a second time and verifies the normal evolution prompt is used instead of the bootstrap branch.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t1_to_t2_integration.py -k 't2_to_t3_bootstrap_then_normal_evolution'` (1 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (634 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 0, and moves focus to MVP.4b Step 4: live-vault T2→T3 run and validation.

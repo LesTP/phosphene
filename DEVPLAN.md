@@ -2,7 +2,7 @@
 phase: MVP.4b
 blocked: false
 state: execute
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -83,7 +83,7 @@ When personality files exist, use the existing supersession/unchanged path uncha
 
 **Contract change:** None to public API — `distill_t2_to_t3()` signature unchanged. Internal behavior change: creates T3 files when none exist. Update ARCH_distillation.md evolution step 1-2 to document the bootstrap branch.
 
-### Step 3: Integration test — full T2→T3 with FakeLLM
+### Step 3: Integration test — full T2→T3 with FakeLLM (done)
 
 **What:** End-to-end test: seed a MemoryStore with 60 T2 notes (no T3), run `distill_t2_to_t3()` with FakeLLM, verify:
 - Reflection ran in 2 batches (batch_size=30)
