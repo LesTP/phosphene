@@ -34,22 +34,43 @@ print(f"=== First Generation ===")
 print(f"Model: {model}")
 
 # Step 1: Load T3 personality files directly (no full index rebuild)
+# Filter out superseded files — same logic as MemoryStore.get_personality_context()
 t3_dir = vault_path / "tier3"
 t3_files = sorted(t3_dir.glob("*.md")) if t3_dir.exists() else []
-print(f"T3 personality files: {len(t3_files)}")
 
-if not t3_files:
-    print("ERROR: No T3 personality files. Run T2→T3 distillation first.")
-    sys.exit(1)
-
-# Parse T3 content
-personality_context = []
+# Parse all T3 frontmatter to find supersession chains
+import re
+note_ids_by_file = {}
+supersedes_targets = set()
 for f in t3_files:
     raw = f.read_text(encoding="utf-8")
     parts = raw.split("---", 2)
     if len(parts) >= 3:
+        fm = parts[1]
+        note_id_match = re.search(r"note_id:\s*(.+)", fm)
+        supersedes_match = re.search(r"supersedes:\s*(.+)", fm)
+        note_id = note_id_match.group(1).strip() if note_id_match else f.stem
+        note_ids_by_file[f] = note_id
+        if supersedes_match:
+            target = supersedes_match.group(1).strip().strip("'\"")
+            if target:
+                supersedes_targets.add(target)
+
+# Keep only non-superseded files
+current_files = [f for f in t3_files if note_ids_by_file.get(f, f.stem) not in supersedes_targets]
+print(f"T3 personality files: {len(current_files)} current ({len(t3_files) - len(current_files)} superseded, filtered out)")
+
+if not current_files:
+    print("ERROR: No current T3 personality files. Run T2→T3 distillation first.")
+    sys.exit(1)
+
+# Parse T3 content
+personality_context = []
+for f in current_files:
+    raw = f.read_text(encoding="utf-8")
+    parts = raw.split("---", 2)
+    if len(parts) >= 3:
         body = parts[2].strip()
-        # Extract title from frontmatter
         title = f.stem
         for line in parts[1].splitlines():
             if line.strip().startswith("title:"):
