@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 
 import pytest
@@ -85,6 +86,29 @@ def test_constructor_rebuilds_index_across_tiers_sorted_by_created_at(tmp_path: 
     assert entries[2].importance == 0.1
     assert entries[2].unresolvedness == 0.2
     assert entries[2].tags == ["a"]
+
+
+def test_constructor_writes_index_cache_after_rebuild(tmp_path: Path) -> None:
+    vault_path = tmp_path / "vault"
+    now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    notes = [
+        make_note("first", 1, now, title="First", links=["second"]),
+        make_note("second", 2, now + timedelta(seconds=1), title="Second"),
+    ]
+    for note in notes:
+        write_note(vault_path, note)
+
+    MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    cache_path = vault_path / ".index_cache.json"
+    assert cache_path.exists()
+    payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    assert payload["version"] == 1
+    cached_notes = {note["note_id"]: note for note in payload["notes"]}
+    assert set(cached_notes) == {"first", "second"}
+    assert cached_notes["first"]["path"] == "tier1/first.md"
+    assert cached_notes["first"]["links"] == ["second"]
+    assert cached_notes["second"]["link_count"] == 1
 
 
 def test_get_index_filters_by_tier_and_rejects_invalid_tier(tmp_path: Path) -> None:

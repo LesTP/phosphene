@@ -2,7 +2,7 @@
 phase: MVP.4d
 blocked: false
 state: execute
-steps_remaining: 3
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -50,7 +50,7 @@ steps_remaining: 3
 
 **Cache contents per note:** `note_id`, `tier`, `path`, `created_at`, `updated_at`, `supersedes`, `links`, `tags`, `importance`, `unresolvedness`, `cluster_group`, `source`, `link_count`, `decay_deadline`. No content or embeddings — those are loaded on demand from the actual files.
 
-### Step 1: Cache write — persist index after rebuild
+### Step 1: Cache write — persist index after rebuild — Complete
 
 **What:** After `_rebuild_index()` completes, serialize the index entries to `vault/.index_cache.json`. Use atomic write (temp file + rename). Include a version number and timestamp.
 

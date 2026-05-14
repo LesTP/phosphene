@@ -178,3 +178,13 @@ Attempted to run the required Pi-side script for preflight plus `run.py --once`,
 **Contract changes:** None.
 
 Confirmed MVP.4d as a three-step Build phase: write the MemoryStore index cache after a full rebuild, load the cache on startup when valid and fresh with a `skip_cache` test escape hatch, then validate the warmed-cache `run.py --once` path on the Pi. DEVPLAN state moved to `execute`; the invocation step budget was normalized from the prompt and decremented to 3.
+
+### Step MVP.4d.1: Cache write after index rebuild
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** None.
+
+Added versioned `vault/.index_cache.json` writing after a full MemoryStore index rebuild. The cache is atomically written through a same-directory temporary file and includes note ID, tier, relative path, timestamps, supersession pointer, links, tags, scores, cluster/source metadata, computed link count, and decay deadline. Added a matching `_read_index_cache()` helper for the next step and unit coverage proving constructor rebuild creates the cache with all note IDs.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_index.py` (11 passed), `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_store_note.py tests/memory_store/test_index.py` (25 passed), and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (637 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 2, and moves focus to MVP.4d Step 2: cache read on startup.

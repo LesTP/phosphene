@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
+import datetime as datetime_module
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,6 +39,8 @@ from phosphene.memory_store.vault import generate_note_id, note_path, parse_note
 
 _VALID_TIERS = {1, 2, 3}
 _MAX_TITLE_LENGTH = 150
+_INDEX_CACHE_VERSION = 1
+_INDEX_CACHE_FILENAME = ".index_cache.json"
 
 
 class MemoryStore:
@@ -452,6 +456,57 @@ class MemoryStore:
             for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
                 note = parse_note(path.read_text(encoding="utf-8"))
                 self._index.register(note, path)
+        self._write_index_cache()
+
+    def _write_index_cache(self) -> None:
+        cache_path = self.vault_path / _INDEX_CACHE_FILENAME
+        notes = [
+            parse_note(entry.path.read_text(encoding="utf-8"))
+            for entry in sorted(
+                self._index.entries.values(),
+                key=lambda indexed: (indexed.tier, indexed.note_id),
+            )
+        ]
+        payload = {
+            "version": _INDEX_CACHE_VERSION,
+            "created_at": datetime_module.datetime.now(timezone.utc).isoformat(),
+            "notes": [
+                {
+                    "note_id": note.note_id,
+                    "tier": note.tier,
+                    "path": str(
+                        note_path(self.vault_path, note.tier, note.note_id).relative_to(
+                            self.vault_path
+                        )
+                    ),
+                    "created_at": note.created_at.isoformat(),
+                    "updated_at": note.updated_at.isoformat(),
+                    "supersedes": note.supersedes,
+                    "links": list(note.links),
+                    "tags": list(note.tags),
+                    "importance": note.importance,
+                    "unresolvedness": note.unresolvedness,
+                    "cluster_group": note.cluster_group,
+                    "source": note.source,
+                    "link_count": self._index.inbound_count(note.note_id) + len(note.links),
+                    "decay_deadline": (
+                        note.decay_deadline.isoformat()
+                        if note.decay_deadline is not None
+                        else None
+                    ),
+                }
+                for note in notes
+            ],
+        }
+        tmp_path = cache_path.with_name(f"{cache_path.name}.tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(cache_path)
+
+    def _read_index_cache(self) -> dict[str, object] | None:
+        cache_path = self.vault_path / _INDEX_CACHE_FILENAME
+        if not cache_path.exists():
+            return None
+        return json.loads(cache_path.read_text(encoding="utf-8"))
 
     def _note_path_from_index(self, note_id: str) -> Path:
         entry = self._index.entries.get(note_id)
