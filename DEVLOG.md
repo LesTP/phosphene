@@ -152,3 +152,13 @@ Second run (evolution): all 9/9 batches succeeded, 51 insights (was 42). All 7 p
 **Contract changes:** None.
 
 Confirmed MVP.4c as a two-step Build phase: first persist every `GeneratorOutput` to `vault/outputs/` before Telegram routing and update the saved frontmatter after delivery, then run the first live generation on the Pi and verify Telegram delivery plus output archival. DEVPLAN state moved to `execute`.
+
+### Step MVP.4c.1: Save GeneratorOutput to vault/outputs/
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** None.
+
+Added generation output archival inside `_run_generation()`: after `generator.generate()` and before routing, the orchestrator writes markdown under `vault/outputs/` with YAML frontmatter for intent tag, output mode, importance, active T3 personality file IDs, creation time, and initial `delivery_success: false`. After routing completes, the same file is updated to reflect actual delivery success, so failed Telegram delivery still leaves the generated body archived.
+
+Added tests for successful and failed delivery persistence. Also updated a stale distillation test to match the already-documented MVP.4b behavior where hallucinated reflection source IDs are warned-and-dropped instead of raising. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t2_to_t3_preparation.py tests/orchestrator/test_orchestrator_exports.py` (86 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (636 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4c Step 2: first live generation plus Telegram delivery on the Pi.

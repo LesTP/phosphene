@@ -2,7 +2,7 @@
 phase: MVP.4c
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -29,7 +29,7 @@ steps_remaining: 2
 ## Current Status
 
 - **Phase** — MVP.4c: Generation output persistence + first run
-- **Focus** — Save generations to vault/outputs/ before Telegram delivery, then first live generation.
+- **Focus** — Run the first live generation on the Pi and verify Telegram delivery plus output archival.
 - **Blocked** — No.
 
 ## MVP.4: Remaining Steps
@@ -40,7 +40,7 @@ steps_remaining: 2
 - [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
 - [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated. See MVP.4a.
 - [x] **T2→T3 distillation** — 7 personality files bootstrapped and evolved. See MVP.4b.
-- [ ] **Save generations** — see MVP.4c below
+- [x] **Save generations** — persisted to vault/outputs/ before routing; delivery_success updated after route
 - [ ] **Run generation** — first output via Telegram
 - [ ] **Verify Telegram** — check message arrives on phone
 

@@ -1,10 +1,12 @@
 import json
+import tempfile
 from dataclasses import fields
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 import phosphene.orchestrator as orchestrator
 from phosphene.distillation import (
@@ -51,11 +53,18 @@ class ValidGateway:
 
 
 class RecordingMemoryStore(ValidMemoryStore):
-    def __init__(self, personality_files: list[object] | None = None) -> None:
+    def __init__(
+        self,
+        personality_files: list[object] | None = None,
+        vault_path: Path | None = None,
+    ) -> None:
         super().__init__()
         self.store_note = self._store_note
         self.get_personality_context = self._get_personality_context
         self.run_decay = self._run_decay
+        self.vault_path = (
+            vault_path if vault_path is not None else Path(tempfile.mkdtemp()) / "vault"
+        )
         self.notes: list[object] = []
         self.personality_files = [] if personality_files is None else personality_files
         self.personality_context_calls = 0
@@ -741,6 +750,40 @@ def test_trigger_generation_routes_output_and_counts_successful_delivery() -> No
     assert gateway.sent_messages[0].content == "send this"
 
 
+def test_trigger_generation_persists_output_before_successful_delivery(tmp_path) -> None:
+    personality = SimpleNamespace(note_id="personality-file-1")
+    memory_store = RecordingMemoryStore(
+        personality_files=[personality],
+        vault_path=tmp_path / "vault",
+    )
+    output = make_generator_output("archive this output")
+    generator = FakeGenerator(output)
+    gateway = RoutingGateway()
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=generator,
+            gateway=gateway,
+        ),
+        build_config(),
+    )
+
+    result = instance.trigger("generation")
+
+    output_files = list((tmp_path / "vault" / "outputs").glob("*.md"))
+    assert result.success is True
+    assert result.outputs_delivered == 1
+    assert len(output_files) == 1
+    metadata, body = read_output_file(output_files[0])
+    assert metadata["intent_tag"] == "synthesis"
+    assert metadata["output_mode"] == "prompted"
+    assert metadata["importance_score"] == 0.5
+    assert metadata["delivery_success"] is True
+    assert metadata["personality_file_ids"] == ["personality-file-1"]
+    assert datetime.fromisoformat(metadata["created_at"])
+    assert body == "archive this output"
+
+
 def test_bootstrap_transitions_to_generation_after_distillation_produces_personality() -> None:
     item = SimpleNamespace(content="seed fragment", source="corpus")
     fragment = SimpleNamespace(
@@ -948,6 +991,32 @@ def test_trigger_generation_treats_delivery_failure_as_zero_delivered() -> None:
     assert len(gateway.sent_messages) == 1
 
 
+def test_trigger_generation_preserves_output_when_delivery_fails(tmp_path) -> None:
+    memory_store = RecordingMemoryStore(
+        personality_files=[SimpleNamespace(note_id="personality-file-1")],
+        vault_path=tmp_path / "vault",
+    )
+    gateway = RoutingGateway(delivery_success=False)
+    instance = MVPOrchestrator(
+        build_modules(
+            memory_store=memory_store,
+            generator=FakeGenerator(make_generator_output("failed delivery output")),
+            gateway=gateway,
+        ),
+        build_config(),
+    )
+
+    result = instance.trigger("generation")
+
+    output_files = list((tmp_path / "vault" / "outputs").glob("*.md"))
+    assert result.success is True
+    assert result.outputs_delivered == 0
+    assert len(output_files) == 1
+    metadata, body = read_output_file(output_files[0])
+    assert metadata["delivery_success"] is False
+    assert body == "failed delivery output"
+
+
 def test_run_respond_skips_bootstrap_without_generator_call() -> None:
     memory_store = RecordingMemoryStore(personality_files=[])
     generator = FakeGenerator(make_generator_output())
@@ -1000,6 +1069,12 @@ def test_start_listener_dispatches_inbound_message_to_respond(monkeypatch) -> No
     assert generator.respond_calls == [(message, {}, config.generator_config)]
     assert len(gateway.sent_messages) == 1
     assert gateway.sent_messages[0].content == "reply"
+
+
+def read_output_file(path: Path) -> tuple[dict[str, object], str]:
+    text = path.read_text(encoding="utf-8")
+    frontmatter, body = text[4:].split("\n---\n", 1)
+    return yaml.safe_load(frontmatter), body
 
 
 def test_run_respond_catches_empty_personality_error_as_bootstrap_drop() -> None:

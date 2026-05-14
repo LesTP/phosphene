@@ -623,7 +623,6 @@ def test_parse_evolution_proposals_rejects_omitted_personality_files() -> None:
         ('{"insights": "nope"}', "insights list"),
         ('{"insights": [{"content": "", "source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", "confidence": 0.2}]}', "content cannot be empty"),
         ('{"insights": [{"content": "x", "source_pattern_ids": [], "insight_type": "new_pattern", "confidence": 0.2}]}', "source_pattern_ids cannot be empty"),
-        ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-x"], "insight_type": "new_pattern", "confidence": 0.2}]}', "unknown pattern ids"),
         ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-a"], "insight_type": "mood", "confidence": 0.2}]}', "insight_type"),
         ('{"insights": [{"content": "x", "source_pattern_ids": ["pattern-a"], "insight_type": "new_pattern", "confidence": 2}]}', r"confidence must be in \[0.0, 1.0\]"),
     ],
@@ -634,6 +633,15 @@ def test_parse_reflection_insights_rejects_malformed_responses(
 ) -> None:
     with pytest.raises(DistillationError, match=message):
         _parse_reflection_insights(response, valid_pattern_ids={"pattern-a"})
+
+
+def test_parse_reflection_insights_drops_unknown_pattern_ids() -> None:
+    insights = _parse_reflection_insights(
+        '{"insights": [{"content": "x", "source_pattern_ids": ["pattern-x"], "insight_type": "new_pattern", "confidence": 0.2}]}',
+        valid_pattern_ids={"pattern-a"},
+    )
+
+    assert insights == []
 
 
 def test_distill_t2_to_t3_raises_no_pattern_data_before_feedback_or_writes(tmp_path) -> None:

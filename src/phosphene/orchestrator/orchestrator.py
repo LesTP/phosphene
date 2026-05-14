@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter, sleep
 from typing import Callable
 
+import yaml
 from croniter import croniter
 
 from phosphene.distillation import (
@@ -256,6 +260,11 @@ class MVPOrchestrator:
                 {},
                 self.config.generator_config,
             )
+            output_path = _save_generation_output(
+                self.modules.memory_store,
+                output,
+                _personality_file_ids(context.personality_files),
+            )
         except EmptyPersonalityError:
             return ActivationResult(
                 task_type="generation",
@@ -264,7 +273,9 @@ class MVPOrchestrator:
             )
 
         delivery = route(output, self.config.router_config, self.modules.gateway)
-        delivered = 1 if delivery is not None and delivery.success else 0
+        delivery_success = delivery is not None and delivery.success
+        _update_generation_delivery_success(output_path, delivery_success)
+        delivered = 1 if delivery_success else 0
 
         return ActivationResult(
             task_type="generation",
@@ -407,3 +418,89 @@ def _fragment_title(fragment: object) -> str:
     title_source = annotation or content
     title = " ".join(title_source.split())
     return title[:150] if title else "Untitled"
+
+
+def _save_generation_output(
+    memory_store: object,
+    output: object,
+    personality_file_ids: list[str],
+) -> Path:
+    vault_path = getattr(memory_store, "vault_path")
+    created_at = datetime.now(timezone.utc)
+    outputs_path = vault_path / "outputs"
+    outputs_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = outputs_path / _generation_output_filename(output, created_at)
+    output_path.write_text(
+        _serialize_generation_output(
+            output,
+            personality_file_ids=personality_file_ids,
+            delivery_success=False,
+            created_at=created_at,
+        ),
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def _personality_file_ids(personality_files: list[object]) -> list[str]:
+    return [
+        note_id
+        for note_id in (getattr(note, "note_id", None) for note in personality_files)
+        if note_id is not None
+    ]
+
+
+def _update_generation_delivery_success(output_path: Path, delivery_success: bool) -> None:
+    text = output_path.read_text(encoding="utf-8")
+    metadata, body = _split_markdown_frontmatter(text)
+    metadata["delivery_success"] = delivery_success
+    output_path.write_text(_serialize_frontmatter(metadata, body), encoding="utf-8")
+
+
+def _generation_output_filename(output: object, created_at: datetime) -> str:
+    content = getattr(output, "content")
+    slug = _slugify_output_content(content)
+    timestamp = created_at.strftime("%Y%m%d%H%M%S")
+    digest = hashlib.sha1(
+        f"{content}\0{created_at.isoformat()}".encode("utf-8")
+    ).hexdigest()[:8]
+    return f"{slug}-{timestamp}-{digest}.md"
+
+
+def _serialize_generation_output(
+    output: object,
+    *,
+    personality_file_ids: list[str],
+    delivery_success: bool,
+    created_at: datetime,
+) -> str:
+    metadata = {
+        "intent_tag": getattr(output, "intent_tag"),
+        "output_mode": getattr(output, "output_mode"),
+        "importance_score": getattr(output, "importance_score"),
+        "delivery_success": delivery_success,
+        "personality_file_ids": personality_file_ids,
+        "created_at": created_at.isoformat(timespec="seconds"),
+    }
+    return _serialize_frontmatter(metadata, getattr(output, "content"))
+
+
+def _serialize_frontmatter(metadata: dict[str, object], body: str) -> str:
+    frontmatter = yaml.safe_dump(
+        metadata,
+        allow_unicode=True,
+        sort_keys=False,
+    )
+    return f"---\n{frontmatter}---\n{body}"
+
+
+def _split_markdown_frontmatter(text: str) -> tuple[dict[str, object], str]:
+    frontmatter, body = text[4:].split("\n---\n", 1)
+    return yaml.safe_load(frontmatter) or {}, body
+
+
+def _slugify_output_content(content: str) -> str:
+    words = re.findall(r"[\w]+", content.lower())
+    slug = "-".join(words)[:60].strip("-")
+    return slug or "output"
