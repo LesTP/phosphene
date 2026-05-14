@@ -2,7 +2,7 @@
 phase: MVP.4d
 blocked: false
 state: execute
-steps_remaining: 2
+steps_remaining: 1
 ---
 
 # Phosphene — Development Plan
@@ -58,7 +58,7 @@ steps_remaining: 2
 
 **Verification:** Unit test: build a MemoryStore, verify `.index_cache.json` exists, verify it contains all note IDs. Existing tests must pass.
 
-### Step 2: Cache read — load index from cache on startup
+### Step 2: Cache read — load index from cache on startup — Complete
 
 **What:** In `_rebuild_index()`, check if `vault/.index_cache.json` exists and is valid:
 1. Cache exists AND cache version matches current code

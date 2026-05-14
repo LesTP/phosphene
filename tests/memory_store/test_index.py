@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 
 import pytest
 
+import phosphene.memory_store.store as store_module
 from phosphene.memory_store import (
     InvalidTierError,
     MemoryStore,
@@ -107,8 +109,80 @@ def test_constructor_writes_index_cache_after_rebuild(tmp_path: Path) -> None:
     cached_notes = {note["note_id"]: note for note in payload["notes"]}
     assert set(cached_notes) == {"first", "second"}
     assert cached_notes["first"]["path"] == "tier1/first.md"
+    assert cached_notes["first"]["title"] == "First"
     assert cached_notes["first"]["links"] == ["second"]
     assert cached_notes["second"]["link_count"] == 1
+
+
+def test_constructor_loads_fresh_index_cache_without_parsing_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault_path = tmp_path / "vault"
+    now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    write_note(vault_path, make_note("cached", 1, now, title="Cached"))
+    MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    def fail_parse_note(_: str) -> MemoryNote:
+        raise AssertionError("cache load should not parse markdown notes")
+
+    monkeypatch.setattr(store_module, "parse_note", fail_parse_note)
+    cached_store = MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    assert [entry.note_id for entry in cached_store.get_index()] == ["cached"]
+    assert cached_store.get_index()[0].title == "Cached"
+
+
+def test_constructor_rebuilds_when_cache_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault_path = tmp_path / "vault"
+    now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    write_note(vault_path, make_note("stale", 1, now, title="Stale"))
+    MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    cache_path = vault_path / ".index_cache.json"
+    payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    cache_created_at = datetime.fromisoformat(payload["created_at"])
+    future_mtime = cache_created_at.timestamp() + 10
+    note_file = vault_path / "tier1" / "stale.md"
+    os.utime(note_file, (future_mtime, future_mtime))
+
+    original_parse_note = store_module.parse_note
+    parse_count = 0
+
+    def count_parse_note(markdown: str) -> MemoryNote:
+        nonlocal parse_count
+        parse_count += 1
+        return original_parse_note(markdown)
+
+    monkeypatch.setattr(store_module, "parse_note", count_parse_note)
+    rebuilt_store = MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    assert [entry.note_id for entry in rebuilt_store.get_index()] == ["stale"]
+    assert parse_count > 0
+
+
+def test_skip_cache_forces_rebuild_even_when_cache_is_fresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault_path = tmp_path / "vault"
+    now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    write_note(vault_path, make_note("skip", 1, now, title="Skip"))
+    MemoryStore(MemoryStoreConfig(vault_path=str(vault_path)))
+
+    original_parse_note = store_module.parse_note
+    parse_count = 0
+
+    def count_parse_note(markdown: str) -> MemoryNote:
+        nonlocal parse_count
+        parse_count += 1
+        return original_parse_note(markdown)
+
+    monkeypatch.setattr(store_module, "parse_note", count_parse_note)
+    rebuilt_store = MemoryStore(MemoryStoreConfig(vault_path=str(vault_path), skip_cache=True))
+
+    assert [entry.note_id for entry in rebuilt_store.get_index()] == ["skip"]
+    assert parse_count > 0
 
 
 def test_get_index_filters_by_tier_and_rejects_invalid_tier(tmp_path: Path) -> None:

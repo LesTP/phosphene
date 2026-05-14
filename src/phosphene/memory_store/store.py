@@ -451,6 +451,9 @@ class MemoryStore:
             raise VaultError(f"vault path is not writable: {self.vault_path}")
 
     def _rebuild_index(self) -> None:
+        if not self.config.skip_cache and self._load_index_cache():
+            return
+
         self._index = Index()
         for tier in sorted(_VALID_TIERS):
             for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
@@ -474,6 +477,7 @@ class MemoryStore:
                 {
                     "note_id": note.note_id,
                     "tier": note.tier,
+                    "title": note.title,
                     "path": str(
                         note_path(self.vault_path, note.tier, note.note_id).relative_to(
                             self.vault_path
@@ -506,7 +510,85 @@ class MemoryStore:
         cache_path = self.vault_path / _INDEX_CACHE_FILENAME
         if not cache_path.exists():
             return None
-        return json.loads(cache_path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _load_index_cache(self) -> bool:
+        payload = self._read_index_cache()
+        if payload is None or payload.get("version") != _INDEX_CACHE_VERSION:
+            return False
+
+        cache_created_at = _parse_cache_datetime(payload.get("created_at"))
+        newest_note_mtime = self._newest_note_mtime()
+        if cache_created_at is None or cache_created_at <= newest_note_mtime:
+            return False
+
+        notes = payload.get("notes")
+        if not isinstance(notes, list):
+            return False
+        cached_paths = {
+            note_payload.get("path")
+            for note_payload in notes
+            if isinstance(note_payload, dict)
+        }
+        if cached_paths != self._note_relative_paths():
+            return False
+
+        cached_index = Index()
+        try:
+            for note_payload in notes:
+                if not isinstance(note_payload, dict):
+                    return False
+                relative_path = note_payload["path"]
+                if not isinstance(relative_path, str):
+                    return False
+                path = self.vault_path / relative_path
+                if not path.is_file():
+                    return False
+                note = MemoryNote(
+                    note_id=str(note_payload["note_id"]),
+                    tier=int(note_payload["tier"]),
+                    content="",
+                    title=str(note_payload["title"]),
+                    importance=float(note_payload["importance"]),
+                    unresolvedness=float(note_payload["unresolvedness"]),
+                    links=list(note_payload["links"]),
+                    tags=list(note_payload["tags"]),
+                    source=note_payload["source"],
+                    friction_target=None,
+                    embedding=None,
+                    attractor_relevance=None,
+                    cluster_group=note_payload["cluster_group"],
+                    supersedes=note_payload["supersedes"],
+                    created_at=_require_cache_datetime(note_payload["created_at"]),
+                    updated_at=_require_cache_datetime(note_payload["updated_at"]),
+                    link_count=int(note_payload["link_count"]),
+                    decay_deadline=_parse_cache_datetime(note_payload["decay_deadline"]),
+                )
+                cached_index.register(note, path)
+        except (KeyError, TypeError, ValueError, VaultError):
+            return False
+
+        self._index = cached_index
+        return True
+
+    def _newest_note_mtime(self) -> datetime:
+        newest = datetime.fromtimestamp(0, tz=timezone.utc)
+        for tier in sorted(_VALID_TIERS):
+            for path in (self.vault_path / f"tier{tier}").glob("*.md"):
+                mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+                newest = max(newest, mtime)
+        return newest
+
+    def _note_relative_paths(self) -> set[str]:
+        paths: set[str] = set()
+        for tier in sorted(_VALID_TIERS):
+            for path in (self.vault_path / f"tier{tier}").glob("*.md"):
+                paths.add(str(path.relative_to(self.vault_path)))
+        return paths
 
     def _note_path_from_index(self, note_id: str) -> Path:
         entry = self._index.entries.get(note_id)
@@ -554,3 +636,24 @@ def _validate_title(title: str) -> None:
 def _validate_score(field_name: str, value: float) -> None:
     if not 0.0 <= value <= 1.0:
         raise InvalidScoreError(f"{field_name} must be between 0.0 and 1.0")
+
+
+def _parse_cache_datetime(value: object) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _require_cache_datetime(value: object) -> datetime:
+    parsed = _parse_cache_datetime(value)
+    if parsed is None:
+        raise ValueError("cache datetime is missing or invalid")
+    return parsed

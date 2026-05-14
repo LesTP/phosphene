@@ -17,6 +17,7 @@ class MemoryStoreConfig:
     tier2_cycle_window_days: int = 30
     tier3_superseded_retention_days: int = 90
     link_density_threshold: int = 2
+    skip_cache: bool = False
 
 
 @dataclass

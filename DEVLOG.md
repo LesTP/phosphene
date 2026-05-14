@@ -188,3 +188,13 @@ Confirmed MVP.4d as a three-step Build phase: write the MemoryStore index cache 
 Added versioned `vault/.index_cache.json` writing after a full MemoryStore index rebuild. The cache is atomically written through a same-directory temporary file and includes note ID, tier, relative path, timestamps, supersession pointer, links, tags, scores, cluster/source metadata, computed link count, and decay deadline. Added a matching `_read_index_cache()` helper for the next step and unit coverage proving constructor rebuild creates the cache with all note IDs.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_index.py` (11 passed), `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_store_note.py tests/memory_store/test_index.py` (25 passed), and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (637 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 2, and moves focus to MVP.4d Step 2: cache read on startup.
+
+### Step MVP.4d.2: Cache read on startup
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** `ARCH_memory_store.md` documents `MemoryStoreConfig.skip_cache` and the startup index cache.
+
+Added startup cache loading for MemoryStore. `_rebuild_index()` now loads `vault/.index_cache.json` when the cache version matches, the cached path set matches actual tier markdown files, and the cache timestamp is newer than the newest note mtime; otherwise it falls back to full markdown parsing and rewrites the cache. Added tolerant cache parsing, datetime validation, and `skip_cache` for tests or forced rebuilds. Cache-loaded indexes avoid markdown parsing but still load full note bodies on demand through `get_note()`.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_index.py tests/memory_store/test_types.py` (24 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (640 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4d Step 3: Pi validation of `run.py --once` with the cached index.

@@ -17,6 +17,7 @@ class MemoryStoreConfig:
     tier2_cycle_window_days: int = 30       # Tier 2 distillation cycle window
     tier3_superseded_retention_days: int = 90  # retention of superseded Tier 3 versions
     link_density_threshold: int = 2         # inbound link count required for extended retention
+    skip_cache: bool = False                # bypass startup index cache and force full rebuild
 
 @dataclass
 class NoteInput:
@@ -266,7 +267,7 @@ Decay rules (enforced internally, parameters from `MemoryStoreConfig`):
 ## State
 
 - **Note files:** Obsidian-compatible markdown with YAML frontmatter and `[[wikilink]]` backlinks. One `.md` file per note, organized by tier subdirectory.
-- **Index:** In-memory, derived from frontmatter. Rebuilt on startup; updated incrementally on writes. All read queries go through the index first.
+- **Index:** In-memory, derived from frontmatter. Rebuilt on startup or loaded from `vault/.index_cache.json` when the cache version matches and its timestamp is newer than all tier markdown files. Updated incrementally on writes. All read queries go through the index first.
 - **Embedding vectors:** Stored separately from markdown files (binary format), keyed on note_id. Only present for notes where the consumer provided an embedding.
 - **Supersession chain:** Tier 3 version history maintained via `supersedes` pointers. Old versions remain readable until their `decay_deadline`.
 - **Concurrency:** Supports concurrent reads. Writes are serialized (single writer). Distillation runs as a read-only subprocess — it reads via the public API and writes back results through `store_note` / `supersede` at completion.
