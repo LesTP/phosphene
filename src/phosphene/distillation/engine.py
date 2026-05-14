@@ -899,7 +899,10 @@ def _build_reflection_request(
             '{"insights": [{"content": "...", "source_pattern_ids": ["..."], '
             '"insight_type": "recurring_tension|new_pattern|evolution|'
             'contradiction", "confidence": 0.0}]}. Confidence must be in '
-            "[0.0, 1.0]."
+            "[0.0, 1.0]. IMPORTANT: source_pattern_ids must use the full "
+            "note_id string (the long slug like "
+            "'the-cluster-centers-on-...-20260513114528-xxxx'), NOT the "
+            "numeric cluster_group value."
         ),
         "patterns": [_pattern_note_payload(note) for note in prepared.pattern_notes],
         "feedback_metrics": [
@@ -1488,10 +1491,14 @@ def _parse_reflection_insights(
                 note_id for note_id in source_pattern_ids if note_id not in valid_pattern_ids
             ]
             if unknown_ids:
-                raise DistillationError(
-                    "LLM reflection insight source_pattern_ids include unknown "
-                    f"pattern ids: {', '.join(unknown_ids)}"
-                )
+                print(f"  WARNING: LLM hallucinated {len(unknown_ids)} pattern id(s), "
+                      f"dropping: {', '.join(unknown_ids[:3])}"
+                      f"{'...' if len(unknown_ids) > 3 else ''}")
+                source_pattern_ids = [
+                    note_id for note_id in source_pattern_ids if note_id in valid_pattern_ids
+                ]
+                if not source_pattern_ids:
+                    continue  # skip this insight entirely — no valid sources
 
         raw_insight_type = raw_insight.get("insight_type", raw_insight.get("type"))
         if not isinstance(raw_insight_type, str):
@@ -2001,7 +2008,6 @@ def _note_content(note: object) -> str:
 def _pattern_note_payload(note: object) -> Mapping[str, object]:
     return {
         "note_id": str(getattr(note, "note_id")),
-        "cluster_group": _optional_string(getattr(note, "cluster_group", None)),
         "title": _optional_string(getattr(note, "title", None)),
         "content": _note_content(note),
         "importance": _numeric_score(getattr(note, "importance", 0.0)),
