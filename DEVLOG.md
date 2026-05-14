@@ -144,3 +144,11 @@ Fix applied: (1) removed `cluster_group` from `_pattern_note_payload()` — the 
 Second run (evolution): all 9/9 batches succeeded, 51 insights (was 42). All 7 personality files superseded with enriched content. Titles evolved to be more specific (e.g., "The Authenticity Paradox" → "The Authenticity Paradox and Evolution Beyond Binary Thinking").
 
 **Gotcha promoted:** LLMs hallucinate shorter/simpler IDs when long slug IDs and short numeric IDs coexist in the prompt. Remove competing ID fields or use synthetic short IDs with a mapping.
+
+### MVP.4c phase plan activated
+**Date:** 2026-05-14
+**Mode:** autonomous Plan
+**Outcome:** Ready for execution
+**Contract changes:** None.
+
+Confirmed MVP.4c as a two-step Build phase: first persist every `GeneratorOutput` to `vault/outputs/` before Telegram routing and update the saved frontmatter after delivery, then run the first live generation on the Pi and verify Telegram delivery plus output archival. DEVPLAN state moved to `execute`.

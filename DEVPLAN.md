@@ -1,7 +1,7 @@
 ---
 phase: MVP.4c
 blocked: false
-state: plan
+state: execute
 steps_remaining: 2
 ---
 

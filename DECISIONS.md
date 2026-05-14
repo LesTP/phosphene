@@ -395,3 +395,10 @@ Priority: Required for MVP bootstrap
 Decision: Execute MVP.4b as a four-step Build phase: add `t2_reflection_batch_size` and batch `_reflect_tier2_patterns()`, add a T3 bootstrap branch when no personality files exist, prove the full T2->T3 path with FakeLLM integration coverage, then run and validate the live vault after preflight and cost estimate.
 Rationale: The live vault has 251 T2 notes and 0 T3 files. Reading all T2 notes into one reflection prompt creates an impractical context load, while the existing evolution path can only supersede current T3 files. Batching makes T2->T3 scale with corpus volume without changing steady-state behavior, and the bootstrap branch preserves the pipeline goal of deriving initial personality files from reflected corpus patterns.
 Revisit if: Batch-level reflection loses cross-batch synthesis quality in practice, or if live-vault validation shows the bootstrap prompt produces generic personality files rather than corpus-specific dimensions.
+
+D-56: MVP.4c persists generated outputs outside distillation
+Date: 2026-05-14 | Status: Closed
+Priority: Required for MVP observability
+Decision: Execute MVP.4c as a two-step Build phase: persist each `GeneratorOutput` as Obsidian-compatible markdown under `vault/outputs/` before routing, update `delivery_success` after routing, then run one live Pi generation and verify Telegram delivery plus output archival.
+Rationale: Generated content is currently delivered and discarded, so the system cannot be studied over time. Keeping generated outputs outside `vault/tier1/`, `vault/tier2/`, and `vault/tier3/` preserves an audit/archive layer without feeding the agent's own generations back into personality distillation by default.
+Revisit if: Human-selected generated outputs need promotion into Tier 1, or if output analysis becomes a first-class feedback path with explicit anti-echo safeguards.
