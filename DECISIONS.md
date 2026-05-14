@@ -402,3 +402,10 @@ Priority: Required for MVP observability
 Decision: Execute MVP.4c as a two-step Build phase: persist each `GeneratorOutput` as Obsidian-compatible markdown under `vault/outputs/` before routing, update `delivery_success` after routing, then run one live Pi generation and verify Telegram delivery plus output archival.
 Rationale: Generated content is currently delivered and discarded, so the system cannot be studied over time. Keeping generated outputs outside `vault/tier1/`, `vault/tier2/`, and `vault/tier3/` preserves an audit/archive layer without feeding the agent's own generations back into personality distillation by default.
 Revisit if: Human-selected generated outputs need promotion into Tier 1, or if output analysis becomes a first-class feedback path with explicit anti-echo safeguards.
+
+D-57: MVP.4d caches the Memory Store index as a vault sidecar
+Date: 2026-05-14 | Status: Closed
+Priority: Required for Pi usability
+Decision: Execute MVP.4d as a three-step Build phase: first write vault/.index_cache.json after full MemoryStore index rebuild, then read that cache on startup when its version matches and it is newer than all tier markdown files, then validate run.py --once on the Pi with the warmed cache.
+Rationale: The live vault has thousands of markdown notes, and repeatedly YAML-parsing all of them during MemoryStore construction makes cold starts slow enough to block normal MVP operation. A JSON sidecar preserves the existing markdown source of truth while making the common startup path a single small parse.
+Revisit if: Multiple processes begin writing the vault concurrently, cache validity needs per-file mtimes instead of a global newest-file check, or the cache grows to include content/embeddings rather than index metadata only.

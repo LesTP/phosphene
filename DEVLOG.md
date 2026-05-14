@@ -170,3 +170,11 @@ Added tests for successful and failed delivery persistence. Also updated a stale
 **Contract changes:** None.
 
 Attempted to run the required Pi-side script for preflight plus `run.py --once`, but both `scp` and `ssh` failed before execution with `Could not resolve hostname pirozhok: Name or service not known`. No preflight, LLM call, Telegram delivery, or vault write happened. DEVPLAN is blocked for human/operator action: run the Step 2 command locally on the Pi or provide a reachable SSH/Tailscale host from this environment.
+
+### MVP.4d phase plan activated
+**Date:** 2026-05-14
+**Mode:** autonomous Plan
+**Outcome:** Ready for execution
+**Contract changes:** None.
+
+Confirmed MVP.4d as a three-step Build phase: write the MemoryStore index cache after a full rebuild, load the cache on startup when valid and fresh with a `skip_cache` test escape hatch, then validate the warmed-cache `run.py --once` path on the Pi. DEVPLAN state moved to `execute`; the invocation step budget was normalized from the prompt and decremented to 3.
