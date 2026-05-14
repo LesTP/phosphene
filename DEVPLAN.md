@@ -1,8 +1,8 @@
 ---
-phase: MVP.4c
-blocked: true
-state: execute
-steps_remaining: 0
+phase: MVP.4d
+blocked: false
+state: plan
+steps_remaining: 3
 ---
 
 # Phosphene — Development Plan
@@ -28,75 +28,66 @@ steps_remaining: 0
 
 ## Current Status
 
-- **Phase** — MVP.4c: Generation output persistence + first run
-- **Focus** — Run the first live generation on the Pi and verify Telegram delivery plus output archival.
-- **Blocked** — Yes: Step 2 must run on the Pi, but hostname `pirozhok` is not resolvable from this environment.
+- **Phase** — MVP.4d: Cached index for fast MemoryStore startup
+- **Focus** — Eliminate 15+ min cold-start index rebuild. Make `run.py --once` usable on Pi.
+- **Blocked** — No.
 
 ## MVP.4: Remaining Steps
 
-- [x] T1→T2 distillation working — 12/12 cluster summaries succeeded, 11 T2 notes produced from 200 notes
-- [x] **Fix missing notes** — root cause: note ID collision (same title+timestamp → same filename). Fixed by including content in hash. Re-seeded: 3,856 T1 notes (was 1,469).
-- [x] **Stage 200 notes + run preflight** — prepare for chronological distillation
-- [x] **Full chronological distillation** — 3,856 T1 → 225 clusters, 2,328 promoted, 1,528 noise. 251 T2 notes + 225 assertion caches.
-- [x] **Fix T2→T2 cross-links** — engine fixed; vault rebuilt and validated. See MVP.4a.
-- [x] **T2→T3 distillation** — 7 personality files bootstrapped and evolved. See MVP.4b.
-- [x] **Save generations** — persisted to vault/outputs/ before routing; delivery_success updated after route
-- [ ] **Run generation** — first output via Telegram
-- [ ] **Verify Telegram** — check message arrives on phone
+- [x] T1→T2 distillation — 3,856 T1 → 251 T2 notes + 225 assertion caches
+- [x] Fix T2→T2 cross-links — similarity-filtered. See MVP.4a.
+- [x] T2→T3 distillation — 7 personality files bootstrapped and evolved. See MVP.4b.
+- [x] Generation output persistence — vault/outputs/. See MVP.4c.
+- [x] First generation + Telegram delivery — verified via lean script.
+- [ ] **Cached index** — see MVP.4d below
+- [ ] **Verify `run.py --once`** — should complete in <30s with cached index
 
-## MVP.4c: Generation Output Persistence (autonomous, Build)
+## MVP.4d: Cached Index for Fast MemoryStore Startup (autonomous, Build)
 
-**Problem:** `_run_generation()` produces a `GeneratorOutput` in memory, routes it to Telegram, and discards it. Generated content is not saved anywhere. The system's development over time cannot be studied without preserving its outputs.
+**Problem:** `_rebuild_index()` reads and YAML-parses every `.md` file in the vault on every MemoryStore construction. With 4,107 notes on the Pi's USB drive, this takes 15+ minutes — making `run.py --once` unusable and cold starts painfully slow.
 
-**Decision:** Save to `vault/outputs/` as Obsidian-compatible markdown with frontmatter. NOT in the distillation loop (distillation reads `vault/tier1/`, `vault/tier2/`, `vault/tier3/` only). Outputs are an archival/analysis layer — they can be retrospectively analyzed or selectively promoted to T1, but by default they do not feed back into personality evolution. This avoids echo chamber / self-reinforcement.
+**Solution:** Write a JSON sidecar cache (`vault/.index_cache.json`) after index rebuild. On next startup, load from cache if it's newer than the newest vault file. The MemoryStore is the only writer, so the cache stays in sync automatically. Add `--rebuild-index` flag for manual invalidation.
 
-**Telegram smoke test:** Passed. Bot `@battlepenguin_phosphenebot` delivered to chat_id successfully.
+**Cache contents per note:** `note_id`, `tier`, `path`, `created_at`, `updated_at`, `supersedes`, `links`, `tags`, `importance`, `unresolvedness`, `cluster_group`, `source`, `link_count`, `decay_deadline`. No content or embeddings — those are loaded on demand from the actual files.
 
-### Step 1: Save GeneratorOutput to vault/outputs/
+### Step 1: Cache write — persist index after rebuild
 
-**What:** In `_run_generation()` (orchestrator.py), after `generator.generate()` and before `route()`, write the output as a markdown file in `vault/outputs/`:
+**What:** After `_rebuild_index()` completes, serialize the index entries to `vault/.index_cache.json`. Use atomic write (temp file + rename). Include a version number and timestamp.
 
-```
-vault/outputs/{slug}-{timestamp}-{hash}.md
----
-intent_tag: observation
-output_mode: prompted
-importance_score: 0.7
-delivery_success: true/false  (updated after route())
-personality_file_ids: [list of T3 note_ids active at generation time]
-created_at: '2026-05-14T09:30:00+00:00'
----
-[generated content body]
-```
+**Files:** `memory_store/store.py` — `_rebuild_index()`, new `_write_index_cache()`, new `_read_index_cache()`.
 
-Save BEFORE routing so the output is preserved even if Telegram delivery fails. Update `delivery_success` after routing completes.
+**Verification:** Unit test: build a MemoryStore, verify `.index_cache.json` exists, verify it contains all note IDs. Existing tests must pass.
 
-**Files:** `orchestrator/orchestrator.py` — `_run_generation()`. Possibly a `_save_generation_output()` helper.
+### Step 2: Cache read — load index from cache on startup
 
-**Verification:** Unit test: run generation with FakeGenerator + FakeGateway, verify `.md` file appears in `vault/outputs/`, verify frontmatter fields. Test with failed delivery: verify file still saved with `delivery_success: false`. Existing tests must pass.
+**What:** In `_rebuild_index()`, check if `vault/.index_cache.json` exists and is valid:
+1. Cache exists AND cache version matches current code
+2. Cache timestamp is newer than the newest `.md` file modification time across all tiers
+3. If both pass: load from cache (single file read + JSON parse) instead of scanning
+4. If either fails: fall back to full scan, then write updated cache
 
-### Step 2: First live generation + Telegram delivery
+Add `MemoryStoreConfig.skip_cache: bool = False` for tests that need guaranteed fresh index.
 
-**What:** Run `run.py --once` on the Pi. This triggers one orchestrator cycle: ingestion (no sources configured → skip), distillation (gates won't pass — just ran), generation (personality files exist → generate), delivery (Telegram).
+**Files:** `memory_store/store.py` — `_rebuild_index()`, `MemoryStoreConfig`.
+
+**Verification:** Unit test: build MemoryStore (full scan), verify cache written. Construct second MemoryStore, verify it loads from cache (mock/spy on file reads to confirm no `.md` parsing). Modify a vault file, construct third MemoryStore, verify it falls back to full scan and updates cache. Existing tests must pass.
+
+### Step 3: Validate on Pi
+
+**What:** Run `run.py --once` on the Pi. First run builds cache (still 15 min). Second run should complete in <30 seconds.
 
 **Verification:**
-- Generated content appears in `vault/outputs/`
-- Message arrives on Telegram
-- Content is recognizably derived from the personality files (not generic)
-- Activation log (`logs/mvp_orchestrator.jsonl`) records the result
+- First run: cache file created at `vault/.index_cache.json`
+- Second run: startup in <30s, generation + Telegram delivery works
+- `tools/measure_density.py` produces same results with and without cache
 
-**Note:** This step involves real LLM spend (~$0.50-1). Run on Pi.
+## MVP.4c: Generation Output Persistence — Complete
+
+Outputs saved to `vault/outputs/` as markdown with frontmatter. Not in distillation loop. First generation delivered to Telegram. Superseded T3 files filtered in lean script. See DEVLOG.
 
 ## MVP.4b: Batch Reflection + T3 Bootstrap — Complete
 
 Batched T2 reflection (30 notes per batch) + bootstrap T3 creation. 251 T2 patterns → 51 insights → 7 personality files created and evolved. See DEVLOG.
-
-**What:** End-to-end test: seed a MemoryStore with 60 T2 notes (no T3), run `distill_t2_to_t3()` with FakeLLM, verify:
-- Reflection ran in 2 batches (batch_size=30)
-- Bootstrap creation produced T3 personality files
-- Personality files are stored in vault/tier3/
-- `get_personality_context()` returns the new files
-- A second `distill_t2_to_t3()` call uses the normal supersession path (not bootstrap)
 
 ## MVP.4a: Fix T2→T2 Cross-Links — Complete
 
