@@ -398,8 +398,18 @@ class DistillationEngine:
         """
         with self._acquire_consolidation_lock():
             prepared = self._prepare_tier2_evolution_input(config)
+            print(f"T2→T3: Loaded {len(prepared.pattern_notes)} T2 patterns, "
+                  f"{len(prepared.feedback_events)} feedback events")
             reflection = self._reflect_tier2_patterns(prepared, config)
+            print(f"T2→T3: Reflection complete — {len(reflection.insights)} insights "
+                  f"({', '.join(f'{t}: {c}' for t, c in _count_insight_types(reflection.insights).items())})")
             proposal = self._propose_personality_evolution(reflection, config)
+            if proposal.bootstrap_proposals:
+                print(f"T2→T3: Bootstrap mode — {len(proposal.bootstrap_proposals)} personality files proposed")
+            else:
+                n_supersede = len(proposal.supersession_proposals)
+                n_unchanged = len(proposal.unchanged_ids)
+                print(f"T2→T3: Evolution mode — {n_supersede} supersessions, {n_unchanged} unchanged")
             write_result = self._write_personality_evolution(proposal, config)
             metadata = self._read_run_metadata()
             self._write_run_metadata(
@@ -409,7 +419,7 @@ class DistillationEngine:
                 )
             )
 
-            return EvolutionResult(
+            result = EvolutionResult(
                 insights=reflection.insights,
                 superseded=write_result["superseded"],
                 unchanged_ids=proposal.unchanged_ids,
@@ -418,6 +428,9 @@ class DistillationEngine:
                 ),
                 compression_ratio=write_result["compression_ratio"],
             )
+            print(f"T2→T3: SUCCESS — {len(result.superseded)} files written, "
+                  f"compression_ratio={result.compression_ratio:.3f}")
+            return result
 
     def _read_run_metadata(self) -> _DistillationRunMetadata:
         if not self._run_metadata_path.exists():
@@ -700,6 +713,7 @@ class DistillationEngine:
                         source="distillation",
                     )
                 )
+                print(f"  Bootstrap: Wrote \"{bootstrap.title}\" → {note_id}")
                 superseded.append(
                     SupersessionRecord(
                         old_note_id="",
@@ -920,25 +934,42 @@ def _build_reflection_audit_artifact(
     raw_responses: list[str] = []
     insights: list[ReflectionInsight] = []
 
-    for batch in _tier2_reflection_batches(prepared, config):
-        batch_request_messages = _build_reflection_request(batch)
-        raw_response = llm_complete_callable(
-            messages=batch_request_messages,
-            config=config.llm_config,
-            tier=config.reflection_tier,
-        )
-        request_messages.extend(batch_request_messages)
-        raw_responses.append(raw_response)
-        insights.extend(
-            _parse_reflection_insights(
-                raw_response,
-                valid_pattern_ids={
-                    str(getattr(note, "note_id"))
-                    for note in batch.pattern_notes
-                    if getattr(note, "note_id", None) is not None
-                },
+    batches = _tier2_reflection_batches(prepared, config)
+    total_batches = len(batches)
+    print(f"T2→T3: Split into {total_batches} reflection batch(es) "
+          f"(batch_size={config.t2_reflection_batch_size})")
+
+    for batch_index, batch in enumerate(batches, 1):
+        batch_chars = sum(len(getattr(n, "content", "") or "") for n in batch.pattern_notes)
+        print(f"  Reflection batch {batch_index}/{total_batches}: "
+              f"{len(batch.pattern_notes)} patterns, {batch_chars} chars → LLM call...",
+              end="", flush=True)
+        try:
+            batch_request_messages = _build_reflection_request(batch)
+            raw_response = llm_complete_callable(
+                messages=batch_request_messages,
+                config=config.llm_config,
+                tier=config.reflection_tier,
             )
-        )
+            request_messages.extend(batch_request_messages)
+            raw_responses.append(raw_response)
+            batch_insights = list(
+                _parse_reflection_insights(
+                    raw_response,
+                    valid_pattern_ids={
+                        str(getattr(note, "note_id"))
+                        for note in batch.pattern_notes
+                        if getattr(note, "note_id", None) is not None
+                    },
+                )
+            )
+            insights.extend(batch_insights)
+            type_counts = _count_insight_types(batch_insights)
+            type_str = ", ".join(f"{c} {t}" for t, c in type_counts.items()) if type_counts else "none"
+            print(f" OK — {len(batch_insights)} insights ({type_str})")
+        except Exception as exc:
+            print(f" FAILED — {type(exc).__name__}: {exc}")
+            raise
 
     return _ReflectionAuditArtifact(
         request_messages=request_messages,
@@ -1200,19 +1231,30 @@ def _build_bootstrap_proposal_artifact(
     if llm_complete_callable is None:
         llm_complete_callable = _toolkit_complete
 
-    request_messages = _build_bootstrap_request(insights)
-    raw_response = llm_complete_callable(
-        messages=request_messages,
-        config=config.llm_config,
-        tier=config.evolution_tier,
-    )
+    insight_chars = sum(len(i.content) for i in insights)
+    print(f"  Bootstrap: LLM call with {len(insights)} insights, {insight_chars} chars...",
+          end="", flush=True)
+    try:
+        request_messages = _build_bootstrap_request(insights)
+        raw_response = llm_complete_callable(
+            messages=request_messages,
+            config=config.llm_config,
+            tier=config.evolution_tier,
+        )
+        proposals = _parse_bootstrap_proposals(raw_response)
+        print(f" OK — {len(proposals)} personality files proposed")
+        for p in proposals:
+            print(f"    \"{p.title}\" ({len(p.content)} chars)")
+    except Exception as exc:
+        print(f" FAILED — {type(exc).__name__}: {exc}")
+        raise
     return _EvolutionProposalArtifact(
         request_messages=request_messages,
         raw_response=raw_response,
         supersession_proposals=[],
         unchanged_ids=[],
         criteria_adjustments=[],
-        bootstrap_proposals=_parse_bootstrap_proposals(raw_response),
+        bootstrap_proposals=proposals,
     )
 
 
@@ -2130,6 +2172,14 @@ def _numeric_score(value: object) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _count_insight_types(insights: Sequence[ReflectionInsight]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for insight in insights:
+        t = insight.insight_type or "unknown"
+        counts[t] = counts.get(t, 0) + 1
+    return counts
 
 
 def _feedback_criterion_names(feedback_event: object) -> list[str]:

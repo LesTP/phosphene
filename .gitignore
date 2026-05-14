@@ -8,3 +8,5 @@ seed/
 notebooks/*.py
 notebooks/*.ipynb
 .env
+vault/
+logs/

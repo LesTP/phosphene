@@ -128,7 +128,8 @@ Engine fixed (similarity-filtered cross-links), vault rebuilt (51K bad links str
 ## Discussion Items
 
 - **`tools/preflight.py`** — should it run automatically before expensive operations?
-- **Corpus exploration protocol** — write a `tools/explore_corpus.py` (or notebook) that runs on any new seed corpus before seeding and returns tuning parameter suggestions. Steps: (1) measure language distribution (% Cyrillic, Latin, mixed), (2) terrain analysis (pairwise similarity stats), (3) test embedding model candidates on cross-lingual gap, (4) run UMAP + HDBSCAN at multiple `reduce_dims` values, (5) compute cluster coherences at multiple thresholds, (6) test 1-2 cluster summaries on candidate LLM models for refusal, (7) estimate cost for full distillation. Output: recommended `.env` parameter values. This automates everything we manually discovered over this session.
+- **T2→T3 preflight section** — current preflight only checks T1→T2 readiness. Needs: T2 count vs context budget, batched reflection batch count estimate, T2 embedding availability, cost estimate for T2→T3 (different from T1→T2), bootstrap path detection (0 T3 files).
+- **Corpus exploration protocol** — write a `tools/explore_corpus.py` (or notebook) that runs on any new seed corpus before seeding and returns tuning parameter suggestions. Steps: (1) measure language distribution (% Cyrillic, Latin, mixed), (2) terrain analysis (pairwise similarity stats), (3) test embedding model candidates on cross-lingual gap, (4) run UMAP + HDBSCAN at multiple `reduce_dims` values, (5) compute cluster coherences at multiple thresholds, (6) test 1-2 cluster summaries on candidate LLM models for refusal, (7) estimate cost for full distillation. Output: recommended `.env` parameter values. This automates everything we manually discovered over this session. See `DESIGN_BATCH_SEEDING.md` for full design.
 
 ## Key References
 

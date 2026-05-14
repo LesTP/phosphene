@@ -83,6 +83,18 @@ Fix: `generate_note_id()` includes content in the SHA1 hash input.
 
 **What to test:** After seeding, verify `ls vault/tier1/ | wc -l` matches the reported count. If they differ, check for title+timestamp collisions with `tools/debug_seed200.py`.
 
+### T2→T2 cross-links are all-to-all in bootstrap mode
+
+The distillation engine creates cross-references between T2 cluster notes at the end of each `distill_t1_to_t2()` call. The implementation (engine.py lines 638-641) links every T2 note produced in a run to every other T2 note from the same run. In incremental mode (~10 clusters per batch), this is a small clique and roughly correct — they're contemporaneous patterns from the same time window. But in a full-corpus bootstrap (225 clusters in one run), it creates a 225-node complete graph where every note has 224 meaningless cross-links.
+
+Symptom: After `--seed-chronological`, every T2 note has ~200+ links, almost all pointing to other T2 notes. Run `tools/measure_density.py` — if mean T2 link degree is >50, the cross-links are bad. Each distillation run creates a separate clique (e.g., a 26-cluster run produces 26 notes each with 25 cross-links, unconnected to the 225-cluster run's clique).
+
+Impact: Link density metrics become flat (every node equally connected), link-density decay can't distinguish central from peripheral patterns, and the Attention Filter's prompt-to-structure transition has no structural signal to work with.
+
+Fix: Replace the all-to-all mesh with centroid-similarity filtering using `DistillationConfig.cross_link_threshold` (default 0.45) and `max_cross_links` (default 15). After bootstrap, run `tools/rebuild_t2_crosslinks.py --threshold 0.45 --max-links 15` to regenerate proper links from stored centroids.
+
+**What to test:** After distillation, check T2 link distribution. Mean T2→T2 links per note should be 5-15, not 200+. Run `tools/rebuild_t2_crosslinks.py --dry-run` to preview the corrected distribution before writing.
+
 ### "Your" content vs other people's
 
 In LJ exports, comments from other people are embedded alongside your posts. Their voice dilutes your personality signal. In Facebook exports, "shared a post" and "added a photo" boilerplate creates junk clusters.
