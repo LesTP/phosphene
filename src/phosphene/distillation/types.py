@@ -84,6 +84,7 @@ class DistillationConfig:
     min_cluster_coherence: float = 0.4
     cross_link_threshold: float = 0.45
     max_cross_links: int = 15
+    t2_reflection_batch_size: int = 30
 
     def __post_init__(self) -> None:
         _require_present(self.llm_config, "llm_config")
@@ -106,6 +107,10 @@ class DistillationConfig:
         _require_probability(self.min_cluster_coherence, "min_cluster_coherence")
         _require_probability(self.cross_link_threshold, "cross_link_threshold")
         _require_non_negative_int(self.max_cross_links, "max_cross_links")
+        _require_positive_int(
+            self.t2_reflection_batch_size,
+            "t2_reflection_batch_size",
+        )
 
 
 @dataclass

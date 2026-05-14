@@ -27,6 +27,7 @@ class DistillationConfig:
                                                          # clusters below this threshold are held in Tier 1
     cross_link_threshold: float = 0.45                   # minimum centroid similarity for T2→T2 links
     max_cross_links: int = 15                            # cap on same-run T2→T2 links per cluster
+    t2_reflection_batch_size: int = 30                   # Tier 2 notes per reflection LLM call
 
 @dataclass
 class GateStatus:
@@ -152,8 +153,10 @@ Three gates must pass before any distillation runs:
 1. Acquires consolidation lock.
 2. Reads current Tier 2 pattern notes via `memory_store.query_notes(tier=2)`.
 3. If `incorporate_feedback`: reads feedback events, computes per-criterion engagement rates across accepted content.
-4. Calls LLM (at `reflection_tier`) with the pattern layer. Prompt: synthesize what recurring tensions are emerging, what threads are unresolved, what new associative connections have appeared.
-5. Output: list of `ReflectionInsight` — candidate observations, not yet personality file updates.
+4. Sorts Tier 2 notes by importance descending, breaking ties by unresolvedness descending.
+5. Splits the sorted pattern layer into batches of `config.t2_reflection_batch_size`. When the pattern count is less than or equal to the batch size, this is a single batch and behavior matches the unbatched path.
+6. Calls LLM (at `reflection_tier`) once per batch with the existing reflection prompt. Prompt: synthesize what recurring tensions are emerging, what threads are unresolved, what new associative connections have appeared.
+7. Merges all batch outputs into one list of `ReflectionInsight` — candidate observations, not yet personality file updates.
 
 **Step 2 — Evolution:**
 1. Reads current personality files via `memory_store.get_personality_context()`.

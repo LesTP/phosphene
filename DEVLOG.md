@@ -98,3 +98,13 @@ Selected **Option 1+2b combined**: batch reflection becomes the permanent T2→T
 **Contract changes:** Planned -- `DistillationConfig` gains `t2_reflection_batch_size`; `ARCH_distillation.md` will document batched T2 reflection and empty-T3 bootstrap behavior during implementation.
 
 Confirmed MVP.4b as a four-step Build phase: batch reflection, bootstrap T3 creation, FakeLLM integration proof, and live-vault T2->T3 validation after preflight and cost estimate. DEVPLAN state moved to `execute`.
+
+### Step MVP.4b.1: Batch T2 reflection
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Success
+**Contract changes:** `DistillationConfig` now includes `t2_reflection_batch_size`; `ARCH_distillation.md` documents batched T2 reflection.
+
+Added permanent batching to the T2→T3 reflection path. Tier 2 patterns are sorted by importance descending with unresolvedness as the tie-breaker, split by `config.t2_reflection_batch_size`, reflected with the existing prompt once per batch, and merged into a single insight list before evolution. Single-batch runs keep the same request shape as before.
+
+Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_distillation_exports.py tests/distillation/test_t2_to_t3_preparation.py` (53 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (624 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 2, and moves focus to MVP.4b Step 2: empty-T3 bootstrap creation.

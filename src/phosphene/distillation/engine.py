@@ -875,24 +875,58 @@ def _build_reflection_audit_artifact(
     if llm_complete_callable is None:
         llm_complete_callable = _toolkit_complete
 
-    request_messages = _build_reflection_request(prepared)
-    raw_response = llm_complete_callable(
-        messages=request_messages,
-        config=config.llm_config,
-        tier=config.reflection_tier,
-    )
+    request_messages: list[Mapping[str, str]] = []
+    raw_responses: list[str] = []
+    insights: list[ReflectionInsight] = []
+
+    for batch in _tier2_reflection_batches(prepared, config):
+        batch_request_messages = _build_reflection_request(batch)
+        raw_response = llm_complete_callable(
+            messages=batch_request_messages,
+            config=config.llm_config,
+            tier=config.reflection_tier,
+        )
+        request_messages.extend(batch_request_messages)
+        raw_responses.append(raw_response)
+        insights.extend(
+            _parse_reflection_insights(
+                raw_response,
+                valid_pattern_ids={
+                    str(getattr(note, "note_id"))
+                    for note in batch.pattern_notes
+                    if getattr(note, "note_id", None) is not None
+                },
+            )
+        )
+
     return _ReflectionAuditArtifact(
         request_messages=request_messages,
-        raw_response=raw_response,
-        insights=_parse_reflection_insights(
-            raw_response,
-            valid_pattern_ids={
-                str(getattr(note, "note_id"))
-                for note in prepared.pattern_notes
-                if getattr(note, "note_id", None) is not None
-            },
-        ),
+        raw_response="\n---REFLECTION_BATCH---\n".join(raw_responses),
+        insights=insights,
     )
+
+
+def _tier2_reflection_batches(
+    prepared: _Tier2EvolutionInput,
+    config: DistillationConfig,
+) -> list[_Tier2EvolutionInput]:
+    batch_size = config.t2_reflection_batch_size
+    sorted_patterns = sorted(
+        prepared.pattern_notes,
+        key=lambda note: (
+            _numeric_score(getattr(note, "importance", 0.0)),
+            _numeric_score(getattr(note, "unresolvedness", 0.0)),
+        ),
+        reverse=True,
+    )
+    return [
+        _Tier2EvolutionInput(
+            pattern_notes=sorted_patterns[index : index + batch_size],
+            feedback_events=prepared.feedback_events,
+            feedback_metrics=prepared.feedback_metrics,
+        )
+        for index in range(0, len(sorted_patterns), batch_size)
+    ]
 
 
 def _prepare_personality_files(

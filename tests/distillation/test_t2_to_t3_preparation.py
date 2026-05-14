@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 
 import pytest
 
@@ -18,6 +19,7 @@ from phosphene.distillation.engine import (
     _parse_evolution_proposals,
     _parse_reflection_insights,
     _prepare_personality_files,
+    _tier2_reflection_batches,
 )
 from phosphene.distillation.errors import (
     DistillationError,
@@ -277,6 +279,85 @@ def test_reflection_audit_artifact_calls_llm_and_parses_validated_insights(tmp_p
     assert artifact.insights[0].insight_type == "recurring_tension"
     assert artifact.insights[0].confidence == pytest.approx(0.75)
     assert store.write_calls == []
+
+
+def test_reflection_audit_artifact_batches_tier2_patterns_by_importance(tmp_path) -> None:
+    notes = [
+        EvolutionNote(
+            f"pattern-{index}",
+            content=f"pattern content {index}",
+            importance=importance,
+            unresolvedness=unresolvedness,
+        )
+        for index, importance, unresolvedness in [
+            (0, 0.1, 0.9),
+            (1, 0.9, 0.1),
+            (2, 0.9, 0.8),
+            (3, 0.4, 0.2),
+        ]
+    ]
+    prepared = DistillationEngine(
+        EvolutionMemoryStore(tmp_path / "vault", tier2_notes=notes)
+    )._prepare_tier2_evolution_input(
+        DistillationConfig(llm_config=object(), embedding_config=object())
+    )
+    calls: list[list[str]] = []
+
+    def fake_complete(**kwargs: object) -> str:
+        payload = json.loads(kwargs["messages"][0]["content"])  # type: ignore[index]
+        pattern_ids = [pattern["note_id"] for pattern in payload["patterns"]]
+        calls.append(pattern_ids)
+        return (
+            '{"insights": [{"content": "Insight for '
+            + ",".join(pattern_ids)
+            + '", "source_pattern_ids": ["'
+            + pattern_ids[0]
+            + '"], "insight_type": "new_pattern", "confidence": 0.7}]}'
+        )
+
+    artifact = _build_reflection_audit_artifact(
+        prepared,
+        DistillationConfig(
+            llm_config="llm-config",
+            embedding_config=object(),
+            t2_reflection_batch_size=2,
+        ),
+        llm_complete_callable=fake_complete,
+    )
+
+    assert calls == [["pattern-2", "pattern-1"], ["pattern-3", "pattern-0"]]
+    assert [insight.content for insight in artifact.insights] == [
+        "Insight for pattern-2,pattern-1",
+        "Insight for pattern-3,pattern-0",
+    ]
+    assert len(artifact.request_messages) == 2
+    assert "---REFLECTION_BATCH---" in artifact.raw_response
+
+
+def test_reflection_batches_single_batch_when_pattern_count_fits_config(tmp_path) -> None:
+    prepared = DistillationEngine(
+        EvolutionMemoryStore(
+            tmp_path / "vault",
+            tier2_notes=[
+                EvolutionNote(f"pattern-{index}", content=f"pattern content {index}")
+                for index in range(20)
+            ],
+        )
+    )._prepare_tier2_evolution_input(
+        DistillationConfig(llm_config=object(), embedding_config=object())
+    )
+
+    batches = _tier2_reflection_batches(
+        prepared,
+        DistillationConfig(
+            llm_config=object(),
+            embedding_config=object(),
+            t2_reflection_batch_size=30,
+        ),
+    )
+
+    assert len(batches) == 1
+    assert len(batches[0].pattern_notes) == 20
 
 
 def test_prepare_personality_files_computes_version_count_inertia() -> None:

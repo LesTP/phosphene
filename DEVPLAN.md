@@ -2,7 +2,7 @@
 phase: MVP.4b
 blocked: false
 state: execute
-steps_remaining: 3
+steps_remaining: 2
 ---
 
 # Phosphene — Development Plan
@@ -52,7 +52,7 @@ steps_remaining: 3
 
 **Current vault state:** 3,856 T1, 251 T2 (.md + .json caches), 0 T3. T2 cross-links rebuilt with similarity filtering (1-15 links per note). Embeddings stored in `vault/.embeddings/` (4,122 .npy files). 621 tests pass.
 
-### Step 1: Batch reflection — chunk T2 input for `_reflect_tier2_patterns()`
+### Step 1: Batch reflection — chunk T2 input for `_reflect_tier2_patterns()` (done)
 
 **What:** Add `t2_reflection_batch_size: int = 30` to `DistillationConfig`. Modify `_reflect_tier2_patterns()` to:
 1. Sort T2 notes by importance (descending), breaking ties by unresolvedness

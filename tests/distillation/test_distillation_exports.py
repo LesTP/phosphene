@@ -84,6 +84,7 @@ def test_arch_dataclass_field_names_match_contract() -> None:
         "min_cluster_coherence",
         "cross_link_threshold",
         "max_cross_links",
+        "t2_reflection_batch_size",
     ]
     assert [field.name for field in fields(GateStatus)] == [
         "ready",
@@ -228,6 +229,7 @@ def test_arch_dataclasses_construct_with_expected_defaults() -> None:
         ("min_cluster_coherence", -0.1, r"min_cluster_coherence must be in \[0.0, 1.0\]"),
         ("cross_link_threshold", 1.1, r"cross_link_threshold must be in \[0.0, 1.0\]"),
         ("max_cross_links", -1, "max_cross_links must be non-negative"),
+        ("t2_reflection_batch_size", 0, "t2_reflection_batch_size must be positive"),
     ],
 )
 def test_distillation_config_validates_thresholds_and_required_toolkit_configs(
