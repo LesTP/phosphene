@@ -1,8 +1,8 @@
 ---
 phase: MVP.4c
-blocked: false
+blocked: true
 state: execute
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -30,7 +30,7 @@ steps_remaining: 1
 
 - **Phase** — MVP.4c: Generation output persistence + first run
 - **Focus** — Run the first live generation on the Pi and verify Telegram delivery plus output archival.
-- **Blocked** — No.
+- **Blocked** — Yes: Step 2 must run on the Pi, but hostname `pirozhok` is not resolvable from this environment.
 
 ## MVP.4: Remaining Steps
 

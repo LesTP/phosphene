@@ -162,3 +162,11 @@ Confirmed MVP.4c as a two-step Build phase: first persist every `GeneratorOutput
 Added generation output archival inside `_run_generation()`: after `generator.generate()` and before routing, the orchestrator writes markdown under `vault/outputs/` with YAML frontmatter for intent tag, output mode, importance, active T3 personality file IDs, creation time, and initial `delivery_success: false`. After routing completes, the same file is updated to reflect actual delivery success, so failed Telegram delivery still leaves the generated body archived.
 
 Added tests for successful and failed delivery persistence. Also updated a stale distillation test to match the already-documented MVP.4b behavior where hallucinated reflection source IDs are warned-and-dropped instead of raising. Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/distillation/test_t2_to_t3_preparation.py tests/orchestrator/test_orchestrator_exports.py` (86 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (636 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4c Step 2: first live generation plus Telegram delivery on the Pi.
+
+### Step MVP.4c.2: First live generation blocked
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Blocked — Pi hostname unavailable
+**Contract changes:** None.
+
+Attempted to run the required Pi-side script for preflight plus `run.py --once`, but both `scp` and `ssh` failed before execution with `Could not resolve hostname pirozhok: Name or service not known`. No preflight, LLM call, Telegram delivery, or vault write happened. DEVPLAN is blocked for human/operator action: run the Step 2 command locally on the Pi or provide a reachable SSH/Tailscale host from this environment.
