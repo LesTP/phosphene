@@ -198,3 +198,13 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/me
 Added startup cache loading for MemoryStore. `_rebuild_index()` now loads `vault/.index_cache.json` when the cache version matches, the cached path set matches actual tier markdown files, and the cache timestamp is newer than the newest note mtime; otherwise it falls back to full markdown parsing and rewrites the cache. Added tolerant cache parsing, datetime validation, and `skip_cache` for tests or forced rebuilds. Cache-loaded indexes avoid markdown parsing but still load full note bodies on demand through `get_note()`.
 
 Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/memory_store/test_index.py tests/memory_store/test_types.py` (24 passed) and `PYTHONPATH=src:.python_deps python3 -m pytest tests/` (640 passed). DEVPLAN keeps `state: execute`, decrements `steps_remaining` to 1, and moves focus to MVP.4d Step 3: Pi validation of `run.py --once` with the cached index.
+
+### Step MVP.4d.3: Pi cached-index validation blocked
+**Date:** 2026-05-14
+**Mode:** autonomous Build
+**Outcome:** Blocked — Pi hostname unavailable
+**Contract changes:** None.
+
+Attempted the required Pi validation precheck with `ssh -o BatchMode=yes -o ConnectTimeout=10 pirozhok true`, but SSH failed before any script could be copied or executed: `Could not resolve hostname pirozhok: Name or service not known`. No Pi-side `run.py --once`, Telegram delivery check, or `tools/measure_density.py` comparison was run from this environment.
+
+The cache implementation is complete locally and verified by the full test suite, but MVP.4d cannot be closed until an operator runs the validation locally on the Pi or provides a reachable SSH/Tailscale host. DEVPLAN is gated with `blocked: true`, `state: execute`, and `steps_remaining: 0`.

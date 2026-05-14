@@ -1,8 +1,8 @@
 ---
 phase: MVP.4d
-blocked: false
+blocked: true
 state: execute
-steps_remaining: 1
+steps_remaining: 0
 ---
 
 # Phosphene — Development Plan
@@ -30,7 +30,7 @@ steps_remaining: 1
 
 - **Phase** — MVP.4d: Cached index for fast MemoryStore startup
 - **Focus** — Eliminate 15+ min cold-start index rebuild. Make `run.py --once` usable on Pi.
-- **Blocked** — No.
+- **Blocked** — Yes: Step 3 requires Pi-side validation, but `pirozhok` does not resolve from this environment.
 
 ## MVP.4: Remaining Steps
 
@@ -72,7 +72,7 @@ Add `MemoryStoreConfig.skip_cache: bool = False` for tests that need guaranteed 
 
 **Verification:** Unit test: build MemoryStore (full scan), verify cache written. Construct second MemoryStore, verify it loads from cache (mock/spy on file reads to confirm no `.md` parsing). Modify a vault file, construct third MemoryStore, verify it falls back to full scan and updates cache. Existing tests must pass.
 
-### Step 3: Validate on Pi
+### Step 3: Validate on Pi — Blocked
 
 **What:** Run `run.py --once` on the Pi. First run builds cache (still 15 min). Second run should complete in <30 seconds.
 
@@ -80,6 +80,8 @@ Add `MemoryStoreConfig.skip_cache: bool = False` for tests that need guaranteed 
 - First run: cache file created at `vault/.index_cache.json`
 - Second run: startup in <30s, generation + Telegram delivery works
 - `tools/measure_density.py` produces same results with and without cache
+
+**Blocked:** `ssh -o BatchMode=yes -o ConnectTimeout=10 pirozhok true` fails with `Could not resolve hostname pirozhok: Name or service not known`. Operator action required: run the Pi validation locally on the Pi or provide a reachable SSH/Tailscale host.
 
 ## MVP.4c: Generation Output Persistence — Complete
 
