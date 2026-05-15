@@ -208,3 +208,32 @@ Verification passed with `PYTHONPATH=src:.python_deps python3 -m pytest tests/me
 Attempted the required Pi validation precheck with `ssh -o BatchMode=yes -o ConnectTimeout=10 pirozhok true`, but SSH failed before any script could be copied or executed: `Could not resolve hostname pirozhok: Name or service not known`. No Pi-side `run.py --once`, Telegram delivery check, or `tools/measure_density.py` comparison was run from this environment.
 
 The cache implementation is complete locally and verified by the full test suite, but MVP.4d cannot be closed until an operator runs the validation locally on the Pi or provides a reachable SSH/Tailscale host. DEVPLAN is gated with `blocked: true`, `state: execute`, and `steps_remaining: 0`.
+
+### MVP.4d Pi validation — supervised attempts
+**Date:** 2026-05-14/15
+**Mode:** supervised
+**Outcome:** Partial — cache file created successfully but `run.py --once` hangs regardless of cache
+**Contract changes:** None.
+
+**Cache validation:** The `.index_cache.json` file (3.7MB, 4,107 entries) was successfully created by the first `run.py --once` attempt. The file is valid JSON with proper timestamps, note IDs, and all expected metadata fields.
+
+**The `run.py --once` hang is NOT the index rebuild.** Multiple attempts showed the same pattern:
+1. Embedding model loads ("Loading weights: 100%") — completes in ~1s
+2. Process goes silent indefinitely — 15+ minutes with no output, 1.3GB RSS, sleeping state
+3. The cache file already exists from a previous run, so the index should load from cache
+
+**Root cause analysis (hypotheses, not yet confirmed):**
+- `_rebuild_index()` is called inside `get_personality_context()` (line 308) which does a FULL `_rebuild_index()` every time. Even with cache, if the cache validation stats 4,100+ files (checking mtimes), that's slow on USB.
+- The MemoryStore constructor calls `_rebuild_index()` once. But `get_personality_context()` calls it AGAIN. And `query_notes()` may call it again. Multiple full-scan-or-stat operations per cycle.
+- The orchestrator's `--once` path builds multiple modules (MemoryStore, AttentionFilter, SourceIngestion, Distillation, Generator, Gateway, Orchestrator) — each may trigger its own index operation.
+- Memory pressure: 1.3GB RSS on Pi 5 with 8GB RAM. Not OOM but could be swapping.
+
+**What works:** The lean generation script (`tools/run_first_generation.py`) completes in ~30s because it reads only T3 files directly from disk, bypassing MemoryStore entirely.
+
+**Recommended fixes (not yet implemented):**
+1. **Don't call `_rebuild_index()` inside `get_personality_context()`** — the index should be built once at construction and maintained incrementally. The `_rebuild_index()` call at line 308 is defensive but redundant if the store manages its own consistency.
+2. **Cache validation should not stat every file** — instead, compare the count of cached entries vs directory listing count. Only if counts differ, do a full rebuild.
+3. **Add timing/logging to `run.py`** — print timestamps at each module construction step to identify where the time goes. Currently the process is silent between "Loading weights" and whatever happens next.
+4. **Consider Option 4 (tiered loading)** for `--once` generation — only load T3 (7 files) when the only task is generation.
+
+**Workaround:** Use `tools/run_first_generation.py` for generation. Use `run.py` in long-running service mode (default, no `--once`) for production — the index builds once and stays in memory.
