@@ -104,9 +104,11 @@ Engine fixed (similarity-filtered cross-links), vault rebuilt (51K bad links str
 
 ## Deferred Work
 
+- **Fix decay for seeded corpora** — decay uses `created_at` (original publication date) for T1 retention. Bulk-seeded notes with historical timestamps (2002-2026) instantly exceed any retention window and get pruned. The first decay run destroyed 86% of T1 (3,335 of 3,856 notes). Restored via re-seed. **Do not run decay until this is resolved.** Options: (a) use `updated_at` or ingestion timestamp instead of `created_at` for retention, (b) exempt notes with `source=corpus_*` from time-based decay, (c) add a `decay_protected: true` flag for seeded notes. Needs design decision.
 - Feedback Collector Phase 7.2 (delayed engagement checks)
 - Module 8: Explorer (link-following with pre-fetch scoring)
 - Module 9: Full Orchestrator (lateral freedom, tension-responsive scheduling)
+- Cost Accountant — see `toolkit/DESIGN_COST_ACCOUNTANT.md`. Prerequisite for any future LLM operations.
 
 ## Discussion Items
 
