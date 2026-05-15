@@ -6,11 +6,18 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import asdict, is_dataclass
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+
+_BOOT_T0 = time.monotonic()
+
+
+def _elapsed() -> str:
+    return f"[{time.monotonic() - _BOOT_T0:7.1f}s]"
 
 # Add source paths for phosphene and toolkit
 _HERE = Path(__file__).resolve().parent
@@ -367,17 +374,20 @@ def _seed_chronological(env: dict[str, str]) -> int:
 def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     """Construct the real MVP module graph from environment-backed config."""
 
+    print(f"{_elapsed()} build_orchestrator: starting")
     _require_env(env, "TELEGRAM_BOT_TOKEN")
     _require_env(env, "TELEGRAM_CHAT_ID")
     _require_env(env, "ANTHROPIC_API_KEY")
 
     vault_path = Path(env.get("PHOSPHENE_VAULT_PATH", DEFAULT_VAULT_PATH))
+    print(f"{_elapsed()} Building MemoryStore (vault={vault_path})...")
     memory_store = MemoryStore(
         MemoryStoreConfig(
             vault_path=str(vault_path),
             embedding_path=str(vault_path / ".embeddings"),
         )
     )
+    print(f"{_elapsed()} MemoryStore ready ({len(memory_store._index.entries)} entries)")
     llm_config = _make_llm_config(env)
     embedding_config = _make_embedding_config(env)
 
@@ -391,9 +401,13 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     if fallback:
         _dist_engine._FALLBACK_MODELS = [fallback]
 
+    print(f"{_elapsed()} Building AttentionFilter...")
     attention_filter = AttentionFilter(memory_store)
+    print(f"{_elapsed()} Building SourceIngestion...")
     source_ingestion = SourceIngestion(_make_ingestion_config(env, vault_path))
+    print(f"{_elapsed()} Building DistillationEngine...")
     distillation_engine = DistillationEngine(memory_store)
+    print(f"{_elapsed()} Building Generator...")
     generator = Generator(memory_store)
     # Trust tiers for inbound messages
     owner_chat_id = env.get("TELEGRAM_CHAT_ID", "")
@@ -464,6 +478,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
             if hasattr(gateway, "_orchestrator_respond"):
                 gateway._orchestrator_respond(message)
 
+    print(f"{_elapsed()} Building Gateway...")
     gateway = Gateway(
         _make_gateway_config(env),
         on_message=_handle_inbound_message,
@@ -515,6 +530,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
         router_config=router_config,
         log_path=Path(env.get("PHOSPHENE_LOG_PATH", DEFAULT_LOG_PATH)),
     )
+    print(f"{_elapsed()} Building MVPOrchestrator...")
     orchestrator = MVPOrchestrator(modules, config)
 
     # Wire orchestrator respond into the inbound handler's delegation path
@@ -522,6 +538,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     # Save handler reference for re-assignment after start()
     orchestrator._inbound_handler = _handle_inbound_message
 
+    print(f"{_elapsed()} build_orchestrator: complete")
     return orchestrator
 
 

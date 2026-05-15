@@ -451,14 +451,25 @@ class MemoryStore:
             raise VaultError(f"vault path is not writable: {self.vault_path}")
 
     def _rebuild_index(self) -> None:
+        import time as _time
+        _t0 = _time.monotonic()
         if not self.config.skip_cache and self._load_index_cache():
+            print(f"  MemoryStore: index loaded from cache in {_time.monotonic() - _t0:.1f}s "
+                  f"({len(self._index.entries)} entries)")
             return
 
+        print(f"  MemoryStore: cache miss, scanning vault...")
         self._index = Index()
         for tier in sorted(_VALID_TIERS):
+            tier_t0 = _time.monotonic()
+            count = 0
             for path in sorted((self.vault_path / f"tier{tier}").glob("*.md")):
                 note = parse_note(path.read_text(encoding="utf-8"))
                 self._index.register(note, path)
+                count += 1
+            print(f"    tier{tier}: {count} notes in {_time.monotonic() - tier_t0:.1f}s")
+        print(f"  MemoryStore: full scan complete in {_time.monotonic() - _t0:.1f}s "
+              f"({len(self._index.entries)} entries)")
         self._write_index_cache()
 
     def _write_index_cache(self) -> None:
