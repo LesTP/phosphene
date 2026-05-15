@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from phosphene.feedback_collector.types import (
     FeedbackCollectorConfig,
@@ -49,7 +49,7 @@ class FeedbackCollector:
             retention_criteria=self._retention_criteria_for_source_notes(
                 source_note_ids
             ),
-            delivered_at=datetime.now(),
+            delivered_at=datetime.now(timezone.utc),
         )
         return None
 
@@ -111,7 +111,7 @@ class FeedbackCollector:
         return None
 
     def check_silence(self) -> list[FeedbackEvent]:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         events: list[FeedbackEvent] = []
 
         for record in list(self.output_records.values()):

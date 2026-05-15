@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 from phosphene.gateway import InboundMessage
@@ -525,7 +525,7 @@ class Generator:
         if not hasattr(self.memory_store, "query_notes"):
             return []
 
-        since = datetime.now() - timedelta(days=config.skeptical_window_days)
+        since = datetime.now(timezone.utc) - timedelta(days=config.skeptical_window_days)
         return list(
             self.memory_store.query_notes(
                 NoteQuery(
