@@ -21,7 +21,7 @@ Each iteration begins from scratch. Read DEVPLAN frontmatter:
 
 1. **Check `blocked`** — if `true`, exit ESCALATE immediately. The work is gated.
 2. **Read `state`** — this determines your action for this invocation.
-3. **If the prompt specifies `STEPS_REMAINING: N`**, write `steps_remaining: N` to DEVPLAN frontmatter. This sets the step budget for this invocation.
+3. **Set `steps_remaining` in DEVPLAN frontmatter.** If the prompt specifies `STEPS_REMAINING: N`, write `steps_remaining: N`. If not, write `steps_remaining: 1`. Always set this on cold start — a previous batch may have left it at 0.
 4. **If the prompt specifies `ITERATION_JSONL: <path>`**, note the path — used for the per-step turn health check (§4).
 
 ```yaml
