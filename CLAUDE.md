@@ -101,7 +101,7 @@ Do NOT call them via the Skill tool.
 End every iteration with exactly these four lines:
 
 ```
-LOOP_SIGNAL: CONTINUE | ESCALATE
+EXIT: 0 | 1 | 2
 REASON: <one-line summary>
 ACTION_TYPE: PLAN | EXECUTE | REVIEW | CLOSE
 ACTION_ID: <phase.step>

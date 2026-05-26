@@ -132,7 +132,7 @@ unless `steps_remaining` > 0 (see WORKER_SPEC.md §4 for multi-step budget).
 End every iteration with exactly these four lines:
 
 ```
-LOOP_SIGNAL: CONTINUE | ESCALATE
+EXIT: 0 | 1 | 2
 REASON: <one-line summary>
 ACTION_TYPE: PLAN | EXECUTE | REVIEW | CLOSE
 ACTION_ID: <phase.step>
