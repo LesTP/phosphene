@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from phosphene.gateway import DeliveryResult
-from phosphene.gateway import FeedbackSignal
+from toolkit.gateway import DeliveryResult
+from toolkit.gateway import FeedbackSignal
 import phosphene.feedback_collector as feedback_collector
 from phosphene.feedback_collector import (
     FeedbackCollector,

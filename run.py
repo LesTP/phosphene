@@ -38,7 +38,7 @@ if _TOOLKIT_PATH:
 
 from phosphene.attention_filter import AttentionFilter, AttentionFilterConfig
 from phosphene.distillation import DistillationConfig, DistillationEngine
-from phosphene.gateway import Gateway, GatewayConfig, PlatformConfig
+from toolkit.gateway import Gateway, GatewayConfig, PlatformConfig
 from phosphene.generator import GenerationPrompt, Generator, GeneratorConfig, RouterConfig
 from phosphene.memory_store import MemoryStore, MemoryStoreConfig
 from phosphene.orchestrator import (
@@ -423,7 +423,7 @@ def build_orchestrator(env: dict[str, str]) -> MVPOrchestrator:
     def _handle_inbound_message(message: object) -> None:
         """Route inbound messages: # prefix → ingestion, else → conversation."""
         from phosphene.memory_store.types import NoteInput
-        from phosphene.gateway.types import InboundMessage, OutboundMessage
+        from toolkit.gateway.types import InboundMessage, OutboundMessage
 
         if not hasattr(message, "content") or not message.content:
             return

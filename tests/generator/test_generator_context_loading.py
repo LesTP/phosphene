@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 import phosphene.generator.generator as generator_module
-from phosphene.gateway import InboundMessage
+from toolkit.gateway import InboundMessage
 from phosphene.generator import (
     EmptyPersonalityError,
     FreePlayTrigger,

@@ -14,7 +14,7 @@ from phosphene.distillation import (
     InsufficientDataError,
     NoPatternDataError,
 )
-from phosphene.gateway import DeliveryResult, InboundMessage
+from toolkit.gateway import DeliveryResult, InboundMessage
 from phosphene.generator import EmptyPersonalityError, GeneratorOutput, RouterConfig
 from phosphene.generator.types import TokenUsage
 from phosphene.orchestrator import (

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
-from phosphene.gateway import InboundMessage
+from toolkit.gateway import InboundMessage
 from phosphene.generator.errors import EmptyPersonalityError, LLMAPIError
 from phosphene.generator.types import (
     AmbientContext,

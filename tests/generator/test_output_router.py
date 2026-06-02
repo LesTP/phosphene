@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from phosphene.gateway import DeliveryResult, OutboundMessage
+from toolkit.gateway import DeliveryResult, OutboundMessage
 from phosphene.generator import GeneratorOutput, LengthThresholds, RouterConfig, route
 from phosphene.generator.types import TokenUsage
 

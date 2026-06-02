@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from phosphene.gateway import DeliveryResult, Gateway, OutboundMessage
+from toolkit.gateway import DeliveryResult, Gateway, OutboundMessage
 from phosphene.generator.types import GeneratorOutput, RouterConfig
 
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 import phosphene.generator.generator as generator_module
-from phosphene.gateway import DeliveryResult, OutboundMessage
+from toolkit.gateway import DeliveryResult, OutboundMessage
 from phosphene.generator import (
     GenerationPrompt,
     Generator,
