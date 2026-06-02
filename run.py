@@ -47,7 +47,7 @@ from phosphene.orchestrator import (
     ModuleRefs,
     ScheduleEntry,
 )
-from phosphene.source_ingestion import AdapterConfig, IngestionConfig, SourceIngestion
+from toolkit.source_ingestion import AdapterConfig, IngestionConfig, SourceIngestion
 
 
 DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"

@@ -7,7 +7,7 @@ for p in ["/mnt/passport/shared/toolkit/src", "../toolkit/src"]:
         break
 
 from phosphene.memory_store.vault import generate_note_id
-from phosphene.source_ingestion import SourceIngestion, IngestionConfig, AdapterConfig
+from toolkit.source_ingestion import SourceIngestion, IngestionConfig, AdapterConfig
 
 # Minimal env
 env = {}

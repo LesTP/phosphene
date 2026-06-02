@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 # Replicate what seed-direct does: poll adapters, filter, clean, generate IDs
-from phosphene.source_ingestion import SourceIngestion, IngestionConfig, AdapterConfig
+from toolkit.source_ingestion import SourceIngestion, IngestionConfig, AdapterConfig
 
 vault_path = Path("vault")
 params_common = {"marker_path": str(vault_path / ".source_markers_check.json")}

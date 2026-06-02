@@ -7,7 +7,7 @@ for p in ["/mnt/passport/shared/toolkit/src", "../toolkit/src"]:
         break
 
 from pathlib import Path
-from phosphene.source_ingestion import SourceIngestion
+from toolkit.source_ingestion import SourceIngestion
 
 # Use run.py's config builder
 exec(open("run.py").read().split("def main")[0])  # load imports and defaults
