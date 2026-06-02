@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from phosphene.feedback_collector import FeedbackCollector
+from toolkit.feedback_collector import FeedbackCollector
 from toolkit.gateway import DeliveryResult, FeedbackSignal, OutboundMessage
 from phosphene.generator import GeneratorOutput, RouterConfig, route
 from phosphene.generator.types import TokenUsage
@@ -112,7 +112,7 @@ def test_feedback_collector_round_trips_gateway_generator_and_memory_store(
 
 
 def test_feedback_collector_imports_alongside_public_boundary_types() -> None:
-    from phosphene.feedback_collector import (
+    from toolkit.feedback_collector import (
         FeedbackCollectorConfig,
         FeedbackEvent,
         OutputRecord,
