@@ -6,13 +6,13 @@
 |-----------|---------------|--------------|
 | Memory Store | Three-tier hierarchical memory (daily log → pattern layer → personality files). Index layer, density metrics, forgetting, versioned personality files. | none (leaf) |
 | Attention Filter | Personality-driven content selection and annotation. Prompt-to-structure transition. | toolkit/llm_client, toolkit/embedding, Memory Store (read: density metrics, existing notes) |
-| Source Ingestion | Adapters for Telegram channels, RSS, Reddit → normalized content items. | none (leaf per adapter) |
+| Source Ingestion | Adapters for Telegram channels, RSS, Reddit → normalized content items. **Moved to toolkit/source_ingestion on 2026-06-02.** | none (leaf per adapter) |
 | Distillation | Tier promotion: T1→T2 (RAPTOR-style clustering), T2→T3 (two-step reflect-evolve). | toolkit/clustering, toolkit/embedding, toolkit/llm_client, Memory Store |
-| Generator | Prompted and lateral-freedom generation from personality context. Intent-tagged output. | toolkit/llm_client, Memory Store (read: personality files, unresolved threads) |
+| Generator | Prompted and lateral-freedom generation from personality context. Intent-tagged output. | toolkit/llm_client, Memory Store (read: personality files, unresolved threads), toolkit/gateway (for InboundMessage type) |
 | Explorer | Link-following via Playwright, pre-fetch scoring, source evaluation protocol. | toolkit/embedding, toolkit/llm_client |
-| Gateway | Multi-platform message bus (inbound + outbound). Telegram + Discord. | toolkit/telegram_client, discord library |
-| Output Router | Maps generator output (intent_tag, mode) → platform + format + feedback affordance. | Gateway |
-| Feedback Collector | Normalizes signals from all platforms into common format. Intent-aware interpretation. | Memory Store (write: feedback events) |
+| Gateway | Multi-platform message bus (inbound + outbound). Telegram + Discord. **Moved to toolkit/gateway on 2026-06-02.** | toolkit/telegram_client, discord library |
+| Output Router | Maps generator output (intent_tag, mode) → platform + format + feedback affordance. | toolkit/gateway |
+| Feedback Collector | Normalizes signals from all platforms into common format. Intent-aware interpretation. **Moved to toolkit/feedback_collector on 2026-06-02.** Phosphene wires its `MemoryStore` as the memory writer (duck-typed contract). | Memory Store (write: feedback events) |
 | Scheduler | Activation management: cron triggers, tension-responsive frequency, lateral-freedom budget allocation, ambient stream assembly. | Memory Store (read: tension metrics) |
 | Orchestrator | Wires all modules. Manages activation lifecycle: trigger → load context → execute task → lateral opportunity → output → log. | All modules |
 | Reviewer Panel *(deferred — flexible scope, see below)* | Multi-model evaluation of Generator outputs against personality criteria. Produces signals for the Feedback Collector. | toolkit/llm_client (multiple model handles), Generator (consumes outputs), Memory Store (read: personality context for evaluation criteria) |
@@ -60,8 +60,8 @@ Explorer → [SourceProposal] → human approval → Source Ingestion config
 |-------|--------|-----------|--------|
 | 1 | Memory Store | Leaf. Everything depends on it. Three-tier CRUD, index layer, density metrics API. | Complete |
 | 2 | Attention Filter | First module that actively uses Memory Store. Tests density metrics. Core novel mechanism. | Complete |
-| 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Complete |
-| 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Complete |
+| 3 | Source Ingestion | Feeds the Attention Filter. Enables daily operation loop. Corpus adapters for initial import. | Complete — moved to toolkit/source_ingestion 2026-06 |
+| 4 | Gateway | Message bus for input and output. Needed before user-visible output. | Complete — moved to toolkit/gateway 2026-06 |
 | 5 | Generator + Output Router | First user-visible outputs. Prompted generation from personality context. | Complete |
 | 6 | Distillation | Core developmental mechanism. T1→T2 with RAPTOR, T2→T3 with reflect-evolve. | Complete |
 | 7 | Feedback Collector | Closes the loop. Connects platform signals back to Memory Store. | Phase 7.1 complete |
@@ -74,7 +74,7 @@ Modules 1–6 are complete. The MVP path (see PROJECT.md MVP Definition) require
 
 | Order | Module | MVP? | Status |
 |-------|--------|------|--------|
-| 7.1 | Feedback Collector (immediate) | No | Complete |
+| 7.1 | Feedback Collector (immediate) | No | Complete — moved to toolkit/feedback_collector 2026-06 |
 | 7.2 | Feedback Collector (delayed) | No | Not started |
 | MVP | Orchestrator (minimal) | **Yes** | Complete — ARCH_orchestrator_mvp.md |
 | 8 | Explorer | No | Not started |

@@ -15,6 +15,41 @@ Corpus → T1 (3,856 notes) → T2 (251 clusters) → T3 (7 personality files) �
 
 First output delivered to Telegram on 2026-05-14. Content is personality-specific, derived from 20+ years of corpus.
 
+---
+
+## Project Status: Paused as of 2026-06-02
+
+The MVP output was disappointing for two structural reasons:
+
+1. **False uncertainty.** "Unresolvedness" as built is a graph-topology metric (dangling links, low link-degree notes). Corpus seeding turned extraction artefacts — dead links, dangling references — into a phantom interior life that the personality machinery then operated on. The system constructed its own universe ruled by the extraction framing.
+2. **Generic LLM-sounding output.** T1 → T2 (RAPTOR clusters) → T3 (personality files) is a compression chain. By T3 we have abstractions of abstractions in summary register. Voice — the thing that makes writing have anyone's voice — is precisely what resists summarisation. RAPTOR was designed for retrieval over factual corpora; its objective is orthogonal to what we wanted out the other end.
+
+Decision: don't scrap, pause. Vault is preserved for future analysis (and the "skip T2/T3, retrieve raw T1, prompt thinly" test remains runnable from the vault as-is — a real falsification of the corpus-seeding hypothesis). A sibling project (assistant / zettelkasten hybrid, not yet built) will reuse the plumbing.
+
+### Migration log
+
+| Date | What moved | New home |
+|------|-----------|----------|
+| 2026-06-02 | `phosphene.gateway` | `toolkit.gateway` |
+| 2026-06-02 | `phosphene.source_ingestion` | `toolkit.source_ingestion` |
+| 2026-06-02 | `phosphene.feedback_collector` | `toolkit.feedback_collector` |
+
+These modules are no longer in `phosphene/src/phosphene/`. Phosphene imports them from `toolkit.<module>`. The `ARCH_<module>.md` files in Phosphene are stubs pointing at the toolkit ARCH equivalents. Public APIs unchanged. `feedback_collector` decoupled from `phosphene.memory_store` via internal duck-typed dataclasses; Phosphene's `MemoryStore` accepts them without changes (see `toolkit/ARCHITECTURE.md` D-4).
+
+`memory_store`, `attention_filter`, `distillation`, `generator`, `orchestrator`, `scoring` remain in Phosphene. `memory_store` is intentionally not lifted — it's too phosphene-domain-coupled (tiers, unresolvedness, friction, PersonalityContext baked into the public API and on-disk layout). A future "extract a thin `toolkit.note_store` primitive + leave Phosphene's tiered wrapper" pass is open as a Phase 2 question, not scheduled.
+
+### Relaunch criteria (informal)
+
+If Phosphene is ever picked back up, the things that would have to be true (or at least seriously considered):
+
+- A distillation approach that doesn't compress voice out of the corpus (e.g., retrieval-based generation that keeps raw T1 in the prompt instead of layering T3 abstractions)
+- A signal for "real" vs "extraction-artefact" unresolvedness, or dropping unresolvedness as a primary driver
+- Honest test of whether prompt-thinned corpus retrieval produces less generic output than the full distillation pipeline did
+
+---
+
+## What's Working (frozen snapshot)
+
 ### Modules Complete (7 of 9 + MVP Orchestrator)
 
 | Module | Status | Tests |
