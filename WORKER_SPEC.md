@@ -15,125 +15,128 @@ You are a **stateless worker** in an autonomous development loop.
 
 ---
 
-## 2. Cold Start — State Detection
+## 2. Cold Start
 
-Each invocation begins from scratch. Read three inputs:
-
-**From DEVPLAN frontmatter:**
-```yaml
----
-phase: 3b
-blocked: false
-state: execute
-steps_remaining: 0
----
-```
-
-**From the prompt (injected by the runner):**
-- `STEPS_REMAINING: N` — max actions this invocation (default 1)
-- `STOP_BEFORE_REVIEW: true|false` — stop before entering review state (default false)
-- `ITERATION_JSONL: <path>` — log path for turn health check (codex only)
-
-**Cold start sequence:**
-1. Read `blocked` — if `true`, EXIT 1 immediately.
-2. Read `state` — determines the first action.
-3. Write `steps_remaining: STEPS_REMAINING` to DEVPLAN frontmatter (overwrite any stale value).
+Each invocation begins from scratch. Read the adapter file (CLAUDE.md or
+CODEX.md), follow its references to this spec and project docs, then enter
+the main loop (§3).
 
 No external state, no session memory, no inter-iteration side channels.
 
 ---
 
-## 3. Transition Table
+## 3. Main Loop
 
-After performing an action, the next state is determined by lookup — not judgment.
-
-```
-NEXT[state]:
-  plan    → execute
-  execute → review   IF no unchecked steps remain in DEVPLAN
-            execute  OTHERWISE
-  review  → close
-  close   → ∅       (terminal — close always exits)
-```
-
-"No unchecked steps remain" is the ONE judgment call in this table.
-The worker reads the step checklist in DEVPLAN after performing the action.
-Everything else is a counter, a boolean, or a table lookup.
-
-| State | What the action does |
-|-------|---------------------|
-| `plan` | Break the next phase into steps. Update DEVPLAN with step breakdown. |
-| `execute` | Do the next incomplete step. Run tests. Update DEVLOG. Commit. |
-| `review` | Review phase output against the architecture contract. Apply must-fix and should-fix items. |
-| `close` | Doc cleanup: DEVPLAN summary, DEVLOG entry, ARCHITECTURE.md status, contract propagation, gotchas promotion. |
-
-The `/close` bot command (or human) clears the gate: sets `blocked: false` and `state: plan`.
-
----
-
-## 4. Main Loop
-
-Follow this pseudocode literally. Do not interpret — execute.
+Before each action, call the state machine script. It reads DEVPLAN
+frontmatter, computes what to do, and outputs the decision. The worker
+does the work. All state transitions, budget tracking, and exit logic
+live in the script — not in your head.
 
 ```
-steps_done = 0
-
 LOOP:
-  perform_action(state)
-  steps_done += 1
-  commit changes, update DEVLOG and DEVPLAN
-
-  next = NEXT[state]                                  # §3 transition table
-
-  # ---- EXIT CHECK ---- first match wins, top to bottom ----
-
-  1. if state == "close"                               → set blocked=true, EXIT 0
-  2. if STOP_BEFORE_REVIEW and next == "review"        → EXIT 0  (keep state as-is)
-  3. if steps_done == STEPS_REMAINING                       → set state=next, EXIT 0
-  4. if ITERATION_JSONL and turns > steps_done × 50    → EXIT 2  "health check"
-
-  # ---- NO EXIT ---- continue to next action
-  state = next
-  write DEVPLAN { state, steps_remaining: STEPS_REMAINING - steps_done }
-  goto LOOP
+  1. output=$(bash tools/state_machine.sh)
+  2. ACTION = parse "ACTION:" from output
+     NEXT   = parse "NEXT:" from output
+  3. if ACTION == "EXIT" → emit exit signal, stop
+  4. perform the action (PLAN / EXECUTE / REVIEW / CLOSE)
+  5. if error → emit exit signal with EXIT 2, stop
+  6. commit changes, update DEVLOG and DEVPLAN
+  7. write state=$NEXT to DEVPLAN frontmatter:
+     sed -i "s/^state:.*/state: $NEXT/" DEVPLAN.md
+  8. goto 1
 ```
 
-### Exit check — why this order
+| ACTION | What the worker does |
+|--------|---------------------|
+| `PLAN` | Break the next phase into steps. Update DEVPLAN with step breakdown. |
+| `EXECUTE` | Do the next incomplete step. Run tests. Update DEVLOG. |
+| `REVIEW` | Review phase output against the architecture contract. Apply must-fix and should-fix items. |
+| `CLOSE` | Doc cleanup: DEVPLAN summary, DEVLOG entry, ARCHITECTURE.md status, contract propagation, gotchas promotion. |
+| `EXIT` | Emit exit signal and stop. Do not perform any action. |
 
-1. **Close is terminal.** Close sets `blocked=true` and exits regardless of
-   remaining budget. The phase gate is structural.
-2. **Stop-at boundary.** Fires even if budget remains. Keeps `state` as-is
-   (execute) so the next invocation starts at the review boundary on a
-   different backend.
-3. **Budget exhausted.** Writes `state=next` so the next invocation picks
-   up at the right point.
-4. **Health check.** Safety circuit breaker. Only fires if the worker is
-   spiraling (>50 turns per step). Normal steps use 20–45 turns.
+The script handles: blocked check, budget initialization and decrement,
+execute→review transition (when all steps are checked off), stop-before-review,
+and close→blocked. The worker never computes transitions or checks exit
+conditions — it reads ACTION/NEXT and does the work.
 
-### Turn health check detail
+### Loop discipline (critical)
 
-If `ITERATION_JSONL` was provided, check the turn count after each step:
+Two contracts you must NOT break. Both have already cost work in production loops.
+
+**1. Single call per iteration.** Call `state_machine.sh` exactly ONCE per loop iteration — at the top, before the action. Never re-call inside or after the action. The script decrements budget on every call. "Defensive" re-calls ("let me check the controller before touching files") drop a step.
+
+If your context feels fuzzy mid-action — long file read, session resume, internal recovery moment — assume the action the script dispatched is **still in flight** and complete it. Re-read your own previous tool output to reorient if needed. Only call `state_machine.sh` again after you have completed steps 4–7 of the LOOP (commit + DEVLOG + state-write).
+
+**2. Trust the script's verdict; never self-judge.** The script decides EXIT, REVIEW, EXECUTE, etc. — based on `STEP_BUDGET`, `STOP_BEFORE_REVIEW`, unchecked-steps count, and the `blocked` flag. Your job is to do what it returns and then call it again. Do NOT:
+
+- Pre-compute budget exhaustion (`"5 - 3 = exhausted, stopping"` is wrong arithmetic AND wrong process — `5 - 3 = 2`)
+- Decide on your own that REVIEW is next
+- Skip the call because "I know what it will say"
+
+If the script keeps returning EXECUTE and you have completed all named steps in the phase, that means an unchecked checkbox exists somewhere — check the DEVPLAN and resolve it, don't bypass the script.
+
+**Documented incidents these rules address (real production failures):**
+
+- *Codex iter:* re-called `state_machine.sh` after a 105k-char `cat` read; lost the final budgeted action (budget=8, only 7 actions performed).
+- *Claude iter:* self-judged "STEP_BUDGET of 5 exhausted (used 3 actions)" and exited with 2 actions still available.
+
+### Turn health check (Codex only)
+
+If `ITERATION_JSONL` was provided in the prompt, check the turn count
+after each action:
 
 ```bash
 grep -c '"item.completed"' "$ITERATION_JSONL"
 ```
 
-If total turns exceed `steps_done × 50`, EXIT 2 with a reason explaining
-which step was expensive.
+If total turns exceed `steps_completed × 50`, EXIT 2 with a reason.
+This is a safety circuit breaker, not the budgeting mechanism.
 
-### Budget of 1
+The `/close` bot command (or human) clears the gate: sets `blocked: false`
+and `state: plan`.
 
-When `STEPS_REMAINING` is 1 (the default), the loop executes exactly one action and
-exits via rule 3. This is identical to the original one-action-per-invocation
-model.
+### Shell command discipline (non-interactive only)
+
+The loop invokes bash non-interactively — no stdin, no editor, no human at the
+keyboard. Any command that waits for input, opens `$EDITOR`, or pipes through
+a pager will **hang the loop indefinitely** until the operator manually kills
+the process tree.
+
+**Git — banned (always hang):**
+
+- `git add -p` / `git add --patch` — interactive hunk staging, no scriptable equivalent. Use `git add <paths>` to stage whole files.
+- `git commit` without `-m` — opens `$EDITOR`. Always pass `-m "..."`. For amends: `git commit --amend -m "..."` or `git commit --amend --no-edit`.
+- `git rebase -i` / `git rebase --interactive` — opens `$EDITOR`. Use `git rebase --autosquash` or scripted edits.
+- `git citool` / `git gui` — GUI tools, never available.
+- Any subcommand that opens an editor without a message-override flag.
+
+**Git — pager-bypass on potentially-long reads:**
+
+- `git --no-pager log`, `git --no-pager diff`, `git --no-pager show`. Otherwise git auto-pipes through `less`, which blocks on stdin.
+
+**Other shells — common offenders:**
+
+- Interactive editors (`nano`, `vim`, `vi`, `emacs`) — use `sed -i '...'` or heredocs (`cat > file <<'EOF' ... EOF`) for non-interactive edits.
+- Pagers (`less`, `more`, `man`) — pipe through `cat` or set `PAGER=cat`.
+- `read` (bash builtin) — by definition waits on stdin.
+- `sudo` without `-n` or a NOPASSWD config entry — waits for a password prompt.
+- `ssh` without `-o BatchMode=yes` — may prompt for host-key acceptance or a password.
+
+**If you need to stage only part of a file's diff:** don't reach for `git add -p`
+as a workaround — there's no way for the loop to provide hunk-by-hunk stdin.
+Instead, split the change into separate edits so each file change is a discrete
+commit's worth, or revert unwanted parts with `git restore <file>` before
+`git add <file>`. The working tree is the source of truth; shape it correctly
+before staging.
 
 ---
 
-## 5. Document Discipline
+## 4. Document Discipline
 
 Every iteration that modifies project state must leave an auditable trail:
 
-- **DEVPLAN.md** — update `state` transitions, `steps_remaining`, mark step completions.
+- **DEVPLAN.md** — mark step completions. State transitions are written
+  by the worker (`state=$NEXT` from the script) after each action.
 - **DEVLOG.md** — append a dated entry at the bottom (newest last).
 - **DECISIONS.md** — log non-trivial decisions with rationale.
 - **ARCHITECTURE.md** — update implementation sequence status on phase close.
@@ -142,23 +145,22 @@ Read docs **immediately before editing** — stale reads cause lost updates.
 
 ---
 
-## 6. Escalation Conditions
+## 5. Escalation Conditions
 
-These are judgment calls made DURING `perform_action()`, not part of the
-mechanical exit check in §4. When any fires, EXIT 2 with a reason.
+These are judgment calls made DURING the action, not part of the
+state machine script. When any fires, EXIT 2 with a reason.
 
-- `blocked` is `true` (EXIT 1 on cold start — §2)
 - 3 consecutive failures on the same problem
 - Work regime shifts to Refine or Explore
 - Scope needs to expand beyond the defined phase
 - Contract change would affect other modules
 - All modules complete
 - Unclear or contradictory spec
-- Turn health check exceeded (§4, rule 4)
+- Turn health check exceeded (§3)
 
 ---
 
-## 7. Output Contract
+## 6. Output Contract
 
 The **final lines** of every invocation must be:
 
@@ -181,7 +183,7 @@ The runner uses exit code + DEVPLAN state for control decisions, not these field
 
 ---
 
-## 8. Autonomous Behavioral Rules
+## 7. Autonomous Behavioral Rules
 
 These rules supplement GOVERNANCE.md for autonomous execution:
 
@@ -192,7 +194,7 @@ These rules supplement GOVERNANCE.md for autonomous execution:
 
 ---
 
-## 9. Prohibitions
+## 8. Prohibitions
 
 - Do **not** read files outside the project directory.
 - Do **not** modify files outside the project directory.
